@@ -3,6 +3,22 @@
 import { useState, useTransition } from "react";
 import { setSectionAction } from "@/lib/actions/admin";
 
+const LABELS: Record<string, string> = {
+  hero: "Hero banner",
+  stats: "Statistics",
+  services: "Services",
+  pricing: "Pricing plans",
+  trainers: "Trainers",
+  gallery: "Gallery",
+  videos: "Videos",
+  testimonials: "Testimonials",
+  hours: "Opening hours",
+  reviews: "Google reviews",
+  contact: "Join / Contact form",
+  popup: "Popup offer",
+  footer: "Footer",
+};
+
 export function SectionToggle({
   sectionKey,
   enabled,
@@ -12,12 +28,13 @@ export function SectionToggle({
 }) {
   const [on, setOn] = useState(enabled);
   const [pending, startTransition] = useTransition();
+  const label = LABELS[sectionKey] || sectionKey.replaceAll("_", " ");
 
   return (
     <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-charcoal/40 px-4 py-4">
       <div>
-        <p className="capitalize text-white">{sectionKey}</p>
-        <p className="text-xs text-muted">Show on public website</p>
+        <p className="text-white">{label}</p>
+        <p className="text-xs text-muted">Show this block on the public website</p>
       </div>
       <button
         type="button"
@@ -33,6 +50,7 @@ export function SectionToggle({
           on ? "bg-gold" : "bg-white/15"
         }`}
         aria-pressed={on}
+        aria-label={`${on ? "Hide" : "Show"} ${label}`}
       >
         <span
           className={`absolute top-1 h-6 w-6 rounded-full bg-black transition ${

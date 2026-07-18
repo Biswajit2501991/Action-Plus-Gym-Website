@@ -1,14 +1,39 @@
 import { getSiteContent } from "@/lib/cms/get-site-content";
-import { JsonCollectionEditor } from "@/components/admin/JsonCollectionEditor";
+import { ItemListEditor } from "@/components/admin/ItemListEditor";
 
 export default async function WebsiteGalleryPage() {
   const content = await getSiteContent();
   return (
-    <JsonCollectionEditor
+    <ItemListEditor
       title="Gallery"
-      description="Photo URLs for the gallery. Include image_url, alt_text, sort_order."
-      initialData={content.gallery}
+      description="Photos for the website gallery. Paste image links and a short alt text."
       table="website_gallery_images"
+      itemLabel="Photo"
+      initialRows={content.gallery}
+      createEmpty={() => ({
+        album_id: null,
+        image_url: "",
+        alt_text: "",
+        sort_order: 0,
+        is_active: true,
+      })}
+      fields={[
+        {
+          key: "image_url",
+          label: "Image URL",
+          type: "url",
+          fullWidth: true,
+          placeholder: "https://...",
+        },
+        {
+          key: "alt_text",
+          label: "Photo description",
+          type: "text",
+          fullWidth: true,
+          placeholder: "Gym floor",
+        },
+        { key: "is_active", label: "Show on website", type: "toggle" },
+      ]}
     />
   );
 }

@@ -3,6 +3,14 @@
 import { useState, useTransition } from "react";
 import { savePopupAction } from "@/lib/actions/admin";
 import type { PopupOffer } from "@/lib/types";
+import {
+  AdminPageHeader,
+  Field,
+  SaveBar,
+  TextInput,
+  TextTextarea,
+  Toggle,
+} from "@/components/admin/form-ui";
 
 export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
   const [form, setForm] = useState({
@@ -28,9 +36,10 @@ export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
 
   return (
     <form
-      className="grid max-w-2xl gap-4"
+      className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
+        setMsg(null);
         startTransition(async () => {
           await savePopupAction({
             ...form,
@@ -38,65 +47,85 @@ export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
               ? new Date(form.expires_at).toISOString()
               : "",
           });
-          setMsg("Popup saved.");
+          setMsg("Popup offer saved.");
         });
       }}
     >
-      <label className="flex items-center gap-3 text-sm text-white">
-        <input
-          type="checkbox"
-          checked={form.enabled}
-          onChange={(e) => set("enabled", e.target.checked)}
-        />
-        Enable popup
-      </label>
-      {(
-        [
-          ["title", "Title"],
-          ["body", "Body"],
-          ["image_url", "Image URL"],
-          ["button_text", "Button text"],
-          ["button_href", "Button link"],
-          ["bg_color", "Background colour"],
-          ["accent_color", "Accent colour"],
-          ["text_color", "Text colour"],
-        ] as const
-      ).map(([key, label]) => (
-        <label key={key} className="block text-sm">
-          <span className="mb-1 block text-muted">{label}</span>
-          {key === "body" ? (
-            <textarea
-              value={form[key]}
-              onChange={(e) => set(key, e.target.value)}
-              rows={3}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2"
-            />
-          ) : (
-            <input
-              value={form[key]}
-              onChange={(e) => set(key, e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2"
-            />
-          )}
-        </label>
-      ))}
-      <label className="block text-sm">
-        <span className="mb-1 block text-muted">Expiry (optional)</span>
-        <input
-          type="datetime-local"
-          value={form.expires_at}
-          onChange={(e) => set("expires_at", e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2"
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
-      >
-        {pending ? "Saving..." : "Save popup"}
-      </button>
-      {msg ? <p className="text-sm text-emerald-300">{msg}</p> : null}
+      <AdminPageHeader
+        title="Popup Offer"
+        description="Welcome popup shown to visitors. Turn it off anytime."
+      />
+
+      <div className="grid max-w-3xl gap-3 rounded-2xl border border-white/10 bg-charcoal/40 p-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <Toggle
+            label="Show popup on website"
+            hint="When off, visitors will not see this offer"
+            checked={form.enabled}
+            onChange={(next) => set("enabled", next)}
+          />
+        </div>
+        <Field label="Title" className="md:col-span-2">
+          <TextInput
+            value={form.title}
+            onChange={(e) => set("title", e.target.value)}
+          />
+        </Field>
+        <Field label="Message" className="md:col-span-2">
+          <TextTextarea
+            rows={3}
+            value={form.body}
+            onChange={(e) => set("body", e.target.value)}
+          />
+        </Field>
+        <Field label="Image URL" className="md:col-span-2">
+          <TextInput
+            value={form.image_url}
+            onChange={(e) => set("image_url", e.target.value)}
+            placeholder="https://..."
+          />
+        </Field>
+        <Field label="Button text">
+          <TextInput
+            value={form.button_text}
+            onChange={(e) => set("button_text", e.target.value)}
+          />
+        </Field>
+        <Field label="Button link">
+          <TextInput
+            value={form.button_href}
+            onChange={(e) => set("button_href", e.target.value)}
+            placeholder="#join"
+          />
+        </Field>
+        <Field label="Background colour">
+          <TextInput
+            value={form.bg_color}
+            onChange={(e) => set("bg_color", e.target.value)}
+          />
+        </Field>
+        <Field label="Accent colour">
+          <TextInput
+            value={form.accent_color}
+            onChange={(e) => set("accent_color", e.target.value)}
+          />
+        </Field>
+        <Field label="Text colour">
+          <TextInput
+            value={form.text_color}
+            onChange={(e) => set("text_color", e.target.value)}
+          />
+        </Field>
+        <Field label="Expiry (optional)">
+          <TextInput
+            type="datetime-local"
+            value={form.expires_at}
+            onChange={(e) => set("expires_at", e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <SaveBar pending={pending} message={msg} label="Save popup" />
     </form>
   );
 }
