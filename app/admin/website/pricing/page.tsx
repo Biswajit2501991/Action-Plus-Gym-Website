@@ -6,7 +6,7 @@ export default async function WebsitePricingPage() {
   return (
     <JsonCollectionEditor
       title="Pricing"
-      description="Membership plans in Indian Rupees (e.g. price: \"₹1,499\"). features should be an array of strings."
+      description="Membership plans in Indian Rupees (example price: Rs 1,499). features should be an array of strings."
       initialData={content.pricing}
       table="website_pricing_plans"
     />

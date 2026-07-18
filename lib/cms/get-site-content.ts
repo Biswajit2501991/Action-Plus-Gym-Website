@@ -1,6 +1,7 @@
 import { GYM_ID } from "@/lib/config";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { fallbackContent } from "@/lib/cms/fallback";
+import { ensureFreshReviews } from "@/lib/reviews/sync";
 import type {
   GalleryImage,
   HeroSlide,
@@ -148,7 +149,10 @@ export async function getSiteContent(): Promise<SiteContent> {
       videos: (videosRes.data as VideoItem[]) ?? [],
       testimonials: (testimonialsRes.data as Testimonial[]) ?? [],
       hours: (hoursRes.data as OpeningHour[]) ?? [],
-      reviews: (reviewsRes.data as ReviewCache) ?? null,
+      reviews: await ensureFreshReviews(
+        (reviewsRes.data as (ReviewCache & { updated_at?: string }) | null) ??
+          null,
+      ),
     };
   } catch {
     return fallbackContent;

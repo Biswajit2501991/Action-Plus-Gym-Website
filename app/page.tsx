@@ -17,6 +17,8 @@ import { PopupOffer } from "@/components/site/PopupOffer";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { SITE_URL } from "@/lib/config";
 
+export const revalidate = 3600;
+
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getSiteContent();
   return {

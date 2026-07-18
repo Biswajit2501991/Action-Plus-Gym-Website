@@ -11,7 +11,15 @@ SUPABASE_SERVICE_ROLE_KEY=<optional service role for privileged ops>
 ADMIN_SESSION_SECRET=<long random string 32+ chars>
 NEXT_PUBLIC_SITE_URL=https://actionplusgym.com
 NEXT_PUBLIC_GYM_ID=48815df4-6144-40dd-bbd6-91fd8522d1ff
+
+# Optional — live Google reviews on the homepage slider
+GOOGLE_PLACES_API_KEY=<Google Cloud Places API key>
+GOOGLE_PLACE_ID=<optional Place ID; otherwise text search is used>
+GOOGLE_PLACE_QUERY=Action Plus Gym and Fitness Club Adra West Bengal
+NEXT_PUBLIC_GOOGLE_REVIEWS_URL=https://www.google.com/search?q=Action+Plus+Gym+and+Fitness+Club+Reviews
 ```
+
+Enable **Places API (New)** in Google Cloud. The homepage shows up to 10 top reviews in a slider; after the 10th slide a **Check Google Reviews** button opens your Google listing. Reviews refresh automatically about every 6 hours when the API key is set.
 
 ## 2. Deploy on Railway
 
