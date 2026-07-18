@@ -1,0 +1,3 @@
+-- Seed applied via MCP for Action Plus gym_id 48815df4-6144-40dd-bbd6-91fd8522d1ff
+-- Kept for repo history / re-seeding new environments.
+-- See docs/DEPLOY_RAILWAY.md
