@@ -7,10 +7,10 @@ function parseTimeToMinutes(time: string) {
 
 export function getOpenStatus(
   hours: OpeningHour[],
-  timezone = "Australia/Sydney",
+  timezone = "Asia/Kolkata",
 ) {
   const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-AU", {
+  const parts = new Intl.DateTimeFormat("en-IN", {
     timeZone: timezone,
     weekday: "short",
     hour: "2-digit",

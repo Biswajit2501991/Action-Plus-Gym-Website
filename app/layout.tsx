@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${syne.variable} ${dmSans.variable}`}>
+    <html lang="en-IN" className={`${syne.variable} ${dmSans.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );

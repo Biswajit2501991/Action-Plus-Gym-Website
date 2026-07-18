@@ -6,13 +6,13 @@ export const fallbackContent: SiteContent = {
     gym_id: GYM_ID,
     site_name: "Action Plus Gym",
     tagline: "Train Harder. Live Stronger.",
-    phone: "+61 400 000 000",
+    phone: "+91 90000 00000",
     email: "info@actionplusgym.com",
-    whatsapp: "61400000000",
-    address: "Your Street Address, City, NSW",
+    whatsapp: "919000000000",
+    address: "Action Plus Gym, Adra, West Bengal, India",
     map_embed_url: "",
     google_reviews_url: "https://www.google.com/maps",
-    timezone: "Australia/Sydney",
+    timezone: "Asia/Kolkata",
     socials: {
       instagram: "https://instagram.com",
       facebook: "https://facebook.com",
@@ -179,7 +179,7 @@ export const fallbackContent: SiteContent = {
       id: 1,
       name: "Monthly",
       period: "monthly",
-      price: "$49",
+      price: "₹1,499",
       description: "Flexible month-to-month access.",
       features: ["Full gym access", "Group classes", "Locker rooms"],
       is_featured: false,
@@ -192,7 +192,7 @@ export const fallbackContent: SiteContent = {
       id: 2,
       name: "Quarterly",
       period: "quarterly",
-      price: "$129",
+      price: "₹3,999",
       description: "Best balance of value and commitment.",
       features: [
         "Full gym access",
@@ -210,7 +210,7 @@ export const fallbackContent: SiteContent = {
       id: 3,
       name: "Yearly",
       period: "yearly",
-      price: "$449",
+      price: "₹12,999",
       description: "Maximum savings for serious athletes.",
       features: [
         "Full gym access",
@@ -424,7 +424,7 @@ export const fallbackContent: SiteContent = {
       {
         author: "Daniel P.",
         rating: 5,
-        text: "Best gym experience I have had in Sydney.",
+        text: "Best gym experience I have had in Adra.",
         relative_time: "1 month ago",
       },
       {

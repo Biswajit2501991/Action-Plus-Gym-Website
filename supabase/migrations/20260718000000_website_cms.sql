@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.website_settings (
   address text DEFAULT '',
   map_embed_url text DEFAULT '',
   google_reviews_url text DEFAULT '',
-  timezone text NOT NULL DEFAULT 'Australia/Sydney',
+  timezone text NOT NULL DEFAULT 'Asia/Kolkata',
   socials jsonb NOT NULL DEFAULT '{}'::jsonb,
   seo_title text DEFAULT 'Action Plus Gym | Premium Fitness',
   seo_description text DEFAULT 'Premium gym training, personal coaching, and world-class facilities.',

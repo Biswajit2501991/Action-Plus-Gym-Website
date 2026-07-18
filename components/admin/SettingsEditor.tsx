@@ -4,6 +4,12 @@ import { useState, useTransition } from "react";
 import { saveSettingsAction } from "@/lib/actions/admin";
 import type { WebsiteSettings } from "@/lib/types";
 
+const TIMEZONES = [
+  { value: "Asia/Kolkata", label: "India (IST — Asia/Kolkata)" },
+  { value: "Asia/Calcutta", label: "India (Asia/Calcutta)" },
+  { value: "UTC", label: "UTC" },
+] as const;
+
 export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
   const [form, setForm] = useState({
     site_name: settings.site_name,
@@ -14,7 +20,7 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
     address: settings.address,
     map_embed_url: settings.map_embed_url,
     google_reviews_url: settings.google_reviews_url,
-    timezone: settings.timezone,
+    timezone: settings.timezone || "Asia/Kolkata",
     seo_title: settings.seo_title,
     seo_description: settings.seo_description,
     seo_og_image: settings.seo_og_image,
@@ -59,9 +65,26 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
           <span className="mb-1 block capitalize text-muted">
             {key.replaceAll("_", " ")}
           </span>
-          {key.includes("description") ||
-          key.includes("subheadline") ||
-          key === "address" ? (
+          {key === "timezone" ? (
+            <select
+              value={value}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, timezone: e.target.value }))
+              }
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2"
+            >
+              {!TIMEZONES.some((tz) => tz.value === value) ? (
+                <option value={value}>{value}</option>
+              ) : null}
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          ) : key.includes("description") ||
+            key.includes("subheadline") ||
+            key === "address" ? (
             <textarea
               value={value}
               onChange={(e) =>
