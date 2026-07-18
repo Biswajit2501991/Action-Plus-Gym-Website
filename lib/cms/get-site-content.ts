@@ -126,35 +126,63 @@ export async function getSiteContent(): Promise<SiteContent> {
       sections[row.section_key] = row.enabled;
     }
 
-    const pricing = (pricingRes.data ?? []).map((p) => ({
-      ...p,
-      features: Array.isArray(p.features)
-        ? p.features
-        : typeof p.features === "string"
-          ? JSON.parse(p.features)
-          : [],
-    })) as PricingPlan[];
+    const pricing = (pricingRes.data ?? []).map((p) => {
+      let features: string[] = [];
+      try {
+        features = Array.isArray(p.features)
+          ? p.features.map(String)
+          : typeof p.features === "string"
+            ? (JSON.parse(p.features) as unknown[]).map(String)
+            : [];
+      } catch {
+        features = [];
+      }
+      return { ...p, features };
+    }) as PricingPlan[];
+
+    let reviews: ReviewCache | null = null;
+    try {
+      reviews = await ensureFreshReviews(
+        (reviewsRes.data as (ReviewCache & { updated_at?: string }) | null) ??
+          null,
+      );
+    } catch (error) {
+      console.error("ensureFreshReviews failed", error);
+      reviews =
+        (reviewsRes.data as ReviewCache | null) ?? fallbackContent.reviews;
+    }
+
+    if (reviews) {
+      reviews = {
+        overall_rating: Number(reviews.overall_rating) || 0,
+        total_reviews: Number(reviews.total_reviews) || 0,
+        google_url: reviews.google_url || "",
+        reviews: Array.isArray(reviews.reviews) ? reviews.reviews : [],
+      };
+    }
 
     return {
       settings: settingsRes.data as WebsiteSettings,
       sections,
       popup: (popupRes.data as PopupOffer) ?? null,
-      heroSlides: (slidesRes.data as HeroSlide[]) ?? [],
+      heroSlides: ((slidesRes.data as HeroSlide[]) ?? []).filter(
+        (s) => Boolean(s?.image_url),
+      ),
       stats: (statsRes.data as StatItem[]) ?? [],
       services: (servicesRes.data as ServiceItem[]) ?? [],
       pricing,
       trainers: (trainersRes.data as Trainer[]) ?? [],
       albums: (albumsRes.data as GalleryAlbum[]) ?? [],
-      gallery: (galleryRes.data as GalleryImage[]) ?? [],
+      gallery: ((galleryRes.data as GalleryImage[]) ?? []).filter((g) =>
+        Boolean(g?.image_url),
+      ),
       videos: (videosRes.data as VideoItem[]) ?? [],
       testimonials: (testimonialsRes.data as Testimonial[]) ?? [],
       hours: (hoursRes.data as OpeningHour[]) ?? [],
-      reviews: await ensureFreshReviews(
-        (reviewsRes.data as (ReviewCache & { updated_at?: string }) | null) ??
-          null,
-      ),
+      reviews,
     };
-  } catch {
+  } catch (error) {
+    console.error("getSiteContent failed", error);
     return fallbackContent;
   }
 }

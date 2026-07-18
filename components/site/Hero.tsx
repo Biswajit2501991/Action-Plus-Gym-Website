@@ -13,21 +13,22 @@ export function Hero({
   settings: WebsiteSettings;
   slides: HeroSlide[];
 }) {
+  const safeSlides = slides.filter((s) => Boolean(s?.image_url));
   const [index, setIndex] = useState(0);
-  const active = slides[index] ?? slides[0];
+  const active = safeSlides[index] ?? safeSlides[0];
 
   useEffect(() => {
-    if (slides.length < 2) return;
+    if (safeSlides.length < 2) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
+      setIndex((i) => (i + 1) % safeSlides.length);
     }, 6000);
     return () => clearInterval(id);
-  }, [slides.length]);
+  }, [safeSlides.length]);
 
   return (
     <section className="relative min-h-[100svh] overflow-hidden">
       <AnimatePresence mode="wait">
-        {active ? (
+        {active?.image_url ? (
           <motion.div
             key={active.id + active.image_url}
             initial={{ opacity: 0, scale: 1.06 }}
@@ -45,7 +46,9 @@ export function Hero({
               sizes="100vw"
             />
           </motion.div>
-        ) : null}
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-black via-[#1a1408] to-black" />
+        )}
       </AnimatePresence>
 
       <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black" />

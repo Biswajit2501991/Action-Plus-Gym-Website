@@ -65,11 +65,16 @@ export async function syncGoogleReviewsCache(
 export async function ensureFreshReviews(
   existing?: ReviewsRow | null,
 ): Promise<ReviewCache | null> {
-  if (!process.env.GOOGLE_PLACES_API_KEY?.trim()) {
+  try {
+    if (!process.env.GOOGLE_PLACES_API_KEY?.trim()) {
+      return existing ?? null;
+    }
+    if (existing && !isStale(existing.updated_at)) {
+      return existing;
+    }
+    return (await syncGoogleReviewsCache(existing)) ?? existing ?? null;
+  } catch (error) {
+    console.error("ensureFreshReviews failed", error);
     return existing ?? null;
   }
-  if (existing && !isStale(existing.updated_at)) {
-    return existing;
-  }
-  return (await syncGoogleReviewsCache(existing)) ?? existing ?? null;
 }

@@ -10,7 +10,10 @@ import type { ReviewCache } from "@/lib/types";
 const AUTO_MS = 5200;
 
 export function Reviews({ reviews }: { reviews: ReviewCache }) {
-  const slides = reviews.reviews.slice(0, 10);
+  const slides = (Array.isArray(reviews.reviews) ? reviews.reviews : []).slice(
+    0,
+    10,
+  );
   // Final slide index = slides.length (CTA after the last review)
   const total = slides.length + 1;
   const [index, setIndex] = useState(0);
