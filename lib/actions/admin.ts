@@ -9,7 +9,8 @@ import {
   isOwnerRole,
   setAdminCookie,
 } from "@/lib/auth/session";
-import { createAnonServerClient, createServerClient } from "@/lib/supabase/server";
+import { createAnonServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service";
 import type { WebsiteMedia } from "@/lib/types";
 import {
   MAX_IMAGE_BYTES,
@@ -213,15 +214,12 @@ export async function uploadWebsiteMediaAction(formData: FormData) {
   const clean = safeFileName(file.name) || `${kind}-${stamp}`;
   const storagePath = `gyms/${gymId}/${kind}/${stamp}-${clean}`;
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-    return {
-      ok: false as const,
-      error:
-        "Uploads need SUPABASE_SERVICE_ROLE_KEY in Railway Variables (Supabase → Project Settings → API → service_role).",
-    };
+  const service = createServiceRoleClient();
+  if (!service.ok) {
+    return { ok: false as const, error: service.error };
   }
+  const supabase = service.client;
 
-  const supabase = createServerClient();
   const buffer = Buffer.from(await file.arrayBuffer());
   const { error: uploadError } = await supabase.storage
     .from(WEBSITE_MEDIA_BUCKET)
@@ -232,7 +230,15 @@ export async function uploadWebsiteMediaAction(formData: FormData) {
 
   if (uploadError) {
     console.error("uploadWebsiteMediaAction storage", uploadError);
-    return { ok: false as const, error: uploadError.message || "Upload failed." };
+    const msg = uploadError.message || "Upload failed.";
+    if (/invalid compact jws/i.test(msg)) {
+      return {
+        ok: false as const,
+        error:
+          "Invalid Compact JWS — Railway SUPABASE_SERVICE_ROLE_KEY is wrong. In Supabase → Project Settings → API, copy service_role (secret), paste into Railway Variables, redeploy.",
+      };
+    }
+    return { ok: false as const, error: msg };
   }
 
   const { data: pub } = supabase.storage

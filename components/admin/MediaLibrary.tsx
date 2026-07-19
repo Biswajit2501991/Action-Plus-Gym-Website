@@ -152,7 +152,14 @@ export function MediaLibrary({
             {pending ? "Uploading…" : "Click to upload images or videos"}
           </p>
           <p className="mt-2 text-xs text-muted">
-            Images up to 10 MB · Videos up to 50 MB · Saved to Supabase Storage + database
+            Images up to 10 MB · Videos up to 50 MB · Saved to Supabase Storage +
+            database
+          </p>
+          <p className="mt-2 max-w-lg text-[11px] text-white/45">
+            Uploads need Railway variable{" "}
+            <span className="text-white/70">SUPABASE_SERVICE_ROLE_KEY</span> =
+            Supabase <span className="text-white/70">service_role</span> key
+            (not JWT Secret, not anon key).
           </p>
         </label>
         {msg ? <p className="mt-3 text-sm text-emerald-300">{msg}</p> : null}
