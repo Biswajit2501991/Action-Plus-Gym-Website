@@ -4,6 +4,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { LeadForm } from "@/components/site/LeadForm";
 import { FloatingActions } from "@/components/site/FloatingActions";
+import { isGoogleMapsEmbedUrl } from "@/lib/maps";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -59,16 +60,21 @@ export default async function ContactPage() {
                   WhatsApp Us
                 </a>
               ) : null}
-              {settings.map_embed_url ? (
+              {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
                 <iframe
                   title="Map"
                   src={settings.map_embed_url}
                   className="mt-4 h-64 w-full rounded-2xl border-0"
                   loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
                 />
               ) : (
-                <div className="mt-4 flex h-64 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-muted">
-                  Add a Google Maps embed URL in admin settings.
+                <div className="mt-4 flex h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-4 text-center text-sm text-muted">
+                  <p>Map needs a Google Maps embed link (not a search or reviews page).</p>
+                  <p className="text-xs">
+                    Admin → Contact &amp; Brand → Google Maps embed URL
+                  </p>
                 </div>
               )}
             </div>

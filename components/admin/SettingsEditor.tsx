@@ -150,11 +150,15 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
               onChange={(e) => set("address", e.target.value)}
             />
           </Field>
-          <Field label="Google Maps embed URL" className="md:col-span-2">
+          <Field
+            label="Google Maps embed URL"
+            className="md:col-span-2"
+            hint="Must be an embed link. Google Maps → Share → Embed a map → copy src= URL. Do not paste Search or Reviews links."
+          >
             <TextInput
               value={form.map_embed_url}
               onChange={(e) => set("map_embed_url", e.target.value)}
-              placeholder="https://www.google.com/maps/embed?..."
+              placeholder="https://www.google.com/maps/embed?pb=..."
             />
           </Field>
           <Field label="Google reviews page URL" className="md:col-span-2">
