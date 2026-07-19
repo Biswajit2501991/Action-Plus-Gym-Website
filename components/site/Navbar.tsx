@@ -12,7 +12,6 @@ const links = [
   { href: "#trainers", label: "Trainers" },
   { href: "#gallery", label: "Gallery" },
   { href: "#reviews", label: "Reviews" },
-  { href: "/contact", label: "Contact" },
 ];
 
 export function Navbar({ brand }: { brand: string }) {
@@ -48,9 +47,14 @@ export function Navbar({ brand }: { brand: string }) {
               {l.label}
             </Link>
           ))}
-          <Button href="#join" className="!py-2.5 !text-xs">
-            Join Now
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button href="/contact" className="!py-2.5 !text-xs">
+              Contact
+            </Button>
+            <Button href="#join" className="!py-2.5 !text-xs">
+              Join Now
+            </Button>
+          </div>
         </nav>
 
         <button
@@ -76,6 +80,9 @@ export function Navbar({ brand }: { brand: string }) {
                 {l.label}
               </Link>
             ))}
+            <Button href="/contact" onClick={() => setOpen(false)}>
+              Contact
+            </Button>
             <Button href="#join" onClick={() => setOpen(false)}>
               Join Now
             </Button>
