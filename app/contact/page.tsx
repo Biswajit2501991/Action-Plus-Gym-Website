@@ -23,8 +23,12 @@ export default async function ContactPage() {
       <Navbar brand={settings.site_name} />
       <main className="pt-28">
         <section className="container-site px-5 pb-14 md:px-8">
-          <div className="grid items-stretch gap-6 md:grid-cols-2 md:gap-8">
-            <div className="flex min-h-0 flex-col">
+          {/*
+            Mobile: stacked Contact block first, then Join.
+            Desktop: two equal columns side by side.
+          */}
+          <div className="flex flex-col gap-10 md:grid md:grid-cols-2 md:items-stretch md:gap-8">
+            <div className="order-1 flex min-h-0 flex-col">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
                 Contact
               </p>
@@ -34,7 +38,7 @@ export default async function ContactPage() {
               <p className="mt-3 min-h-[2.5rem] text-sm text-muted">
                 Visit us in Adra, call, or message — we&apos;re here to help you start.
               </p>
-              <div className="mt-6 flex min-h-[34rem] flex-1 flex-col space-y-4 rounded-3xl border border-white/10 bg-charcoal/50 p-6 text-sm text-white/80">
+              <div className="mt-6 flex min-h-[28rem] flex-1 flex-col space-y-4 rounded-3xl border border-white/10 bg-charcoal/50 p-6 text-sm text-white/80 md:min-h-[34rem]">
                 <p>
                   <span className="text-muted">Address</span>
                   <br />
@@ -64,7 +68,7 @@ export default async function ContactPage() {
                     WhatsApp Us
                   </a>
                 ) : null}
-                <div className="mt-auto h-64 w-full overflow-hidden rounded-2xl border border-white/10 md:h-72">
+                <div className="mt-auto h-56 w-full overflow-hidden rounded-2xl border border-white/10 md:h-72">
                   {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
                     <iframe
                       title="Map"
@@ -86,7 +90,7 @@ export default async function ContactPage() {
               </div>
             </div>
 
-            <div id="join" className="flex min-h-0 flex-col">
+            <div id="join" className="order-2 flex min-h-0 flex-col">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
                 Join
               </p>
@@ -96,7 +100,7 @@ export default async function ContactPage() {
               <p className="mt-3 min-h-[2.5rem] text-sm text-muted">
                 We respond quickly during opening hours.
               </p>
-              <div className="mt-6 flex min-h-[34rem] flex-1 flex-col rounded-3xl border border-white/10 bg-charcoal/50 p-6 md:p-8">
+              <div className="mt-6 flex min-h-[28rem] flex-1 flex-col rounded-3xl border border-white/10 bg-charcoal/50 p-6 md:min-h-[34rem] md:p-8">
                 <LeadForm
                   embedded
                   defaultSource="website_contact"
