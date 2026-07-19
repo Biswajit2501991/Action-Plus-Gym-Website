@@ -12,6 +12,7 @@ import {
   TextTextarea,
 } from "@/components/admin/form-ui";
 import { MediaUrlField } from "@/components/admin/MediaUrlField";
+import { normalizeGoogleMapsEmbedUrl } from "@/lib/maps";
 
 const TIMEZONES = [
   { value: "Asia/Kolkata", label: "India (IST)" },
@@ -153,11 +154,15 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
           <Field
             label="Google Maps embed URL"
             className="md:col-span-2"
-            hint="Must be an embed link. Google Maps → Share → Embed a map → copy src= URL. Do not paste Search or Reviews links."
+            hint="Google Maps → Share → Embed a map. Paste the embed URL, or the whole iframe — we extract the link automatically."
           >
             <TextInput
               value={form.map_embed_url}
               onChange={(e) => set("map_embed_url", e.target.value)}
+              onBlur={() => {
+                const cleaned = normalizeGoogleMapsEmbedUrl(form.map_embed_url);
+                if (cleaned) set("map_embed_url", cleaned);
+              }}
               placeholder="https://www.google.com/maps/embed?pb=..."
             />
           </Field>

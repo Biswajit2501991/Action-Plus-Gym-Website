@@ -4,7 +4,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { LeadForm } from "@/components/site/LeadForm";
 import { FloatingActions } from "@/components/site/FloatingActions";
-import { isGoogleMapsEmbedUrl } from "@/lib/maps";
+import { isGoogleMapsEmbedUrl, normalizeGoogleMapsEmbedUrl } from "@/lib/maps";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -63,7 +63,7 @@ export default async function ContactPage() {
               {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
                 <iframe
                   title="Map"
-                  src={settings.map_embed_url}
+                  src={normalizeGoogleMapsEmbedUrl(settings.map_embed_url)}
                   className="mt-4 h-64 w-full rounded-2xl border-0"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"

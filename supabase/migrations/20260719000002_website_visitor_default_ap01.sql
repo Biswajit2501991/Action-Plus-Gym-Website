@@ -1,4 +1,4 @@
--- Assign website leads to Adra (AP01) and set external_visitor_id so Gym Manager can list them.
+-- Website leads always default to Adra (AP01).
 
 CREATE OR REPLACE FUNCTION public.website_create_visitor(
   p_gym_id uuid,
@@ -40,6 +40,7 @@ BEGIN
     AND upper(gc.code) = 'AP01'
   LIMIT 1;
 
+  -- Fallback only if AP01 is missing for this gym
   IF v_branch IS NULL THEN
     SELECT gc.id INTO v_branch
     FROM gym_codes gc
@@ -87,8 +88,15 @@ BEGIN
 END;
 $$;
 
--- Backfill existing website leads that were stored without an app-facing id.
-UPDATE visitors
-SET external_visitor_id = 'W-' || id::text
-WHERE intake_source LIKE 'website%'
-  AND (external_visitor_id IS NULL OR btrim(external_visitor_id) = '');
+-- Move any website leads not already on AP01 onto Adra.
+UPDATE visitors v
+SET assigned_gym_code_id = gc.id,
+    updated_at = now()
+FROM gym_codes gc
+WHERE v.gym_id = gc.gym_id
+  AND upper(gc.code) = 'AP01'
+  AND v.intake_source LIKE 'website%'
+  AND (
+    v.assigned_gym_code_id IS NULL
+    OR v.assigned_gym_code_id IS DISTINCT FROM gc.id
+  );
