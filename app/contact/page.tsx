@@ -5,6 +5,9 @@ import { Footer } from "@/components/site/Footer";
 import { LeadForm } from "@/components/site/LeadForm";
 import { FloatingActions } from "@/components/site/FloatingActions";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Contact",
   description: "Contact Action Plus Gym for memberships, trials, and enquiries.",

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { GYM_ID } from "@/lib/config";
 import {
@@ -17,6 +18,12 @@ import {
   mediaKindFromMime,
   safeFileName,
 } from "@/lib/media/constants";
+
+function revalidatePublicSite() {
+  revalidatePath("/", "layout");
+  revalidatePath("/");
+  revalidatePath("/contact");
+}
 
 export async function loginAction(formData: FormData) {
   const login = String(formData.get("login") || "").trim();
@@ -75,6 +82,7 @@ export async function saveSettingsAction(payload: Record<string, unknown>) {
     p_token: session.token,
     p_payload: payload,
   });
+  revalidatePublicSite();
   return data;
 }
 
@@ -86,6 +94,7 @@ export async function setSectionAction(sectionKey: string, enabled: boolean) {
     p_section_key: sectionKey,
     p_enabled: enabled,
   });
+  revalidatePublicSite();
   return data;
 }
 
@@ -96,6 +105,7 @@ export async function savePopupAction(payload: Record<string, unknown>) {
     p_token: session.token,
     p_payload: payload,
   });
+  revalidatePublicSite();
   return data;
 }
 
@@ -110,6 +120,7 @@ export async function replaceCollectionAction(
     p_table: table,
     p_rows: rows,
   });
+  revalidatePublicSite();
   return data;
 }
 
@@ -120,6 +131,7 @@ export async function saveReviewsAction(payload: Record<string, unknown>) {
     p_token: session.token,
     p_payload: payload,
   });
+  revalidatePublicSite();
   return data;
 }
 
@@ -254,6 +266,7 @@ export async function uploadWebsiteMediaAction(formData: FormData) {
     };
   }
 
+  revalidatePublicSite();
   return { ok: true as const, item: row as WebsiteMedia };
 }
 
@@ -265,5 +278,6 @@ export async function deleteWebsiteMediaAction(mediaId: number) {
     p_media_id: mediaId,
   });
   if (error) return { ok: false as const, error: error.message };
+  revalidatePublicSite();
   return data as { ok: boolean; error?: string };
 }
