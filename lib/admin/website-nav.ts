@@ -30,6 +30,11 @@ export const websiteSections = [
     description: "Coach profiles and bios",
   },
   {
+    href: "/admin/website/media",
+    label: "Media Library",
+    description: "Upload images and videos saved to the database",
+  },
+  {
     href: "/admin/website/gallery",
     label: "Gallery",
     description: "Photo gallery images",

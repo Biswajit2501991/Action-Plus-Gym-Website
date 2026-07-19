@@ -12,6 +12,7 @@ import {
   TextTextarea,
   Toggle,
 } from "@/components/admin/form-ui";
+import { MediaUrlField } from "@/components/admin/MediaUrlField";
 
 export type EditorField =
   | {
@@ -21,6 +22,7 @@ export type EditorField =
       placeholder?: string;
       hint?: string;
       fullWidth?: boolean;
+      mediaKind?: "image" | "video" | "any";
     }
   | {
       key: string;
@@ -235,6 +237,21 @@ export function ItemListEditor({
                   );
                 }
 
+                if (field.type === "url") {
+                  return (
+                    <MediaUrlField
+                      key={field.key}
+                      label={field.label}
+                      hint={field.hint || "Upload from Media Library or paste a link"}
+                      className={wrap}
+                      placeholder={field.placeholder}
+                      value={String(value ?? "")}
+                      acceptKind={field.mediaKind || "any"}
+                      onChange={(next) => update(index, field.key, next)}
+                    />
+                  );
+                }
+
                 return (
                   <Field
                     key={field.key}
@@ -243,13 +260,7 @@ export function ItemListEditor({
                     className={wrap}
                   >
                     <TextInput
-                      type={
-                        field.type === "number"
-                          ? "number"
-                          : field.type === "url"
-                            ? "url"
-                            : "text"
-                      }
+                      type={field.type === "number" ? "number" : "text"}
                       placeholder={field.placeholder}
                       value={String(value ?? "")}
                       onChange={(e) =>

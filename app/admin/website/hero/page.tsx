@@ -23,17 +23,19 @@ export default async function WebsiteHeroPage() {
           { key: "title", label: "Slide title", type: "text", placeholder: "Strength" },
           {
             key: "image_url",
-            label: "Image URL",
+            label: "Image",
             type: "url",
-            placeholder: "https://...",
+            placeholder: "Upload or paste image link",
             fullWidth: true,
-            hint: "Paste a direct image link",
+            mediaKind: "image",
+            hint: "Use Media Library upload",
           },
           {
             key: "video_url",
-            label: "Video URL (optional)",
+            label: "Video (optional)",
             type: "url",
             fullWidth: true,
+            mediaKind: "video",
           },
           {
             key: "is_active",

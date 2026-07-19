@@ -20,10 +20,11 @@ export default async function WebsiteGalleryPage() {
       fields={[
         {
           key: "image_url",
-          label: "Image URL",
+          label: "Image",
           type: "url",
           fullWidth: true,
-          placeholder: "https://...",
+          placeholder: "Upload or paste image link",
+          mediaKind: "image",
         },
         {
           key: "alt_text",

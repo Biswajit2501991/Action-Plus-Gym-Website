@@ -45,9 +45,10 @@ export default async function WebsiteServicesPage() {
         },
         {
           key: "image_url",
-          label: "Image URL (optional)",
+          label: "Image (optional)",
           type: "url",
           fullWidth: true,
+          mediaKind: "image",
         },
         { key: "is_active", label: "Show on website", type: "toggle" },
       ]}

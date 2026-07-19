@@ -36,10 +36,11 @@ export default async function WebsiteTrainersPage() {
         },
         {
           key: "photo_url",
-          label: "Photo URL",
+          label: "Photo",
           type: "url",
           fullWidth: true,
-          placeholder: "https://...",
+          placeholder: "Upload or paste photo link",
+          mediaKind: "image",
         },
         {
           key: "bio",

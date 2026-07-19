@@ -11,6 +11,7 @@ import {
   TextTextarea,
   Toggle,
 } from "@/components/admin/form-ui";
+import { MediaUrlField } from "@/components/admin/MediaUrlField";
 
 export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
   const [form, setForm] = useState({
@@ -78,13 +79,14 @@ export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
             onChange={(e) => set("body", e.target.value)}
           />
         </Field>
-        <Field label="Image URL" className="md:col-span-2">
-          <TextInput
-            value={form.image_url}
-            onChange={(e) => set("image_url", e.target.value)}
-            placeholder="https://..."
-          />
-        </Field>
+        <MediaUrlField
+          label="Image"
+          className="md:col-span-2"
+          value={form.image_url}
+          onChange={(next) => set("image_url", next)}
+          acceptKind="image"
+          placeholder="Upload or paste image link"
+        />
         <Field label="Button text">
           <TextInput
             value={form.button_text}

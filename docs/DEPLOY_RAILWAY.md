@@ -7,7 +7,7 @@ In Railway → your service → Variables, set:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://oddggoiyckyxolmqqjrf.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from Supabase>
-SUPABASE_SERVICE_ROLE_KEY=<optional service role for privileged ops>
+SUPABASE_SERVICE_ROLE_KEY=<required for Media Library uploads — Supabase service_role key>
 ADMIN_SESSION_SECRET=<long random string 32+ chars>
 NEXT_PUBLIC_SITE_URL=https://actionplusgym.com
 NEXT_PUBLIC_GYM_ID=48815df4-6144-40dd-bbd6-91fd8522d1ff

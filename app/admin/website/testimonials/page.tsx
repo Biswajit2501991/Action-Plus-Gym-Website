@@ -35,15 +35,17 @@ export default async function WebsiteTestimonialsPage() {
         },
         {
           key: "photo_url",
-          label: "Photo URL (optional)",
+          label: "Photo (optional)",
           type: "url",
           fullWidth: true,
+          mediaKind: "image",
         },
         {
           key: "video_url",
-          label: "Video URL (optional)",
+          label: "Video (optional)",
           type: "url",
           fullWidth: true,
+          mediaKind: "video",
         },
         { key: "is_active", label: "Show on website", type: "toggle" },
       ]}

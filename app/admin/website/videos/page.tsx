@@ -29,15 +29,18 @@ export default async function WebsiteVideosPage() {
         },
         {
           key: "mp4_url",
-          label: "MP4 URL (optional)",
+          label: "Uploaded MP4 (optional)",
           type: "url",
           fullWidth: true,
+          mediaKind: "video",
+          hint: "Upload from Media Library",
         },
         {
           key: "thumbnail_url",
-          label: "Thumbnail image URL (optional)",
+          label: "Thumbnail image (optional)",
           type: "url",
           fullWidth: true,
+          mediaKind: "image",
         },
         { key: "is_active", label: "Show on website", type: "toggle" },
       ]}

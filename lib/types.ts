@@ -150,6 +150,21 @@ export type ReviewCache = {
   }>;
 };
 
+export type WebsiteMedia = {
+  id: number;
+  gym_id: string;
+  file_name: string;
+  storage_path: string;
+  public_url: string;
+  mime_type: string;
+  file_size: number;
+  kind: "image" | "video";
+  section_tag: string;
+  alt_text: string;
+  uploaded_by: string;
+  created_at: string;
+};
+
 export type SiteContent = {
   settings: WebsiteSettings;
   sections: Record<string, boolean>;

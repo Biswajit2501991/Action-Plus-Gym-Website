@@ -11,6 +11,7 @@ import {
   TextSelect,
   TextTextarea,
 } from "@/components/admin/form-ui";
+import { MediaUrlField } from "@/components/admin/MediaUrlField";
 
 const TIMEZONES = [
   { value: "Asia/Kolkata", label: "India (IST)" },
@@ -202,12 +203,13 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
               onChange={(e) => set("seo_title", e.target.value)}
             />
           </Field>
-          <Field label="Share image URL">
-            <TextInput
-              value={form.seo_og_image}
-              onChange={(e) => set("seo_og_image", e.target.value)}
-            />
-          </Field>
+          <MediaUrlField
+            label="Share image"
+            value={form.seo_og_image}
+            onChange={(next) => set("seo_og_image", next)}
+            acceptKind="image"
+            placeholder="Upload or paste image link"
+          />
           <Field label="Short description" className="md:col-span-2">
             <TextTextarea
               rows={3}
