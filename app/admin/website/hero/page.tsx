@@ -12,13 +12,13 @@ export default async function WebsiteHeroPage() {
         table="website_hero_slides"
         itemLabel="Slide"
         initialRows={content.heroSlides}
-        createEmpty={() => ({
+        emptyItem={{
           title: "",
           image_url: "",
           video_url: "",
           sort_order: 0,
           is_active: true,
-        })}
+        }}
         fields={[
           { key: "title", label: "Slide title", type: "text", placeholder: "Strength" },
           {
@@ -49,11 +49,11 @@ export default async function WebsiteHeroPage() {
         table="website_stats"
         itemLabel="Stat"
         initialRows={content.stats}
-        createEmpty={() => ({
+        emptyItem={{
           label: "",
           value: "",
           sort_order: 0,
-        })}
+        }}
         fields={[
           { key: "label", label: "Label", type: "text", placeholder: "Members" },
           { key: "value", label: "Value", type: "text", placeholder: "2,500+" },

@@ -10,14 +10,14 @@ export default async function WebsiteServicesPage() {
       table="website_services"
       itemLabel="Service"
       initialRows={content.services}
-      createEmpty={() => ({
+      emptyItem={{
         title: "",
         description: "",
         icon: "dumbbell",
         image_url: "",
         sort_order: 0,
         is_active: true,
-      })}
+      }}
       fields={[
         { key: "title", label: "Service name", type: "text", placeholder: "Personal Training" },
         {

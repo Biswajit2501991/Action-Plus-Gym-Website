@@ -10,7 +10,7 @@ export default async function WebsiteTestimonialsPage() {
       table="website_testimonials"
       itemLabel="Testimonial"
       initialRows={content.testimonials}
-      createEmpty={() => ({
+      emptyItem={{
         name: "",
         quote: "",
         rating: 5,
@@ -18,7 +18,7 @@ export default async function WebsiteTestimonialsPage() {
         video_url: "",
         sort_order: 0,
         is_active: true,
-      })}
+      }}
       fields={[
         { key: "name", label: "Member name", type: "text" },
         {

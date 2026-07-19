@@ -10,10 +10,10 @@ export default async function WebsitePricingPage() {
       table="website_pricing_plans"
       itemLabel="Plan"
       initialRows={content.pricing}
-      createEmpty={() => ({
+      emptyItem={{
         name: "",
         period: "monthly",
-        price: "₹",
+        price: "Rs ",
         description: "",
         features: [],
         is_featured: false,
@@ -21,7 +21,7 @@ export default async function WebsitePricingPage() {
         cta_text: "Join Now",
         sort_order: 0,
         is_active: true,
-      })}
+      }}
       fields={[
         { key: "name", label: "Plan name", type: "text", placeholder: "Monthly" },
         {

@@ -58,7 +58,7 @@ export function ItemListEditor({
   table,
   fields,
   initialRows,
-  createEmpty,
+  emptyItem,
   itemLabel = "Item",
 }: {
   title: string;
@@ -66,7 +66,8 @@ export function ItemListEditor({
   table: string;
   fields: EditorField[];
   initialRows: Row[];
-  createEmpty: () => Row;
+  /** Plain object template for new rows (must be JSON-serializable). */
+  emptyItem: Row;
   itemLabel?: string;
 }) {
   const [rows, setRows] = useState<Row[]>(() =>
@@ -130,7 +131,10 @@ export function ItemListEditor({
           onClick={() =>
             setRows((prev) => [
               ...prev,
-              { ...createEmpty(), sort_order: prev.length },
+              {
+                ...structuredClone(emptyItem),
+                sort_order: prev.length,
+              },
             ])
           }
           className="mt-1 shrink-0 rounded-full border border-gold/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gold hover:bg-gold/10"

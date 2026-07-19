@@ -10,13 +10,13 @@ export default async function WebsiteGalleryPage() {
       table="website_gallery_images"
       itemLabel="Photo"
       initialRows={content.gallery}
-      createEmpty={() => ({
+      emptyItem={{
         album_id: null,
         image_url: "",
         alt_text: "",
         sort_order: 0,
         is_active: true,
-      })}
+      }}
       fields={[
         {
           key: "image_url",

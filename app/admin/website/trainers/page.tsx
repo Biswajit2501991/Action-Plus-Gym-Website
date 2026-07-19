@@ -10,7 +10,7 @@ export default async function WebsiteTrainersPage() {
       table="website_trainers"
       itemLabel="Trainer"
       initialRows={content.trainers}
-      createEmpty={() => ({
+      emptyItem={{
         name: "",
         photo_url: "",
         experience: "",
@@ -19,7 +19,7 @@ export default async function WebsiteTrainersPage() {
         socials: {},
         sort_order: 0,
         is_active: true,
-      })}
+      }}
       fields={[
         { key: "name", label: "Trainer name", type: "text" },
         {

@@ -10,14 +10,14 @@ export default async function WebsiteVideosPage() {
       table="website_videos"
       itemLabel="Video"
       initialRows={content.videos}
-      createEmpty={() => ({
+      emptyItem={{
         title: "",
         youtube_url: "",
         mp4_url: "",
         thumbnail_url: "",
         sort_order: 0,
         is_active: true,
-      })}
+      }}
       fields={[
         { key: "title", label: "Video title", type: "text", fullWidth: true },
         {
