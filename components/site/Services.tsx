@@ -19,7 +19,7 @@ import {
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import type { ServiceItem } from "@/lib/types";
 
-const AUTO_MS = 2000;
+const AUTO_MS = 5000;
 
 const icons: Record<string, React.ComponentType<{ className?: string }>> = {
   dumbbell: Dumbbell,
@@ -150,7 +150,7 @@ export function Services({ services }: { services: ServiceItem[] }) {
                 </button>
               </div>
               <p className="mt-3 text-center text-xs text-muted">
-                Auto-advances every 2 seconds · hover to pause
+                Auto-advances every 5 seconds · hover to pause
               </p>
             </>
           ) : null}
