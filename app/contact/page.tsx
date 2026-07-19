@@ -34,7 +34,7 @@ export default async function ContactPage() {
               <p className="mt-3 min-h-[2.5rem] text-sm text-muted">
                 Visit us in Adra, call, or message — we&apos;re here to help you start.
               </p>
-              <div className="mt-6 flex flex-1 flex-col space-y-4 rounded-3xl border border-white/10 bg-charcoal/50 p-6 text-sm text-white/80">
+              <div className="mt-6 flex min-h-[34rem] flex-1 flex-col space-y-4 rounded-3xl border border-white/10 bg-charcoal/50 p-6 text-sm text-white/80">
                 <p>
                   <span className="text-muted">Address</span>
                   <br />
@@ -64,18 +64,18 @@ export default async function ContactPage() {
                     WhatsApp Us
                   </a>
                 ) : null}
-                <div className="mt-auto min-h-[14rem] flex-1 overflow-hidden rounded-2xl border border-white/10">
+                <div className="mt-auto h-64 w-full overflow-hidden rounded-2xl border border-white/10 md:h-72">
                   {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
                     <iframe
                       title="Map"
                       src={normalizeGoogleMapsEmbedUrl(settings.map_embed_url)}
-                      className="h-full min-h-[14rem] w-full border-0"
+                      className="h-full w-full border-0"
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
                       allowFullScreen
                     />
                   ) : (
-                    <div className="flex h-full min-h-[14rem] flex-col items-center justify-center gap-3 bg-black/40 px-4 text-center text-sm text-muted">
+                    <div className="flex h-full flex-col items-center justify-center gap-3 bg-black/40 px-4 text-center text-sm text-muted">
                       <p>Map needs a Google Maps embed link (not a search or reviews page).</p>
                       <p className="text-xs">
                         Admin → Contact &amp; Brand → Google Maps embed URL
@@ -86,7 +86,7 @@ export default async function ContactPage() {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-col">
+            <div id="join" className="flex min-h-0 flex-col">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
                 Join
               </p>
@@ -96,7 +96,7 @@ export default async function ContactPage() {
               <p className="mt-3 min-h-[2.5rem] text-sm text-muted">
                 We respond quickly during opening hours.
               </p>
-              <div className="mt-6 flex flex-1 flex-col rounded-3xl border border-white/10 bg-charcoal/50 p-6 md:p-8">
+              <div className="mt-6 flex min-h-[34rem] flex-1 flex-col rounded-3xl border border-white/10 bg-charcoal/50 p-6 md:p-8">
                 <LeadForm
                   embedded
                   defaultSource="website_contact"
