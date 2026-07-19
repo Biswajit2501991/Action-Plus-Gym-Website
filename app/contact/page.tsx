@@ -22,68 +22,88 @@ export default async function ContactPage() {
     <>
       <Navbar brand={settings.site_name} />
       <main className="pt-28">
-        <section className="container-site px-5 pb-10 md:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-            Contact
-          </p>
-          <h1 className="mt-3 font-display text-4xl text-white md:text-6xl">
-            Let&apos;s talk training
-          </h1>
-          <div className="mt-8 grid gap-8 md:grid-cols-2">
-            <div className="space-y-4 rounded-3xl border border-white/10 bg-charcoal/50 p-6 text-sm text-white/80">
-              <p>
-                <span className="text-muted">Address</span>
-                <br />
-                {settings.address}
+        <section className="container-site px-5 pb-14 md:px-8">
+          <div className="grid items-stretch gap-6 md:grid-cols-2 md:gap-8">
+            <div className="flex min-h-0 flex-col">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+                Contact
               </p>
-              <p>
-                <span className="text-muted">Phone</span>
-                <br />
-                <a href={`tel:${settings.phone}`} className="text-gold">
-                  {settings.phone}
-                </a>
+              <h1 className="mt-3 font-display text-3xl text-white md:text-5xl">
+                Let&apos;s talk training
+              </h1>
+              <p className="mt-3 min-h-[2.5rem] text-sm text-muted">
+                Visit us in Adra, call, or message — we&apos;re here to help you start.
               </p>
-              <p>
-                <span className="text-muted">Email</span>
-                <br />
-                <a href={`mailto:${settings.email}`} className="text-gold">
-                  {settings.email}
-                </a>
-              </p>
-              {settings.whatsapp ? (
-                <a
-                  href={`https://wa.me/${settings.whatsapp.replace(/[^\d]/g, "")}`}
-                  className="inline-flex rounded-full bg-[#25D366] px-5 py-3 font-semibold text-white"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  WhatsApp Us
-                </a>
-              ) : null}
-              {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
-                <iframe
-                  title="Map"
-                  src={normalizeGoogleMapsEmbedUrl(settings.map_embed_url)}
-                  className="mt-4 h-64 w-full rounded-2xl border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="mt-4 flex h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-4 text-center text-sm text-muted">
-                  <p>Map needs a Google Maps embed link (not a search or reviews page).</p>
-                  <p className="text-xs">
-                    Admin → Contact &amp; Brand → Google Maps embed URL
-                  </p>
+              <div className="mt-6 flex flex-1 flex-col space-y-4 rounded-3xl border border-white/10 bg-charcoal/50 p-6 text-sm text-white/80">
+                <p>
+                  <span className="text-muted">Address</span>
+                  <br />
+                  {settings.address}
+                </p>
+                <p>
+                  <span className="text-muted">Phone</span>
+                  <br />
+                  <a href={`tel:${settings.phone}`} className="text-gold">
+                    {settings.phone}
+                  </a>
+                </p>
+                <p>
+                  <span className="text-muted">Email</span>
+                  <br />
+                  <a href={`mailto:${settings.email}`} className="text-gold">
+                    {settings.email}
+                  </a>
+                </p>
+                {settings.whatsapp ? (
+                  <a
+                    href={`https://wa.me/${settings.whatsapp.replace(/[^\d]/g, "")}`}
+                    className="inline-flex w-fit rounded-full bg-[#25D366] px-5 py-3 font-semibold text-white"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    WhatsApp Us
+                  </a>
+                ) : null}
+                <div className="mt-auto min-h-[14rem] flex-1 overflow-hidden rounded-2xl border border-white/10">
+                  {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
+                    <iframe
+                      title="Map"
+                      src={normalizeGoogleMapsEmbedUrl(settings.map_embed_url)}
+                      className="h-full min-h-[14rem] w-full border-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-[14rem] flex-col items-center justify-center gap-3 bg-black/40 px-4 text-center text-sm text-muted">
+                      <p>Map needs a Google Maps embed link (not a search or reviews page).</p>
+                      <p className="text-xs">
+                        Admin → Contact &amp; Brand → Google Maps embed URL
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
-            <div className="-mt-16 md:mt-0">
-              <LeadForm
-                defaultSource="website_contact"
-                title="Send an enquiry"
-                subtitle="We respond quickly during opening hours."
-              />
+
+            <div className="flex min-h-0 flex-col">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+                Join
+              </p>
+              <h2 className="mt-3 font-display text-3xl text-white md:text-5xl">
+                Send an enquiry
+              </h2>
+              <p className="mt-3 min-h-[2.5rem] text-sm text-muted">
+                We respond quickly during opening hours.
+              </p>
+              <div className="mt-6 flex flex-1 flex-col rounded-3xl border border-white/10 bg-charcoal/50 p-6 md:p-8">
+                <LeadForm
+                  embedded
+                  defaultSource="website_contact"
+                  title="Send an enquiry"
+                  subtitle="We respond quickly during opening hours."
+                />
+              </div>
             </div>
           </div>
         </section>
