@@ -6,6 +6,7 @@ import { websiteSections } from "@/lib/admin/website-nav";
 const mainNav = [
   { href: "/admin", label: "Overview", ownerOnly: false },
   { href: "/admin/leads", label: "Leads", ownerOnly: false },
+  { href: "/admin/messages", label: "Messages", ownerOnly: false },
   { href: "/admin/website", label: "Website", ownerOnly: true },
 ];
 
