@@ -383,10 +383,10 @@ export function AskMeBot() {
             className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:bg-black/30"
           />
           <div
-            className={`absolute bottom-[calc(100%+0.75rem)] right-0 z-[60] flex w-[min(calc(100vw-1.75rem),22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 md:w-[23.5rem] ${
+            className={`z-[60] flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 absolute bottom-[calc(100%+0.75rem)] right-0 w-[min(calc(100vw-1.75rem),22rem)] md:fixed md:bottom-6 md:left-6 md:right-auto md:top-auto md:w-[min(24rem,calc(100vw-3rem))] ${
               formExpanded
-                ? "max-h-[min(calc(100dvh-12rem),34rem)] md:max-h-[min(calc(100dvh-15rem),28rem)]"
-                : "max-h-[min(calc(100dvh-13.5rem),28rem)] md:max-h-[min(calc(100dvh-15rem),24rem)]"
+                ? "max-h-[min(calc(100dvh-12rem),34rem)] md:max-h-[min(calc(100dvh-3rem),36rem)]"
+                : "max-h-[min(calc(100dvh-13.5rem),28rem)] md:max-h-[min(calc(100dvh-3rem),32rem)]"
             }`}
             role="dialog"
             aria-label="Ask Me chat"
