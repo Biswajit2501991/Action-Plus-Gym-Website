@@ -22,6 +22,7 @@ export function AskMeBot() {
   const [open, setOpen] = useState(false);
   const [showBubble, setShowBubble] = useState(false);
   const [faqs, setFaqs] = useState<BotFaq[]>([]);
+  const [askedFaqIds, setAskedFaqIds] = useState<number[]>([]);
   const [lines, setLines] = useState<LocalLine[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showLookup, setShowLookup] = useState(false);
@@ -149,6 +150,7 @@ export function AskMeBot() {
     setError(null);
     setShowForm(false);
     setShowLookup(false);
+    setAskedFaqIds((prev) => (prev.includes(faq.id) ? prev : [...prev, faq.id]));
     setLines((prev) => [
       ...prev,
       { id: `u-${faq.id}-${Date.now()}`, kind: "user", body: faq.question },
@@ -324,16 +326,24 @@ export function AskMeBot() {
 
                 {faqs.length && !formExpanded ? (
                   <div className="flex flex-wrap gap-1.5 pt-0.5 sm:gap-2">
-                    {faqs.map((faq) => (
-                      <button
-                        key={faq.id}
-                        type="button"
-                        onClick={() => pickFaq(faq)}
-                        className="rounded-full border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-left text-[11px] leading-snug text-gold hover:bg-gold/15 sm:px-3 sm:text-xs"
-                      >
-                        {faq.question}
-                      </button>
-                    ))}
+                    {faqs.map((faq) => {
+                      const asked = askedFaqIds.includes(faq.id);
+                      return (
+                        <button
+                          key={faq.id}
+                          type="button"
+                          onClick={() => pickFaq(faq)}
+                          className={`rounded-full border px-2.5 py-1.5 text-left text-[11px] leading-snug sm:px-3 sm:text-xs ${
+                            asked
+                              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
+                              : "border-gold/30 bg-gold/5 text-gold hover:bg-gold/15"
+                          }`}
+                        >
+                          {asked ? "✓ " : ""}
+                          {faq.question}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>
