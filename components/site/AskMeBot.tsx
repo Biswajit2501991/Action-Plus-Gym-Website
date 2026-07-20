@@ -138,6 +138,8 @@ export function AskMeBot() {
 
   function pickFaq(faq: BotFaq) {
     setError(null);
+    setShowForm(false);
+    setShowLookup(false);
     setLines((prev) => [
       ...prev,
       { id: `u-${faq.id}-${Date.now()}`, kind: "user", body: faq.question },
@@ -145,10 +147,9 @@ export function AskMeBot() {
       {
         id: `s-${Date.now()}`,
         kind: "system",
-        body: "Still need help? Submit your query below — Action Plus Gym will reply in this chat.",
+        body: "Still need help? Tap Submit your query — Action Plus Gym will reply in this chat.",
       },
     ]);
-    setShowForm(true);
   }
 
   function submitEnquiry() {
