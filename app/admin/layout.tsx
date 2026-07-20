@@ -34,12 +34,20 @@ export default async function AdminLayout({
         <div className="flex min-h-screen">
           <aside className="hidden w-64 flex-col border-r border-white/10 bg-black/60 p-5 md:flex">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0">
                 <p className="font-display text-lg text-gold-gradient">APG Admin</p>
                 <p className="mt-1 text-xs text-muted">
                   {session.full_name || session.staff_login_id} · {session.staff_role}
                 </p>
               </div>
+              <form action={logoutAction} className="shrink-0 pt-0.5">
+                <button
+                  type="submit"
+                  className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/80 transition hover:border-gold/40 hover:text-gold"
+                >
+                  Logout
+                </button>
+              </form>
             </div>
             <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/5 p-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">
@@ -84,15 +92,7 @@ export default async function AdminLayout({
                 </div>
               ) : null}
             </nav>
-            <form action={logoutAction} className="mt-auto pt-6">
-              <button
-                type="submit"
-                className="text-sm text-muted hover:text-white"
-              >
-                Sign out
-              </button>
-            </form>
-            <p className="mt-4 text-[11px] leading-relaxed text-muted">
+            <p className="mt-auto pt-6 text-[11px] leading-relaxed text-muted">
               Staff accounts are managed in{" "}
               <a
                 href="https://app.gymactionplus.com/"
@@ -111,8 +111,11 @@ export default async function AdminLayout({
               <div className="flex items-center gap-2">
                 <ThemeToggle compact />
                 <form action={logoutAction}>
-                  <button type="submit" className="text-xs text-muted">
-                    Sign out
+                  <button
+                    type="submit"
+                    className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/80"
+                  >
+                    Logout
                   </button>
                 </form>
               </div>
