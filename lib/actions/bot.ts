@@ -7,12 +7,14 @@ import { createAnonServerClient } from "@/lib/supabase/server";
 
 const rateMap = new Map<string, number>();
 
-function rateLimit(key: string, windowMs = 60_000) {
+function isRateLimited(key: string, windowMs: number) {
   const now = Date.now();
   const last = rateMap.get(key) ?? 0;
-  if (now - last < windowMs) return false;
-  rateMap.set(key, now);
-  return true;
+  return now - last < windowMs;
+}
+
+function markRateLimited(key: string) {
+  rateMap.set(key, Date.now());
 }
 
 export type BotFaq = {
@@ -96,8 +98,13 @@ export async function submitBotEnquiryAction(
   }
   if (parsed.data.website) return { ok: true, publicToken: randomUUID() };
 
-  const key = `bot:${parsed.data.mobile}`;
-  if (!rateLimit(key)) {
+  // Follow-ups on an existing chat are allowed more often than brand-new enquiries.
+  // Only mark the rate limit AFTER a successful save so failed attempts can retry.
+  const rateKey = parsed.data.publicToken
+    ? `bot-followup:${parsed.data.publicToken}`
+    : `bot:${parsed.data.mobile}`;
+  const rateWindowMs = parsed.data.publicToken ? 8_000 : 20_000;
+  if (isRateLimited(rateKey, rateWindowMs)) {
     return { ok: false, error: "Please wait a moment before submitting again." };
   }
 
@@ -118,6 +125,7 @@ export async function submitBotEnquiryAction(
   if (!data?.ok) {
     return { ok: false, error: data?.error || "Unable to submit." };
   }
+  markRateLimited(rateKey);
   return { ok: true, publicToken: String(data.public_token) };
 }
 

@@ -44,14 +44,44 @@ export async function getBotThreadAdminAction(threadId: number) {
 }
 
 export async function replyBotThreadAction(threadId: number, body: string) {
-  const session = await requireSession();
-  const supabase = createAnonServerClient();
-  const { data } = await supabase.rpc("website_bot_admin_reply", {
-    p_token: session.token,
-    p_thread_id: threadId,
-    p_body: body,
-  });
-  return data;
+  try {
+    const session = await requireSession();
+    const supabase = createAnonServerClient();
+    const trimmed = String(body || "").trim();
+    if (!trimmed) {
+      return { ok: false, error: "Reply required" };
+    }
+    const { data, error } = await supabase.rpc("website_bot_admin_reply", {
+      p_token: session.token,
+      p_thread_id: Number(threadId),
+      p_body: trimmed,
+    });
+    if (error) {
+      console.error("bot admin reply", error);
+      return {
+        ok: false,
+        error: error.message || "Could not send reply. Please try again.",
+      };
+    }
+    if (!data?.ok) {
+      return {
+        ok: false,
+        error: data?.error || "Could not send reply. Please try again.",
+      };
+    }
+    return data;
+  } catch (e) {
+    console.error("bot admin reply failed", e);
+    return {
+      ok: false,
+      error:
+        e instanceof Error && e.message === "Unauthorized"
+          ? "Session expired — please sign in again."
+          : e instanceof Error
+            ? e.message
+            : "Could not send reply.",
+    };
+  }
 }
 
 export async function listBotFaqsAdminAction() {

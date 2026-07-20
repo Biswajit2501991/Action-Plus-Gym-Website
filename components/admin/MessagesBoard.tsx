@@ -96,11 +96,13 @@ export function MessagesBoard({
 
   function sendReply() {
     if (!selectedId || !reply.trim() || sending) return;
+    const text = reply.trim();
+    const threadId = selectedId;
     setMsg(null);
     setSending(true);
     void (async () => {
       try {
-        const data = await replyBotThreadAction(selectedId, reply.trim());
+        const data = await replyBotThreadAction(threadId, text);
         if (!data?.ok) {
           setMsg(data?.error || "Could not send reply.");
           return;
@@ -109,18 +111,22 @@ export function MessagesBoard({
         setMsg("Reply sent — customer will see it in Ask Me.");
         setThreads((prev) =>
           prev.map((t) =>
-            t.id === selectedId
+            t.id === threadId
               ? {
                   ...t,
                   status: "answered",
-                  last_message: reply.trim().slice(0, 120),
+                  last_message: text.slice(0, 120),
                   updated_at: new Date().toISOString(),
                 }
               : t,
           ),
         );
-        const refreshed = await getBotThreadAdminAction(selectedId);
+        const refreshed = await getBotThreadAdminAction(threadId);
         if (refreshed?.ok) setMessages((refreshed.messages ?? []) as ChatMsg[]);
+      } catch (e) {
+        setMsg(
+          e instanceof Error ? e.message : "Could not send reply. Please try again.",
+        );
       } finally {
         setSending(false);
       }
