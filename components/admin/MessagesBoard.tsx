@@ -56,6 +56,8 @@ export function MessagesBoard({
   );
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [reply, setReply] = useState("");
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [sending, setSending] = useState(false);
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [faqs, setFaqs] = useState<FaqRow[]>(() =>
@@ -72,12 +74,17 @@ export function MessagesBoard({
   function openThread(id: number) {
     setSelectedId(id);
     setMsg(null);
-    startTransition(async () => {
-      const data = await getBotThreadAdminAction(id);
-      if (data?.ok) {
-        setMessages((data.messages ?? []) as ChatMsg[]);
+    setLoadingThread(true);
+    void (async () => {
+      try {
+        const data = await getBotThreadAdminAction(id);
+        if (data?.ok) {
+          setMessages((data.messages ?? []) as ChatMsg[]);
+        }
+      } finally {
+        setLoadingThread(false);
       }
-    });
+    })();
   }
 
   useEffect(() => {
@@ -88,31 +95,36 @@ export function MessagesBoard({
   }, []);
 
   function sendReply() {
-    if (!selectedId || !reply.trim()) return;
+    if (!selectedId || !reply.trim() || sending) return;
     setMsg(null);
-    startTransition(async () => {
-      const data = await replyBotThreadAction(selectedId, reply.trim());
-      if (!data?.ok) {
-        setMsg(data?.error || "Could not send reply.");
-        return;
+    setSending(true);
+    void (async () => {
+      try {
+        const data = await replyBotThreadAction(selectedId, reply.trim());
+        if (!data?.ok) {
+          setMsg(data?.error || "Could not send reply.");
+          return;
+        }
+        setReply("");
+        setMsg("Reply sent — customer will see it in Ask Me.");
+        setThreads((prev) =>
+          prev.map((t) =>
+            t.id === selectedId
+              ? {
+                  ...t,
+                  status: "answered",
+                  last_message: reply.trim().slice(0, 120),
+                  updated_at: new Date().toISOString(),
+                }
+              : t,
+          ),
+        );
+        const refreshed = await getBotThreadAdminAction(selectedId);
+        if (refreshed?.ok) setMessages((refreshed.messages ?? []) as ChatMsg[]);
+      } finally {
+        setSending(false);
       }
-      setReply("");
-      setMsg("Reply sent — customer will see it in Ask Me.");
-      setThreads((prev) =>
-        prev.map((t) =>
-          t.id === selectedId
-            ? {
-                ...t,
-                status: "answered",
-                last_message: reply.trim().slice(0, 120),
-                updated_at: new Date().toISOString(),
-              }
-            : t,
-        ),
-      );
-      const refreshed = await getBotThreadAdminAction(selectedId);
-      if (refreshed?.ok) setMessages((refreshed.messages ?? []) as ChatMsg[]);
-    });
+    })();
   }
 
   function saveFaqs() {
@@ -189,12 +201,12 @@ export function MessagesBoard({
                       {t.customer_name}
                     </p>
                     <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                         t.status === "open"
-                          ? "bg-amber-500/20 text-amber-200"
+                          ? "bg-amber-500 text-black"
                           : t.status === "answered"
-                            ? "bg-emerald-500/15 text-emerald-300"
-                            : "bg-white/10 text-muted"
+                            ? "bg-emerald-700 text-[#ecfdf5]"
+                            : "bg-[color:var(--surface-mid)] text-muted"
                       }`}
                     >
                       {t.status}
@@ -224,7 +236,10 @@ export function MessagesBoard({
                   </p>
                 </div>
                 <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-                  {messages.length === 0 && !pending ? (
+                  {loadingThread && messages.length === 0 ? (
+                    <p className="text-sm text-muted">Loading conversation…</p>
+                  ) : null}
+                  {messages.length === 0 && !loadingThread ? (
                     <p className="text-sm text-muted">
                       Open this conversation to load messages, or send a reply.
                     </p>
@@ -272,11 +287,11 @@ export function MessagesBoard({
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <button
                       type="button"
-                      disabled={pending || !reply.trim()}
+                      disabled={sending || loadingThread || !reply.trim()}
                       onClick={sendReply}
                       className="rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-50"
                     >
-                      {pending ? "Sending…" : "Send reply"}
+                      {sending ? "Sending…" : "Send reply"}
                     </button>
                     {msg ? <p className="text-sm text-emerald-300">{msg}</p> : null}
                   </div>
