@@ -241,6 +241,16 @@ export function AskMeBot() {
     return () => window.clearTimeout(t);
   }, [showForm, showLookup]);
 
+  // Keep greeting visible when opening the panel (desktop height is capped).
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => {
+      const el = document.querySelector("[data-ask-me-scroll]");
+      if (el) el.scrollTop = 0;
+    }, 30);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
   useEffect(() => {
     return () => window.clearTimeout(previewTimerRef.current);
   }, []);
@@ -373,10 +383,10 @@ export function AskMeBot() {
             className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:bg-black/30"
           />
           <div
-            className={`absolute bottom-[calc(100%+0.75rem)] right-0 z-[60] flex w-[min(calc(100vw-1.75rem),22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 md:w-[26rem] ${
+            className={`absolute bottom-[calc(100%+0.75rem)] right-0 z-[60] flex w-[min(calc(100vw-1.75rem),22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 md:w-[23.5rem] ${
               formExpanded
-                ? "max-h-[min(calc(100dvh-12rem),34rem)] md:max-h-[min(calc(100dvh-10rem),38rem)]"
-                : "max-h-[min(calc(100dvh-13.5rem),28rem)] md:max-h-[min(calc(100dvh-11rem),32rem)]"
+                ? "max-h-[min(calc(100dvh-12rem),34rem)] md:max-h-[min(calc(100dvh-15rem),28rem)]"
+                : "max-h-[min(calc(100dvh-13.5rem),28rem)] md:max-h-[min(calc(100dvh-15rem),24rem)]"
             }`}
             role="dialog"
             aria-label="Ask Me chat"
@@ -405,9 +415,9 @@ export function AskMeBot() {
 
             <div
               data-ask-me-scroll
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2.5 sm:py-3 md:px-4"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2.5 sm:py-3"
             >
-              <div className="space-y-2.5 sm:space-y-3 md:space-y-3.5">
+              <div className="space-y-2.5 sm:space-y-3">
                 {lines.map((line) => {
                   if (line.kind === "server") {
                     const m = line.message;
@@ -416,7 +426,7 @@ export function AskMeBot() {
                     return (
                       <div
                         key={line.id}
-                        className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm md:max-w-[88%] ${
+                        className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm ${
                           staff
                             ? "bg-gold/15 text-gold-soft"
                             : customer
@@ -466,7 +476,7 @@ export function AskMeBot() {
                 })}
 
                 {faqs.length && !formExpanded ? (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5 sm:gap-2 md:flex-col md:gap-2 md:pt-1">
+                  <div className="flex flex-wrap gap-1.5 pt-0.5 sm:gap-2 md:grid md:grid-cols-2 md:gap-2 md:pt-1">
                     {faqs.map((faq) => {
                       const asked = askedFaqIds.includes(faq.id);
                       return (
@@ -474,7 +484,7 @@ export function AskMeBot() {
                           key={faq.id}
                           type="button"
                           onClick={() => pickFaq(faq)}
-                          className={`rounded-full border px-2.5 py-1.5 text-left text-[11px] leading-snug sm:px-3 sm:text-xs md:w-full md:rounded-xl md:px-3.5 md:py-2.5 md:text-[13px] md:leading-snug ${
+                          className={`rounded-full border px-2.5 py-1.5 text-left text-[11px] leading-snug sm:px-3 sm:text-xs md:rounded-xl md:px-3 md:py-2 md:text-[12px] md:leading-snug ${
                             asked
                               ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
                               : "border-gold/30 bg-gold/5 text-gold hover:bg-gold/15"
@@ -489,15 +499,15 @@ export function AskMeBot() {
                 ) : null}
               </div>
 
-              <div className="mt-3 space-y-2 border-t border-white/10 pt-3 pb-1 md:mt-4 md:pt-4">
-                <div className="flex gap-2 md:gap-2.5">
+              <div className="mt-3 space-y-2 border-t border-white/10 pt-3 pb-1">
+                <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setShowForm((v) => !v);
                       setShowLookup(false);
                     }}
-                    className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold md:py-2.5 md:text-[13px] ${
+                    className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${
                       showForm
                         ? "border-gold/50 bg-gold/15 text-gold"
                         : "border-white/15 text-white/85 hover:border-gold/40 hover:text-gold"
@@ -511,7 +521,7 @@ export function AskMeBot() {
                       setShowLookup((v) => !v);
                       setShowForm(false);
                     }}
-                    className={`rounded-full border px-3 py-2 text-xs md:px-4 md:py-2.5 md:text-[13px] ${
+                    className={`rounded-full border px-3 py-2 text-xs ${
                       showLookup
                         ? "border-gold/50 bg-gold/15 text-gold"
                         : "border-white/15 text-muted hover:text-white"
