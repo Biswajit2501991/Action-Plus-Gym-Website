@@ -229,13 +229,14 @@ export function AskMeBot() {
             type="button"
             aria-label="Close Ask Me"
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:hidden"
+            className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:bg-black/30"
           />
+          {/* Anchored to top-right corner of Ask Me FAB */}
           <div
-            className={`fixed left-3 right-3 z-[60] mx-auto flex w-auto max-w-[22rem] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 sm:left-auto sm:right-5 sm:mx-0 sm:w-[22rem] ${
+            className={`absolute bottom-[calc(100%+0.75rem)] right-0 z-[60] flex w-[min(calc(100vw-1.75rem),22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 ${
               formExpanded
-                ? "bottom-24 max-h-[min(72dvh,36rem)] md:bottom-28"
-                : "bottom-[11.5rem] max-h-[min(48dvh,26rem)] md:bottom-[12.5rem] md:max-h-[min(52dvh,28rem)]"
+                ? "max-h-[min(calc(100dvh-12rem),34rem)]"
+                : "max-h-[min(calc(100dvh-13.5rem),28rem)]"
             }`}
             role="dialog"
             aria-label="Ask Me chat"
