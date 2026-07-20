@@ -195,6 +195,8 @@ export function AskMeBot() {
     });
   }
 
+  const formExpanded = showForm || showLookup;
+
   return (
     <div className="relative flex flex-col items-end">
       {showBubble && !open ? (
@@ -212,7 +214,6 @@ export function AskMeBot() {
 
       {open ? (
         <>
-          {/* Soft scrim on small screens — tap outside to close */}
           <button
             type="button"
             aria-label="Close Ask Me"
@@ -220,7 +221,11 @@ export function AskMeBot() {
             className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:hidden"
           />
           <div
-            className="fixed bottom-[11.5rem] left-3 right-3 z-[60] mx-auto flex h-auto max-h-[min(48dvh,26rem)] w-auto max-w-[22rem] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 sm:left-auto sm:right-5 sm:mx-0 sm:w-[22rem] md:bottom-[12.5rem] md:max-h-[min(52dvh,28rem)]"
+            className={`fixed left-3 right-3 z-[60] mx-auto flex w-auto max-w-[22rem] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 sm:left-auto sm:right-5 sm:mx-0 sm:w-[22rem] ${
+              formExpanded
+                ? "bottom-24 max-h-[min(72dvh,36rem)] md:bottom-28"
+                : "bottom-[11.5rem] max-h-[min(48dvh,26rem)] md:bottom-[12.5rem] md:max-h-[min(52dvh,28rem)]"
+            }`}
             role="dialog"
             aria-label="Ask Me chat"
           >
@@ -246,171 +251,183 @@ export function AskMeBot() {
               </button>
             </div>
 
-            {/* Content-sized; scrolls only after max-height is reached */}
-            <div className="min-h-0 flex-[1_1_auto] space-y-2.5 overflow-y-auto overscroll-contain px-3 py-2.5 sm:space-y-3 sm:py-3">
-              {lines.map((line) => {
-                if (line.kind === "server") {
-                  const m = line.message;
-                  const staff = m.sender === "staff";
-                  const customer = m.sender === "customer";
-                  return (
-                    <div
-                      key={line.id}
-                      className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm ${
-                        staff
-                          ? "bg-gold/15 text-gold-soft"
-                          : customer
-                            ? "ml-auto bg-white/10 text-white"
-                            : "bg-white/5 text-white/85"
-                      }`}
-                    >
-                      <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-muted">
-                        {staff
-                          ? m.staff_name || "Action Plus Gym"
-                          : customer
-                            ? "You"
-                            : "Ask Me"}
+            <div
+              data-ask-me-scroll
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2.5 sm:py-3"
+            >
+              <div className="space-y-2.5 sm:space-y-3">
+                {lines.map((line) => {
+                  if (line.kind === "server") {
+                    const m = line.message;
+                    const staff = m.sender === "staff";
+                    const customer = m.sender === "customer";
+                    return (
+                      <div
+                        key={line.id}
+                        className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm ${
+                          staff
+                            ? "bg-gold/15 text-gold-soft"
+                            : customer
+                              ? "ml-auto bg-white/10 text-white"
+                              : "bg-white/5 text-white/85"
+                        }`}
+                      >
+                        <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-muted">
+                          {staff
+                            ? m.staff_name || "Action Plus Gym"
+                            : customer
+                              ? "You"
+                              : "Ask Me"}
+                        </p>
+                        <p className="whitespace-pre-wrap">{m.body}</p>
+                      </div>
+                    );
+                  }
+                  if (line.kind === "user") {
+                    return (
+                      <div
+                        key={line.id}
+                        className="ml-auto max-w-[92%] rounded-2xl bg-white/10 px-3 py-2 text-sm text-white"
+                      >
+                        {line.body}
+                      </div>
+                    );
+                  }
+                  if (line.kind === "system") {
+                    return (
+                      <p key={line.id} className="text-center text-[11px] text-muted">
+                        {line.body}
                       </p>
-                      <p className="whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                  );
-                }
-                if (line.kind === "user") {
+                    );
+                  }
                   return (
                     <div
                       key={line.id}
-                      className="ml-auto max-w-[92%] rounded-2xl bg-white/10 px-3 py-2 text-sm text-white"
+                      className="max-w-[92%] rounded-2xl border border-white/10 bg-charcoal/80 px-3 py-2 text-sm text-white/90"
                     >
+                      <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-gold">
+                        Ask Me
+                      </p>
                       {line.body}
                     </div>
                   );
-                }
-                if (line.kind === "system") {
-                  return (
-                    <p key={line.id} className="text-center text-[11px] text-muted">
-                      {line.body}
-                    </p>
-                  );
-                }
-                return (
-                  <div
-                    key={line.id}
-                    className="max-w-[92%] rounded-2xl border border-white/10 bg-charcoal/80 px-3 py-2 text-sm text-white/90"
-                  >
-                    <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-gold">
-                      Ask Me
-                    </p>
-                    {line.body}
+                })}
+
+                {faqs.length && !formExpanded ? (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5 sm:gap-2">
+                    {faqs.map((faq) => (
+                      <button
+                        key={faq.id}
+                        type="button"
+                        onClick={() => pickFaq(faq)}
+                        className="rounded-full border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-left text-[11px] leading-snug text-gold hover:bg-gold/15 sm:px-3 sm:text-xs"
+                      >
+                        {faq.question}
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
-
-              {faqs.length ? (
-                <div className="flex flex-wrap gap-1.5 pt-0.5 sm:gap-2">
-                  {faqs.map((faq) => (
-                    <button
-                      key={faq.id}
-                      type="button"
-                      onClick={() => pickFaq(faq)}
-                      className="rounded-full border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-left text-[11px] leading-snug text-gold hover:bg-gold/15 sm:px-3 sm:text-xs"
-                    >
-                      {faq.question}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="shrink-0 space-y-2 border-t border-white/10 p-2.5 sm:p-3">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm((v) => !v);
-                    setShowLookup(false);
-                  }}
-                  className="flex-1 rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/85 hover:border-gold/40 hover:text-gold"
-                >
-                  Submit your query
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowLookup((v) => !v);
-                    setShowForm(false);
-                  }}
-                  className="rounded-full border border-white/15 px-3 py-2 text-xs text-muted hover:text-white"
-                >
-                  Find replies
-                </button>
+                ) : null}
               </div>
 
-              {showLookup ? (
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
-                  <input
-                    value={lookupMobile}
-                    onChange={(e) => setLookupMobile(e.target.value)}
-                    placeholder="Mobile used when you enquired"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                  />
+              <div className="mt-3 space-y-2 border-t border-white/10 pt-3 pb-1">
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={pending || lookupMobile.trim().length < 6}
-                    onClick={lookupByMobile}
-                    className="w-full rounded-full gold-gradient py-2 text-xs font-semibold text-black disabled:opacity-50"
+                    onClick={() => {
+                      setShowForm((v) => !v);
+                      setShowLookup(false);
+                    }}
+                    className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${
+                      showForm
+                        ? "border-gold/50 bg-gold/15 text-gold"
+                        : "border-white/15 text-white/85 hover:border-gold/40 hover:text-gold"
+                    }`}
                   >
-                    {pending ? "Looking…" : "Load my conversation"}
+                    Submit your query
                   </button>
-                </div>
-              ) : null}
-
-              {showForm ? (
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
-                  <input
-                    value={form.fullName}
-                    onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                    placeholder="Full name"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                  />
-                  <input
-                    value={form.mobile}
-                    onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
-                    placeholder="Mobile"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                  />
-                  <input
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    placeholder="Email (optional)"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                  />
-                  <textarea
-                    value={form.message}
-                    onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                    placeholder="Your query…"
-                    rows={3}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                  />
-                  <input
-                    value={form.website}
-                    onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                    className="hidden"
-                    tabIndex={-1}
-                    autoComplete="off"
-                    aria-hidden
-                  />
                   <button
                     type="button"
-                    disabled={pending}
-                    onClick={submitEnquiry}
-                    className="w-full rounded-full gold-gradient py-2.5 text-xs font-semibold text-black disabled:opacity-50"
+                    onClick={() => {
+                      setShowLookup((v) => !v);
+                      setShowForm(false);
+                    }}
+                    className={`rounded-full border px-3 py-2 text-xs ${
+                      showLookup
+                        ? "border-gold/50 bg-gold/15 text-gold"
+                        : "border-white/15 text-muted hover:text-white"
+                    }`}
                   >
-                    {pending ? "Sending…" : "Send query"}
+                    Find replies
                   </button>
                 </div>
-              ) : null}
 
-              {error ? <p className="text-xs text-red-300">{error}</p> : null}
+                {showLookup ? (
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
+                    <input
+                      value={lookupMobile}
+                      onChange={(e) => setLookupMobile(e.target.value)}
+                      placeholder="Mobile used when you enquired"
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                    />
+                    <button
+                      type="button"
+                      disabled={pending || lookupMobile.trim().length < 6}
+                      onClick={lookupByMobile}
+                      className="w-full rounded-full gold-gradient py-2.5 text-xs font-semibold text-black disabled:opacity-50"
+                    >
+                      {pending ? "Looking…" : "Load my conversation"}
+                    </button>
+                  </div>
+                ) : null}
+
+                {showForm ? (
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
+                    <input
+                      value={form.fullName}
+                      onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+                      placeholder="Full name"
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                    />
+                    <input
+                      value={form.mobile}
+                      onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+                      placeholder="Mobile"
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                    />
+                    <input
+                      value={form.email}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="Email (optional)"
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                    />
+                    <textarea
+                      value={form.message}
+                      onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+                      placeholder="Your query…"
+                      rows={2}
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                    />
+                    <input
+                      value={form.website}
+                      onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                      className="hidden"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden
+                    />
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={submitEnquiry}
+                      className="w-full rounded-full gold-gradient py-3 text-sm font-semibold text-black disabled:opacity-50"
+                    >
+                      {pending ? "Sending…" : "Send query"}
+                    </button>
+                  </div>
+                ) : null}
+
+                {error ? <p className="pb-1 text-xs text-red-300">{error}</p> : null}
+              </div>
             </div>
           </div>
         </>
