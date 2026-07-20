@@ -18,6 +18,21 @@ export async function listBotThreadsAction() {
   return data;
 }
 
+/** Open threads awaiting a staff reply (new / unread for admin). */
+export async function countBotUnreadAction(): Promise<number> {
+  try {
+    const session = await requireSession();
+    const supabase = createAnonServerClient();
+    const { data } = await supabase.rpc("website_bot_admin_unread_count", {
+      p_token: session.token,
+    });
+    if (!data?.ok) return 0;
+    return Number(data.count) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function getBotThreadAdminAction(threadId: number) {
   const session = await requireSession();
   const supabase = createAnonServerClient();

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -14,7 +15,14 @@ const links = [
   { href: "#reviews", label: "Reviews" },
 ];
 
-export function Navbar({ brand }: { brand: string }) {
+export function Navbar({
+  brand,
+  darkHero = false,
+}: {
+  brand: string;
+  /** Keep light nav text over a dark full-bleed hero (homepage). */
+  darkHero?: boolean;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -25,12 +33,15 @@ export function Navbar({ brand }: { brand: string }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const overHero = darkHero && !scrolled;
+
   return (
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-300",
         scrolled ? "glass py-3 shadow-lg shadow-black/30" : "bg-transparent py-5",
       )}
+      {...(overHero ? { "data-on-dark": "" } : {})}
     >
       <div className="container-site flex items-center justify-between gap-4 px-5 md:px-8">
         <Link href="/" className="font-display text-xl tracking-tight text-white md:text-2xl">
@@ -48,6 +59,7 @@ export function Navbar({ brand }: { brand: string }) {
             </Link>
           ))}
           <div className="flex items-center gap-2">
+            <ThemeToggle compact />
             <Button href="/contact" className="!py-2.5 !text-xs">
               Contact
             </Button>
@@ -57,14 +69,17 @@ export function Navbar({ brand }: { brand: string }) {
           </div>
         </nav>
 
-        <button
-          type="button"
-          className="rounded-full border border-white/15 p-2 text-white lg:hidden"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Toggle menu"
-        >
-          {open ? <X size={18} /> : <Menu size={18} />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <ThemeToggle compact />
+          <button
+            type="button"
+            className="rounded-full border border-white/15 p-2 text-white"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Toggle menu"
+          >
+            {open ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
       </div>
 
       {open ? (

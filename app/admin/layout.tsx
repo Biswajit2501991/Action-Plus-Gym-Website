@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getAdminSession, isOwnerRole } from "@/lib/auth/session";
 import { logoutAction } from "@/lib/actions/admin";
+import { countBotUnreadAction } from "@/lib/actions/bot-admin";
 import { websiteSections } from "@/lib/admin/website-nav";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 const mainNav = [
   { href: "/admin", label: "Overview", ownerOnly: false },
@@ -24,26 +26,42 @@ export default async function AdminLayout({
     session = null;
   }
   const owner = session ? isOwnerRole(session.staff_role) : false;
+  const unreadMessages = session ? await countBotUnreadAction() : 0;
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="admin-shell">
       {session ? (
         <div className="flex min-h-screen">
           <aside className="hidden w-64 flex-col border-r border-white/10 bg-black/60 p-5 md:flex">
-            <p className="font-display text-lg text-gold-gradient">APG Admin</p>
-            <p className="mt-1 text-xs text-muted">
-              {session.full_name || session.staff_login_id} · {session.staff_role}
-            </p>
-            <nav className="mt-8 flex flex-col gap-1">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-display text-lg text-gold-gradient">APG Admin</p>
+                <p className="mt-1 text-xs text-muted">
+                  {session.full_name || session.staff_login_id} · {session.staff_role}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/5 p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">
+                Day / Night
+              </p>
+              <ThemeToggle className="w-full justify-between" />
+            </div>
+            <nav className="mt-6 flex flex-col gap-1">
               {mainNav
                 .filter((n) => !n.ownerOnly || owner)
                 .map((n) => (
                   <Link
                     key={n.href}
                     href={n.href}
-                    className="rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/5 hover:text-gold"
+                    className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/5 hover:text-gold"
                   >
-                    {n.label}
+                    <span>{n.label}</span>
+                    {n.href === "/admin/messages" && unreadMessages > 0 ? (
+                      <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                        {unreadMessages > 99 ? "99+" : unreadMessages}
+                      </span>
+                    ) : null}
                   </Link>
                 ))}
 
@@ -88,13 +106,16 @@ export default async function AdminLayout({
             </p>
           </aside>
           <div className="flex-1">
-            <header className="flex items-center justify-between border-b border-white/10 px-5 py-4 md:hidden">
+            <header className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 md:hidden">
               <p className="font-display text-gold">APG Admin</p>
-              <form action={logoutAction}>
-                <button type="submit" className="text-xs text-muted">
-                  Sign out
-                </button>
-              </form>
+              <div className="flex items-center gap-2">
+                <ThemeToggle compact />
+                <form action={logoutAction}>
+                  <button type="submit" className="text-xs text-muted">
+                    Sign out
+                  </button>
+                </form>
+              </div>
             </header>
             <div className="flex gap-2 overflow-x-auto border-b border-white/10 px-4 py-3 md:hidden">
               {mainNav
@@ -103,9 +124,14 @@ export default async function AdminLayout({
                   <Link
                     key={n.href}
                     href={n.href}
-                    className="whitespace-nowrap rounded-full border border-white/10 px-3 py-1 text-xs text-white/80"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 px-3 py-1 text-xs text-white/80"
                   >
                     {n.label}
+                    {n.href === "/admin/messages" && unreadMessages > 0 ? (
+                      <span className="inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[9px] font-bold leading-none text-white">
+                        {unreadMessages > 99 ? "99+" : unreadMessages}
+                      </span>
+                    ) : null}
                   </Link>
                 ))}
               {owner

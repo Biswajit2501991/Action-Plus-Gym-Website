@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+:root,
+html[data-theme="night"] {
   --bg: #0a0a0a;
   --bg-elevated: #121212;
   --charcoal: #1a1a1a;
@@ -12,6 +13,49 @@
   --text-muted: #a3a3a3;
   --border: rgba(201, 162, 39, 0.22);
   --glass: rgba(18, 18, 18, 0.72);
+  --page-gradient:
+    radial-gradient(1200px 600px at 10% -10%, rgba(201, 162, 39, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, rgba(201, 162, 39, 0.08), transparent 50%),
+    linear-gradient(180deg, #0a0a0a 0%, #101010 45%, #0a0a0a 100%);
+  --admin-shell: #080808;
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --ink: #ffffff;
+  --ink-soft: rgba(255, 255, 255, 0.75);
+  --ink-faint: rgba(255, 255, 255, 0.6);
+  --surface-soft: rgba(255, 255, 255, 0.05);
+  --surface-mid: rgba(255, 255, 255, 0.1);
+  --overlay-heavy: rgba(0, 0, 0, 0.6);
+  --overlay-mid: rgba(0, 0, 0, 0.45);
+  --overlay-light: rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme="day"] {
+  --bg: #e9eef3;
+  --bg-elevated: #ffffff;
+  --charcoal: #f3f6f9;
+  --charcoal-soft: #e4e9ef;
+  --gold: #b8921f;
+  --gold-soft: #c9a227;
+  --gold-dim: #8a7018;
+  --text: #141820;
+  --text-muted: #5a6570;
+  --border: rgba(184, 146, 31, 0.35);
+  --glass: rgba(255, 255, 255, 0.86);
+  --page-gradient:
+    radial-gradient(1100px 520px at 8% -8%, rgba(184, 146, 31, 0.14), transparent 55%),
+    radial-gradient(800px 420px at 92% 0%, rgba(40, 70, 100, 0.08), transparent 50%),
+    linear-gradient(180deg, #f4f7fa 0%, #e9eef3 45%, #f2f5f8 100%);
+  --admin-shell: #e9eef3;
+  --panel-border: rgba(20, 24, 32, 0.1);
+  --ink: #141820;
+  --ink-soft: rgba(20, 24, 32, 0.72);
+  --ink-faint: rgba(20, 24, 32, 0.55);
+  --surface-soft: rgba(20, 24, 32, 0.04);
+  --surface-mid: rgba(20, 24, 32, 0.07);
+  --overlay-heavy: rgba(255, 255, 255, 0.72);
+  --overlay-mid: rgba(255, 255, 255, 0.55);
+  --overlay-light: rgba(255, 255, 255, 0.4);
+  color-scheme: light;
 }
 
 @theme inline {
@@ -37,13 +81,11 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(201, 162, 39, 0.12), transparent 55%),
-    radial-gradient(900px 500px at 90% 10%, rgba(201, 162, 39, 0.08), transparent 50%),
-    linear-gradient(180deg, #0a0a0a 0%, #101010 45%, #0a0a0a 100%);
+  background: var(--page-gradient);
   color: var(--text);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
   min-height: 100vh;
+  transition: background 0.25s ease, color 0.2s ease;
 }
 
 h1,
@@ -90,4 +132,136 @@ h3,
   width: 100%;
   max-width: 72rem;
   margin-inline: auto;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  background: var(--admin-shell);
+  color: var(--text);
+}
+
+/* ——— Day mode: remap common night-first utility patterns ——— */
+html[data-theme="day"] .text-white {
+  color: var(--ink) !important;
+}
+html[data-theme="day"] .text-white\/90 {
+  color: color-mix(in srgb, var(--ink) 90%, transparent) !important;
+}
+html[data-theme="day"] .text-white\/85 {
+  color: color-mix(in srgb, var(--ink) 85%, transparent) !important;
+}
+html[data-theme="day"] .text-white\/80 {
+  color: color-mix(in srgb, var(--ink) 80%, transparent) !important;
+}
+html[data-theme="day"] .text-white\/75 {
+  color: var(--ink-soft) !important;
+}
+html[data-theme="day"] .text-white\/70 {
+  color: color-mix(in srgb, var(--ink) 70%, transparent) !important;
+}
+html[data-theme="day"] .text-white\/60 {
+  color: var(--ink-faint) !important;
+}
+html[data-theme="day"] .hover\:text-white:hover {
+  color: var(--ink) !important;
+}
+
+html[data-theme="day"] .border-white\/10 {
+  border-color: var(--panel-border) !important;
+}
+html[data-theme="day"] .border-white\/15 {
+  border-color: rgba(20, 24, 32, 0.14) !important;
+}
+html[data-theme="day"] .border-t.border-white\/10,
+html[data-theme="day"] .border-b.border-white\/10,
+html[data-theme="day"] .border-r.border-white\/10 {
+  border-color: var(--panel-border) !important;
+}
+
+html[data-theme="day"] .bg-white\/5 {
+  background-color: var(--surface-soft) !important;
+}
+html[data-theme="day"] .bg-white\/10 {
+  background-color: var(--surface-mid) !important;
+}
+html[data-theme="day"] .hover\:bg-white\/5:hover {
+  background-color: var(--surface-soft) !important;
+}
+html[data-theme="day"] .hover\:bg-white\/10:hover {
+  background-color: var(--surface-mid) !important;
+}
+
+html[data-theme="day"] .bg-black\/60 {
+  background-color: var(--overlay-heavy) !important;
+}
+html[data-theme="day"] .bg-black\/50 {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+}
+html[data-theme="day"] .bg-black\/40 {
+  background-color: var(--overlay-mid) !important;
+}
+html[data-theme="day"] .bg-black\/30 {
+  background-color: var(--overlay-light) !important;
+}
+html[data-theme="day"] .bg-\[\#080808\] {
+  background-color: var(--admin-shell) !important;
+}
+html[data-theme="day"] .bg-\[\#0c0c0c\] {
+  background-color: var(--bg-elevated) !important;
+}
+html[data-theme="day"] .shadow-black\/40,
+html[data-theme="day"] .shadow-black\/60,
+html[data-theme="day"] .shadow-lg.shadow-black\/30 {
+  --tw-shadow-color: rgba(20, 24, 32, 0.12);
+}
+
+html[data-theme="day"] .theme-toggle {
+  border-color: rgba(20, 24, 32, 0.14);
+  background: rgba(255, 255, 255, 0.7);
+}
+html[data-theme="day"] .theme-toggle button:not([aria-pressed="true"]) {
+  color: rgba(20, 24, 32, 0.65);
+}
+html[data-theme="day"] .theme-toggle button:not([aria-pressed="true"]):hover {
+  color: #141820;
+}
+
+/* Keep light text/controls over dark photography (hero, etc.) */
+html[data-theme="day"] [data-on-dark] .text-white,
+html[data-theme="day"] [data-on-dark].text-white {
+  color: #ffffff !important;
+}
+html[data-theme="day"] [data-on-dark] .text-white\/90 {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+html[data-theme="day"] [data-on-dark] .text-white\/85 {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+html[data-theme="day"] [data-on-dark] .text-white\/80 {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+html[data-theme="day"] [data-on-dark] .text-white\/75 {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+html[data-theme="day"] [data-on-dark] .text-white\/70 {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+html[data-theme="day"] [data-on-dark] .text-white\/60 {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+html[data-theme="day"] [data-on-dark] .border-white\/10,
+html[data-theme="day"] [data-on-dark] .border-white\/15 {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+html[data-theme="day"] [data-on-dark] .bg-black\/40,
+html[data-theme="day"] [data-on-dark] .bg-black\/50,
+html[data-theme="day"] [data-on-dark] .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+html[data-theme="day"] .text-gold-gradient {
+  background: linear-gradient(135deg, #c9a227 0%, #9a7a16 55%, #7a6112 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

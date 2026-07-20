@@ -26,7 +26,7 @@ export function Hero({
   }, [safeSlides.length]);
 
   return (
-    <section className="relative min-h-[100svh] overflow-hidden">
+    <section className="relative min-h-[100svh] overflow-hidden" data-on-dark>
       <AnimatePresence mode="wait">
         {active?.image_url ? (
           <motion.div

@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Bot, MessageSquareText, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { Bell, Bot, MessageSquareText, X } from "lucide-react";
 import {
   getBotThreadAction,
   listBotFaqsAction,
@@ -9,18 +16,51 @@ import {
   type BotFaq,
   type BotMessage,
 } from "@/lib/actions/bot";
+import { playStaffReplyChime, previewWords } from "@/lib/bot-notify";
 
 const TOKEN_KEY = "apg_ask_me_token";
+const LAST_READ_STAFF_KEY = "apg_ask_me_last_read_staff";
+const PREVIEW_COUNT_KEY = "apg_ask_me_reply_preview_count";
 const BUBBLE_SHOW_MS = 3_000;
 const BUBBLE_HIDE_MS = 10_000;
+const REPLY_PREVIEW_MS = 6_000;
+const MAX_REPLY_PREVIEWS = 2;
 
 type LocalLine =
   | { id: string; kind: "bot" | "user" | "system"; body: string }
   | { id: string; kind: "server"; message: BotMessage };
 
+function readInt(key: string, fallback = 0) {
+  try {
+    const n = Number(localStorage.getItem(key));
+    return Number.isFinite(n) ? n : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeInt(key: string, value: number) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    /* ignore */
+  }
+}
+
+function latestStaffMessage(messages: BotMessage[]): BotMessage | null {
+  let latest: BotMessage | null = null;
+  for (const m of messages) {
+    if (m.sender !== "staff") continue;
+    if (!latest || m.id > latest.id) latest = m;
+  }
+  return latest;
+}
+
 export function AskMeBot() {
   const [open, setOpen] = useState(false);
   const [showBubble, setShowBubble] = useState(false);
+  const [replyPreview, setReplyPreview] = useState<string | null>(null);
+  const [hasUnreadReply, setHasUnreadReply] = useState(false);
   const [faqs, setFaqs] = useState<BotFaq[]>([]);
   const [askedFaqIds, setAskedFaqIds] = useState<number[]>([]);
   const [lines, setLines] = useState<LocalLine[]>([]);
@@ -37,6 +77,14 @@ export function AskMeBot() {
     website: "",
   });
   const [lookupMobile, setLookupMobile] = useState("");
+
+  const openRef = useRef(false);
+  const baselineStaffIdRef = useRef<number | null>(null);
+  const previewTimerRef = useRef(0);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const greeting = useMemo(
     () =>
@@ -57,27 +105,78 @@ export function AskMeBot() {
     }
   }, []);
 
-  const loadThread = useCallback(
-    async (opts: { publicToken?: string; mobile?: string }) => {
-      const result = await getBotThreadAction(opts);
-      if (!result.ok) return result;
-      persistToken(result.thread.public_token);
+  const markStaffRead = useCallback((staffId: number) => {
+    if (staffId <= 0) return;
+    writeInt(LAST_READ_STAFF_KEY, staffId);
+    setHasUnreadReply(false);
+  }, []);
+
+  const handleNewStaffReply = useCallback((msg: BotMessage) => {
+    playStaffReplyChime();
+
+    const previewCount = readInt(PREVIEW_COUNT_KEY, 0);
+    if (previewCount < MAX_REPLY_PREVIEWS && !openRef.current) {
+      setReplyPreview(previewWords(msg.body));
+      writeInt(PREVIEW_COUNT_KEY, previewCount + 1);
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = window.setTimeout(() => {
+        setReplyPreview(null);
+      }, REPLY_PREVIEW_MS);
+    }
+
+    if (!openRef.current) {
+      setHasUnreadReply(true);
+    } else {
+      markStaffRead(msg.id);
+    }
+  }, [markStaffRead]);
+
+  const applyMessages = useCallback(
+    (messages: BotMessage[]) => {
       setLines([
         greeting,
-        ...result.messages.map((m) => ({
+        ...messages.map((m) => ({
           id: `m-${m.id}`,
           kind: "server" as const,
           message: m,
         })),
       ]);
-      return result;
+
+      const latest = latestStaffMessage(messages);
+      const latestId = latest?.id ?? 0;
+      const lastRead = readInt(LAST_READ_STAFF_KEY, 0);
+
+      if (baselineStaffIdRef.current === null) {
+        baselineStaffIdRef.current = latestId;
+        setHasUnreadReply(latestId > lastRead);
+        return;
+      }
+
+      if (latest && latestId > baselineStaffIdRef.current) {
+        baselineStaffIdRef.current = latestId;
+        handleNewStaffReply(latest);
+        return;
+      }
+
+      setHasUnreadReply(latestId > lastRead && !openRef.current);
     },
-    [greeting, persistToken],
+    [greeting, handleNewStaffReply],
   );
 
-  // Cycle popup: show 3s → hide 10s → show 3s… (paused while chat is open).
+  const loadThread = useCallback(
+    async (opts: { publicToken?: string; mobile?: string }) => {
+      const result = await getBotThreadAction(opts);
+      if (!result.ok) return result;
+      persistToken(result.thread.public_token);
+      applyMessages(result.messages);
+      return result;
+    },
+    [applyMessages, persistToken],
+  );
+
+  // Default Ask Me bubble cycle (paused while open or while reply preview is showing).
   useEffect(() => {
-    if (open) {
+    if (open || replyPreview) {
       setShowBubble(false);
       return;
     }
@@ -100,7 +199,7 @@ export function AskMeBot() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open]);
+  }, [open, replyPreview]);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,13 +223,14 @@ export function AskMeBot() {
     };
   }, [greeting, loadThread]);
 
+  // Poll for staff replies whether chat is open or closed (needs a saved token).
   useEffect(() => {
-    if (!open || !token) return;
+    if (!token) return;
     const id = window.setInterval(() => {
       void loadThread({ publicToken: token });
     }, 12_000);
     return () => window.clearInterval(id);
-  }, [open, token, loadThread]);
+  }, [token, loadThread]);
 
   useEffect(() => {
     if (!showForm && !showLookup) return;
@@ -141,9 +241,16 @@ export function AskMeBot() {
     return () => window.clearTimeout(t);
   }, [showForm, showLookup]);
 
+  useEffect(() => {
+    return () => window.clearTimeout(previewTimerRef.current);
+  }, []);
+
   function openChat() {
     setShowBubble(false);
+    setReplyPreview(null);
     setOpen(true);
+    const latestId = baselineStaffIdRef.current ?? 0;
+    markStaffRead(latestId);
   }
 
   function pickFaq(faq: BotFaq) {
@@ -230,7 +337,21 @@ export function AskMeBot() {
 
   return (
     <div className="relative flex flex-col items-end">
-      {showBubble && !open ? (
+      {replyPreview && !open ? (
+        <button
+          type="button"
+          onClick={openChat}
+          className="absolute bottom-[calc(100%+0.75rem)] right-0 z-10 w-[min(14rem,calc(100vw-5.5rem))] rounded-2xl border border-gold/50 bg-charcoal/95 px-4 py-3 text-left text-sm text-white shadow-xl shadow-black/40"
+        >
+          <span className="flex items-center gap-1.5 font-semibold text-gold">
+            <Bell className="h-3.5 w-3.5" />
+            New reply
+          </span>
+          <span className="mt-1 block text-xs text-white/80">{replyPreview}</span>
+        </button>
+      ) : null}
+
+      {showBubble && !open && !replyPreview ? (
         <button
           type="button"
           onClick={openChat}
@@ -251,7 +372,6 @@ export function AskMeBot() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:bg-black/30"
           />
-          {/* Anchored to top-right corner of Ask Me FAB */}
           <div
             className={`absolute bottom-[calc(100%+0.75rem)] right-0 z-[60] flex w-[min(calc(100vw-1.75rem),22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 ${
               formExpanded
@@ -477,9 +597,24 @@ export function AskMeBot() {
         type="button"
         onClick={() => (open ? setOpen(false) : openChat())}
         className="relative z-[61] flex h-12 w-12 shrink-0 items-center justify-center rounded-full gold-gradient text-black shadow-lg"
-        aria-label={open ? "Close Ask Me" : "Open Ask Me"}
+        aria-label={
+          open
+            ? "Close Ask Me"
+            : hasUnreadReply
+              ? "Open Ask Me — new reply"
+              : "Open Ask Me"
+        }
       >
-        {open ? <X className="h-5 w-5" /> : <MessageSquareText className="h-5 w-5" />}
+        {open ? (
+          <X className="h-5 w-5" />
+        ) : (
+          <MessageSquareText className="h-5 w-5" />
+        )}
+        {hasUnreadReply && !open ? (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-[#080808]">
+            <Bell className="h-2.5 w-2.5" aria-hidden />
+          </span>
+        ) : null}
       </button>
     </div>
   );
