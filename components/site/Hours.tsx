@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DAY_NAMES, formatTime } from "@/lib/utils";
-import { getOpenStatus } from "@/lib/hours";
+import { getOpenStatus, getTodayDayOfWeek } from "@/lib/hours";
 import type { OpeningHour } from "@/lib/types";
 
 export function Hours({
@@ -14,6 +14,7 @@ export function Hours({
   timezone: string;
 }) {
   const status = getOpenStatus(hours, timezone);
+  const todayDow = getTodayDayOfWeek(timezone);
   const ordered = [...hours]
     .filter((h) => !h.is_hidden)
     .sort((a, b) => {
@@ -51,19 +52,37 @@ export function Hours({
             </span>
           </div>
           <ul>
-            {ordered.map((h) => (
-              <li
-                key={h.id}
-                className="flex items-center justify-between border-b border-white/5 px-6 py-4 text-sm last:border-0"
-              >
-                <span className="text-white">{DAY_NAMES[h.day_of_week]}</span>
-                <span className="text-muted">
-                  {h.is_closed
-                    ? "Closed"
-                    : `${formatTime(h.open_time)} – ${formatTime(h.close_time)}`}
-                </span>
-              </li>
-            ))}
+            {ordered.map((h) => {
+              const isToday = h.day_of_week === todayDow;
+              return (
+                <li
+                  key={h.id}
+                  className={`flex items-center justify-between border-b border-white/5 px-6 py-4 text-sm last:border-0 ${
+                    isToday
+                      ? "bg-gold/10 ring-1 ring-inset ring-gold/35"
+                      : ""
+                  }`}
+                >
+                  <span
+                    className={`flex items-center gap-2 ${
+                      isToday ? "font-semibold text-gold" : "text-white"
+                    }`}
+                  >
+                    {DAY_NAMES[h.day_of_week]}
+                    {isToday ? (
+                      <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black">
+                        Today
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={isToday ? "font-medium text-gold-soft" : "text-muted"}>
+                    {h.is_closed
+                      ? "Closed"
+                      : `${formatTime(h.open_time)} – ${formatTime(h.close_time)}`}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </motion.div>
       </div>

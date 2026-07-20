@@ -5,6 +5,26 @@ function parseTimeToMinutes(time: string) {
   return h * 60 + m;
 }
 
+const WEEKDAY_TO_DOW: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+/** Current day_of_week (0=Sun … 6=Sat) in the gym timezone. */
+export function getTodayDayOfWeek(timezone = "Asia/Kolkata") {
+  const weekday =
+    new Intl.DateTimeFormat("en-IN", {
+      timeZone: timezone,
+      weekday: "short",
+    }).format(new Date()) || "Mon";
+  return WEEKDAY_TO_DOW[weekday] ?? new Date().getDay();
+}
+
 export function getOpenStatus(
   hours: OpeningHour[],
   timezone = "Asia/Kolkata",
@@ -21,16 +41,7 @@ export function getOpenStatus(
   const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Mon";
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
   const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-  const map: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  const day = map[weekday] ?? now.getDay();
+  const day = WEEKDAY_TO_DOW[weekday] ?? now.getDay();
   const current = hour * 60 + minute;
   const today = hours.find((h) => h.day_of_week === day && !h.is_hidden);
 

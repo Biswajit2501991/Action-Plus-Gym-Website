@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { submitNewsletter } from "@/lib/actions/leads";
 import type { OpeningHour, WebsiteSettings } from "@/lib/types";
+import { getTodayDayOfWeek } from "@/lib/hours";
 import { DAY_NAMES, formatTime } from "@/lib/utils";
 
 export function Footer({
@@ -15,6 +16,7 @@ export function Footer({
 }) {
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const todayDow = getTodayDayOfWeek(settings.timezone || "Asia/Kolkata");
   const visibleHours = [...hours]
     .filter((h) => !h.is_hidden)
     .sort((a, b) => {
@@ -59,16 +61,27 @@ export function Footer({
             Hours
           </p>
           <ul className="space-y-2 text-sm text-white/75">
-            {visibleHours.map((h) => (
-              <li key={h.id} className="flex justify-between gap-4">
-                <span>{DAY_NAMES[h.day_of_week].slice(0, 3)}</span>
-                <span>
-                  {h.is_closed
-                    ? "Closed"
-                    : `${formatTime(h.open_time)} – ${formatTime(h.close_time)}`}
-                </span>
-              </li>
-            ))}
+            {visibleHours.map((h) => {
+              const isToday = h.day_of_week === todayDow;
+              return (
+                <li
+                  key={h.id}
+                  className={`flex justify-between gap-4 rounded-lg px-2 py-1 ${
+                    isToday ? "bg-gold/10 text-gold" : ""
+                  }`}
+                >
+                  <span className={isToday ? "font-semibold" : undefined}>
+                    {DAY_NAMES[h.day_of_week].slice(0, 3)}
+                    {isToday ? " · Today" : ""}
+                  </span>
+                  <span className={isToday ? "font-medium text-gold-soft" : undefined}>
+                    {h.is_closed
+                      ? "Closed"
+                      : `${formatTime(h.open_time)} – ${formatTime(h.close_time)}`}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
           {settings.google_reviews_url ? (
             <a
