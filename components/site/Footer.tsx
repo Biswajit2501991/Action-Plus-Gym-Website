@@ -15,7 +15,13 @@ export function Footer({
 }) {
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
-  const visibleHours = hours.filter((h) => !h.is_hidden).slice(0, 4);
+  const visibleHours = [...hours]
+    .filter((h) => !h.is_hidden)
+    .sort((a, b) => {
+      const aa = a.day_of_week === 0 ? 7 : a.day_of_week;
+      const bb = b.day_of_week === 0 ? 7 : b.day_of_week;
+      return aa - bb;
+    });
 
   return (
     <footer className="border-t border-white/10 bg-black/50">
