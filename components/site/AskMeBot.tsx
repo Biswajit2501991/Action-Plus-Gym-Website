@@ -165,9 +165,29 @@ export function AskMeBot() {
 
   function submitEnquiry() {
     setError(null);
+    const fullName = form.fullName.trim();
+    const mobile = form.mobile.trim();
+    const email = form.email.trim();
+    const message = form.message.trim();
+    if (fullName.length < 2) {
+      setError("Enter your full name (at least 2 characters).");
+      return;
+    }
+    if (mobile.replace(/[\s\-()]/g, "").length < 6) {
+      setError("Enter a valid mobile number.");
+      return;
+    }
+    if (message.length < 2) {
+      setError("Enter your query.");
+      return;
+    }
     startTransition(async () => {
       const result = await submitBotEnquiryAction({
-        ...form,
+        fullName,
+        mobile,
+        email,
+        message,
+        website: form.website,
         publicToken: token || "",
       });
       if (!result.ok) {

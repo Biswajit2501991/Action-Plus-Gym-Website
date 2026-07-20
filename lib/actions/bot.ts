@@ -53,21 +53,46 @@ export async function listBotFaqsAction(): Promise<BotFaq[]> {
   return (data.faqs ?? []) as BotFaq[];
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const enquirySchema = z.object({
-  fullName: z.string().min(2).max(120),
-  mobile: z.string().min(6).max(30),
-  email: z.string().email().optional().or(z.literal("")),
-  message: z.string().min(2).max(2000),
-  publicToken: z.string().uuid().optional().or(z.literal("")),
+  fullName: z.string().min(2, "Enter your full name (at least 2 characters).").max(120),
+  mobile: z.string().min(6, "Enter a valid mobile number.").max(30),
+  email: z.union([
+    z.literal(""),
+    z.string().email("Enter a valid email, or leave it blank."),
+  ]),
+  message: z.string().min(2, "Enter your query.").max(2000),
+  publicToken: z.union([z.literal(""), z.string().uuid()]),
   website: z.string().optional(),
 });
 
+function normalizeEnquiryInput(input: Record<string, unknown>) {
+  const rawToken = String(input.publicToken ?? "").trim();
+  return {
+    fullName: String(input.fullName ?? "").trim(),
+    mobile: String(input.mobile ?? "")
+      .trim()
+      .replace(/[\s\-()]/g, ""),
+    email: String(input.email ?? "").trim(),
+    message: String(input.message ?? "").trim(),
+    // Drop stale/invalid localStorage tokens so they don't fail validation.
+    publicToken: UUID_RE.test(rawToken) ? rawToken : "",
+    website: String(input.website ?? ""),
+  };
+}
+
 export async function submitBotEnquiryAction(
-  input: z.infer<typeof enquirySchema>,
+  input: Record<string, unknown>,
 ): Promise<{ ok: true; publicToken: string } | { ok: false; error: string }> {
-  const parsed = enquirySchema.safeParse(input);
+  const parsed = enquirySchema.safeParse(normalizeEnquiryInput(input));
   if (!parsed.success) {
-    return { ok: false, error: "Please check your details and try again." };
+    const first = parsed.error.issues[0]?.message;
+    return {
+      ok: false,
+      error: first || "Please check your details and try again.",
+    };
   }
   if (parsed.data.website) return { ok: true, publicToken: randomUUID() };
 
@@ -83,7 +108,7 @@ export async function submitBotEnquiryAction(
     p_mobile: parsed.data.mobile,
     p_message: parsed.data.message,
     p_email: parsed.data.email || null,
-    p_public_token: parsed.data.publicToken || null,
+    p_public_token: parsed.data.publicToken ? parsed.data.publicToken : null,
   });
 
   if (error) {
