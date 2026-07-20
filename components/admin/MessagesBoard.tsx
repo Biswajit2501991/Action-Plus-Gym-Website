@@ -299,7 +299,17 @@ export function MessagesBoard({
                     >
                       {sending ? "Sending…" : "Send reply"}
                     </button>
-                    {msg ? <p className="text-sm text-emerald-300">{msg}</p> : null}
+                    {msg ? (
+                      <p
+                        className={`text-sm ${
+                          msg.startsWith("Reply sent")
+                            ? "text-emerald-300"
+                            : "text-red-300"
+                        }`}
+                      >
+                        {msg}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </>
