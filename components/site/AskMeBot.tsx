@@ -200,7 +200,7 @@ export function AskMeBot() {
         <button
           type="button"
           onClick={openChat}
-          className="absolute bottom-[calc(100%+0.75rem)] right-0 z-10 w-[14rem] rounded-2xl border border-gold/40 bg-charcoal/95 px-4 py-3 text-left text-sm text-white shadow-xl shadow-black/40"
+          className="absolute bottom-[calc(100%+0.75rem)] right-0 z-10 w-[min(14rem,calc(100vw-5.5rem))] rounded-2xl border border-gold/40 bg-charcoal/95 px-4 py-3 text-left text-sm text-white shadow-xl shadow-black/40"
         >
           <span className="font-semibold text-gold">Ask Me :)</span>
           <span className="mt-1 block text-xs text-white/70">
@@ -210,201 +210,215 @@ export function AskMeBot() {
       ) : null}
 
       {open ? (
-        <div className="absolute bottom-[calc(100%+0.75rem)] right-0 z-20 flex h-[min(70vh,34rem)] w-[min(100vw-1.5rem,22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/50">
-          <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-gold/20 to-transparent px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full gold-gradient text-black">
-                <Bot className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-white">Ask Me</p>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-gold/80">
-                  Action Plus Gym
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white"
-              aria-label="Close chat"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
-            {lines.map((line) => {
-              if (line.kind === "server") {
-                const m = line.message;
-                const staff = m.sender === "staff";
-                const customer = m.sender === "customer";
-                return (
-                  <div
-                    key={line.id}
-                    className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${
-                      staff
-                        ? "bg-gold/15 text-gold-soft"
-                        : customer
-                          ? "ml-auto bg-white/10 text-white"
-                          : "bg-white/5 text-white/85"
-                    }`}
-                  >
-                    <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-muted">
-                      {staff
-                        ? m.staff_name || "Action Plus Gym"
-                        : customer
-                          ? "You"
-                          : "Ask Me"}
-                    </p>
-                    <p className="whitespace-pre-wrap">{m.body}</p>
-                  </div>
-                );
-              }
-              if (line.kind === "user") {
-                return (
-                  <div
-                    key={line.id}
-                    className="ml-auto max-w-[90%] rounded-2xl bg-white/10 px-3 py-2 text-sm text-white"
-                  >
-                    {line.body}
-                  </div>
-                );
-              }
-              if (line.kind === "system") {
-                return (
-                  <p key={line.id} className="text-center text-[11px] text-muted">
-                    {line.body}
+        <>
+          {/* Soft scrim on small screens — tap outside to close */}
+          <button
+            type="button"
+            aria-label="Close Ask Me"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:hidden"
+          />
+          <div
+            className="fixed bottom-[11.5rem] left-3 right-3 z-[60] mx-auto flex h-auto max-h-[min(48dvh,26rem)] w-auto max-w-[22rem] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 sm:left-auto sm:right-5 sm:mx-0 sm:w-[22rem] md:bottom-[12.5rem] md:max-h-[min(52dvh,28rem)]"
+            role="dialog"
+            aria-label="Ask Me chat"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-gradient-to-r from-gold/20 to-transparent px-3 py-2.5 sm:px-4 sm:py-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full gold-gradient text-black sm:h-9 sm:w-9">
+                  <Bot className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Ask Me</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-gold/80">
+                    Action Plus Gym
                   </p>
-                );
-              }
-              return (
-                <div
-                  key={line.id}
-                  className="max-w-[90%] rounded-2xl border border-white/10 bg-charcoal/80 px-3 py-2 text-sm text-white/90"
-                >
-                  <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-gold">
-                    Ask Me
-                  </p>
-                  {line.body}
                 </div>
-              );
-            })}
-
-            {faqs.length ? (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {faqs.map((faq) => (
-                  <button
-                    key={faq.id}
-                    type="button"
-                    onClick={() => pickFaq(faq)}
-                    className="rounded-full border border-gold/30 bg-gold/5 px-3 py-1.5 text-left text-xs text-gold hover:bg-gold/15"
-                  >
-                    {faq.question}
-                  </button>
-                ))}
               </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-2 border-t border-white/10 p-3">
-            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowForm((v) => !v);
-                  setShowLookup(false);
-                }}
-                className="flex-1 rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/85 hover:border-gold/40 hover:text-gold"
+                onClick={() => setOpen(false)}
+                className="rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white"
+                aria-label="Close chat"
               >
-                Submit your query
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowLookup((v) => !v);
-                  setShowForm(false);
-                }}
-                className="rounded-full border border-white/15 px-3 py-2 text-xs text-muted hover:text-white"
-              >
-                Find replies
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {showLookup ? (
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
-                <input
-                  value={lookupMobile}
-                  onChange={(e) => setLookupMobile(e.target.value)}
-                  placeholder="Mobile used when you enquired"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                />
+            {/* Content-sized; scrolls only after max-height is reached */}
+            <div className="min-h-0 flex-[1_1_auto] space-y-2.5 overflow-y-auto overscroll-contain px-3 py-2.5 sm:space-y-3 sm:py-3">
+              {lines.map((line) => {
+                if (line.kind === "server") {
+                  const m = line.message;
+                  const staff = m.sender === "staff";
+                  const customer = m.sender === "customer";
+                  return (
+                    <div
+                      key={line.id}
+                      className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm ${
+                        staff
+                          ? "bg-gold/15 text-gold-soft"
+                          : customer
+                            ? "ml-auto bg-white/10 text-white"
+                            : "bg-white/5 text-white/85"
+                      }`}
+                    >
+                      <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-muted">
+                        {staff
+                          ? m.staff_name || "Action Plus Gym"
+                          : customer
+                            ? "You"
+                            : "Ask Me"}
+                      </p>
+                      <p className="whitespace-pre-wrap">{m.body}</p>
+                    </div>
+                  );
+                }
+                if (line.kind === "user") {
+                  return (
+                    <div
+                      key={line.id}
+                      className="ml-auto max-w-[92%] rounded-2xl bg-white/10 px-3 py-2 text-sm text-white"
+                    >
+                      {line.body}
+                    </div>
+                  );
+                }
+                if (line.kind === "system") {
+                  return (
+                    <p key={line.id} className="text-center text-[11px] text-muted">
+                      {line.body}
+                    </p>
+                  );
+                }
+                return (
+                  <div
+                    key={line.id}
+                    className="max-w-[92%] rounded-2xl border border-white/10 bg-charcoal/80 px-3 py-2 text-sm text-white/90"
+                  >
+                    <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-gold">
+                      Ask Me
+                    </p>
+                    {line.body}
+                  </div>
+                );
+              })}
+
+              {faqs.length ? (
+                <div className="flex flex-wrap gap-1.5 pt-0.5 sm:gap-2">
+                  {faqs.map((faq) => (
+                    <button
+                      key={faq.id}
+                      type="button"
+                      onClick={() => pickFaq(faq)}
+                      className="rounded-full border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-left text-[11px] leading-snug text-gold hover:bg-gold/15 sm:px-3 sm:text-xs"
+                    >
+                      {faq.question}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="shrink-0 space-y-2 border-t border-white/10 p-2.5 sm:p-3">
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={pending || lookupMobile.trim().length < 6}
-                  onClick={lookupByMobile}
-                  className="w-full rounded-full gold-gradient py-2 text-xs font-semibold text-black disabled:opacity-50"
+                  onClick={() => {
+                    setShowForm((v) => !v);
+                    setShowLookup(false);
+                  }}
+                  className="flex-1 rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/85 hover:border-gold/40 hover:text-gold"
                 >
-                  {pending ? "Looking…" : "Load my conversation"}
+                  Submit your query
                 </button>
-              </div>
-            ) : null}
-
-            {showForm ? (
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
-                <input
-                  value={form.fullName}
-                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                  placeholder="Full name"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                />
-                <input
-                  value={form.mobile}
-                  onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
-                  placeholder="Mobile"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                />
-                <input
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="Email (optional)"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                />
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                  placeholder="Your query…"
-                  rows={3}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                />
-                <input
-                  value={form.website}
-                  onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                  className="hidden"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  aria-hidden
-                />
                 <button
                   type="button"
-                  disabled={pending}
-                  onClick={submitEnquiry}
-                  className="w-full rounded-full gold-gradient py-2.5 text-xs font-semibold text-black disabled:opacity-50"
+                  onClick={() => {
+                    setShowLookup((v) => !v);
+                    setShowForm(false);
+                  }}
+                  className="rounded-full border border-white/15 px-3 py-2 text-xs text-muted hover:text-white"
                 >
-                  {pending ? "Sending…" : "Send query"}
+                  Find replies
                 </button>
               </div>
-            ) : null}
 
-            {error ? <p className="text-xs text-red-300">{error}</p> : null}
+              {showLookup ? (
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
+                  <input
+                    value={lookupMobile}
+                    onChange={(e) => setLookupMobile(e.target.value)}
+                    placeholder="Mobile used when you enquired"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                  />
+                  <button
+                    type="button"
+                    disabled={pending || lookupMobile.trim().length < 6}
+                    onClick={lookupByMobile}
+                    className="w-full rounded-full gold-gradient py-2 text-xs font-semibold text-black disabled:opacity-50"
+                  >
+                    {pending ? "Looking…" : "Load my conversation"}
+                  </button>
+                </div>
+              ) : null}
+
+              {showForm ? (
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
+                  <input
+                    value={form.fullName}
+                    onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+                    placeholder="Full name"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                  />
+                  <input
+                    value={form.mobile}
+                    onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+                    placeholder="Mobile"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                  />
+                  <input
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="Email (optional)"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                  />
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+                    placeholder="Your query…"
+                    rows={3}
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
+                  />
+                  <input
+                    value={form.website}
+                    onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                    className="hidden"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden
+                  />
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={submitEnquiry}
+                    className="w-full rounded-full gold-gradient py-2.5 text-xs font-semibold text-black disabled:opacity-50"
+                  >
+                    {pending ? "Sending…" : "Send query"}
+                  </button>
+                </div>
+              ) : null}
+
+              {error ? <p className="text-xs text-red-300">{error}</p> : null}
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
 
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openChat())}
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full gold-gradient text-black shadow-lg"
+        className="relative z-[61] flex h-12 w-12 shrink-0 items-center justify-center rounded-full gold-gradient text-black shadow-lg"
         aria-label={open ? "Close Ask Me" : "Open Ask Me"}
       >
         {open ? <X className="h-5 w-5" /> : <MessageSquareText className="h-5 w-5" />}
