@@ -35,7 +35,7 @@ export default async function AdminLayout({
               <form action={logoutAction} className="shrink-0 pt-0.5">
                 <button
                   type="submit"
-                  className="rounded-full border border-[color:var(--panel-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--ink-soft)] transition hover:border-gold/40 hover:text-gold"
+                  className="rounded-full border border-pink-300/70 bg-pink-200/80 px-2.5 py-1 text-[11px] font-semibold text-pink-900 transition hover:bg-pink-300 hover:border-pink-400"
                 >
                   Logout
                 </button>
@@ -69,7 +69,7 @@ export default async function AdminLayout({
                 <form action={logoutAction}>
                   <button
                     type="submit"
-                    className="rounded-full border border-[color:var(--panel-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--ink-soft)]"
+                    className="rounded-full border border-pink-300/70 bg-pink-200/80 px-2.5 py-1 text-[11px] font-semibold text-pink-900 transition hover:bg-pink-300"
                   >
                     Logout
                   </button>
