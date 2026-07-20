@@ -383,10 +383,10 @@ export function AskMeBot() {
             className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:bg-black/30"
           />
           <div
-            className={`absolute z-[60] flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 bottom-[calc(100%+0.75rem)] right-0 w-[min(calc(100vw-1.75rem),22rem)] md:bottom-0 md:right-full md:left-auto md:mr-3 md:w-[min(24rem,calc(100vw-6.5rem))] ${
+            className={`z-[60] flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/60 absolute bottom-[calc(100%+0.75rem)] right-0 w-[min(calc(100vw-1.75rem),22rem)] md:fixed md:bottom-5 md:right-[5.25rem] md:left-auto md:origin-bottom md:animate-[askMeRise_0.28s_ease-out] ${
               formExpanded
-                ? "max-h-[min(calc(100dvh-12rem),34rem)] md:max-h-[min(calc(100dvh-3rem),36rem)]"
-                : "max-h-[min(calc(100dvh-13.5rem),28rem)] md:max-h-[min(calc(100dvh-3rem),32rem)]"
+                ? "max-h-[min(calc(100dvh-12rem),34rem)] md:max-h-[min(calc(100dvh-2.5rem),36rem)] md:w-[min(24rem,calc(100vw-7rem))]"
+                : "max-h-[min(calc(100dvh-13.5rem),28rem)] md:max-h-[min(calc(100dvh-2.5rem),32rem)] md:w-[min(24rem,calc(100vw-7rem))]"
             }`}
             role="dialog"
             aria-label="Ask Me chat"
