@@ -61,7 +61,10 @@ export async function syncGoogleReviewsCache(
   return merged;
 }
 
-/** Refresh from Google when cache is stale and API key is configured. */
+/**
+ * Serve cached reviews immediately. Never block the page on Google Places —
+ * a slow/failed Places call was timing out SSR and showing error.tsx.
+ */
 export async function ensureFreshReviews(
   existing?: ReviewsRow | null,
 ): Promise<ReviewCache | null> {
@@ -72,7 +75,11 @@ export async function ensureFreshReviews(
     if (existing && !isStale(existing.updated_at)) {
       return existing;
     }
-    return (await syncGoogleReviewsCache(existing)) ?? existing ?? null;
+    // Background refresh only — homepage must not wait on Google.
+    void syncGoogleReviewsCache(existing).catch((error) => {
+      console.error("background Google reviews sync failed", error);
+    });
+    return existing ?? null;
   } catch (error) {
     console.error("ensureFreshReviews failed", error);
     return existing ?? null;

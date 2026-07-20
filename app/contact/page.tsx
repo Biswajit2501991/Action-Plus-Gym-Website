@@ -4,6 +4,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { LeadForm } from "@/components/site/LeadForm";
 import { FloatingActions } from "@/components/site/FloatingActions";
+import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
 import { isGoogleMapsEmbedUrl, normalizeGoogleMapsEmbedUrl } from "@/lib/maps";
 
 export const dynamic = "force-dynamic";
@@ -113,7 +114,9 @@ export default async function ContactPage() {
         </section>
       </main>
       <Footer settings={settings} hours={content.hours} />
-      <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
+      <ClientErrorBoundary>
+        <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
+      </ClientErrorBoundary>
     </>
   );
 }

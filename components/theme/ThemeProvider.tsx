@@ -30,13 +30,28 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function subscribeSystemTheme(onStoreChange: () => void) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => undefined;
+  }
   const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  mq.addEventListener("change", onStoreChange);
-  return () => mq.removeEventListener("change", onStoreChange);
+  if (typeof mq.addEventListener === "function") {
+    mq.addEventListener("change", onStoreChange);
+    return () => mq.removeEventListener("change", onStoreChange);
+  }
+  // Older Safari
+  mq.addListener(onStoreChange);
+  return () => mq.removeListener(onStoreChange);
 }
 
 function getSystemPrefersDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return true;
+  }
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch {
+    return true;
+  }
 }
 
 function applyDomTheme(preference: ThemePreference, resolved: ResolvedTheme) {

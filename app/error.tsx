@@ -1,6 +1,7 @@
 "use client";
 
 export default function Error({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -12,13 +13,24 @@ export default function Error({
       <p className="max-w-md text-sm text-muted">
         The page hit a temporary server error. Try again — your content is safe.
       </p>
-      <button
-        type="button"
-        onClick={() => reset()}
-        className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
-      >
-        Try again
-      </button>
+      {error?.digest ? (
+        <p className="text-[10px] text-muted/70">Ref: {error.digest}</p>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => reset()}
+          className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
+        >
+          Try again
+        </button>
+        <a
+          href="/"
+          className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/80 hover:border-gold/40 hover:text-gold"
+        >
+          Go home
+        </a>
+      </div>
     </div>
   );
 }
