@@ -131,6 +131,15 @@ export function AskMeBot() {
     return () => window.clearInterval(id);
   }, [open, token, loadThread]);
 
+  useEffect(() => {
+    if (!showForm && !showLookup) return;
+    const t = window.setTimeout(() => {
+      const el = document.querySelector("[data-ask-me-scroll]");
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [showForm, showLookup]);
+
   function openChat() {
     setShowBubble(false);
     setOpen(true);
