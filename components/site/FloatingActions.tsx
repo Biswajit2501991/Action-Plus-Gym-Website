@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp, MessageCircle, Phone } from "lucide-react";
+import { AskMeBot } from "@/components/site/AskMeBot";
+
+const fabClass =
+  "flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-lg";
 
 export function FloatingActions({
   phone,
@@ -14,6 +18,7 @@ export function FloatingActions({
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 500);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -22,13 +27,14 @@ export function FloatingActions({
   const wa = whatsapp.replace(/[^\d]/g, "");
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col gap-3">
+    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
+      <AskMeBot />
       {wa ? (
         <a
           href={`https://wa.me/${wa}`}
           target="_blank"
           rel="noreferrer"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg"
+          className={`${fabClass} bg-[#25D366] text-white`}
           aria-label="WhatsApp"
         >
           <MessageCircle className="h-5 w-5" />
@@ -37,7 +43,7 @@ export function FloatingActions({
       {tel ? (
         <a
           href={`tel:${tel}`}
-          className="flex h-12 w-12 items-center justify-center rounded-full gold-gradient text-black shadow-lg"
+          className={`${fabClass} gold-gradient text-black`}
           aria-label="Call"
         >
           <Phone className="h-5 w-5" />
@@ -47,7 +53,7 @@ export function FloatingActions({
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white"
+          className={`${fabClass} border border-white/20 bg-black/70 text-white`}
           aria-label="Back to top"
         >
           <ArrowUp className="h-5 w-5" />

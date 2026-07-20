@@ -11,7 +11,8 @@ import {
 } from "@/lib/actions/bot";
 
 const TOKEN_KEY = "apg_ask_me_token";
-const BUBBLE_KEY = "apg_ask_me_bubble_seen";
+const BUBBLE_SHOW_MS = 3_000;
+const BUBBLE_HIDE_MS = 10_000;
 
 type LocalLine =
   | { id: string; kind: "bot" | "user" | "system"; body: string }
@@ -73,17 +74,32 @@ export function AskMeBot() {
     [greeting, persistToken],
   );
 
+  // Cycle popup: show 3s → hide 10s → show 3s… (paused while chat is open).
   useEffect(() => {
-    try {
-      const seen = sessionStorage.getItem(BUBBLE_KEY);
-      if (!seen) {
-        const t = window.setTimeout(() => setShowBubble(true), 1200);
-        return () => window.clearTimeout(t);
-      }
-    } catch {
-      setShowBubble(true);
+    if (open) {
+      setShowBubble(false);
+      return;
     }
-  }, []);
+    let cancelled = false;
+    let timer = 0;
+
+    const show = () => {
+      if (cancelled) return;
+      setShowBubble(true);
+      timer = window.setTimeout(hide, BUBBLE_SHOW_MS);
+    };
+    const hide = () => {
+      if (cancelled) return;
+      setShowBubble(false);
+      timer = window.setTimeout(show, BUBBLE_HIDE_MS);
+    };
+
+    show();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,17 +131,8 @@ export function AskMeBot() {
     return () => window.clearInterval(id);
   }, [open, token, loadThread]);
 
-  function dismissBubble() {
-    setShowBubble(false);
-    try {
-      sessionStorage.setItem(BUBBLE_KEY, "1");
-    } catch {
-      /* ignore */
-    }
-  }
-
   function openChat() {
-    dismissBubble();
+    setShowBubble(false);
     setOpen(true);
   }
 
@@ -188,12 +195,12 @@ export function AskMeBot() {
   }
 
   return (
-    <div className="fixed bottom-[13.5rem] right-5 z-[45] flex flex-col items-end gap-2 md:bottom-[13.5rem]">
+    <div className="relative flex flex-col items-end">
       {showBubble && !open ? (
         <button
           type="button"
           onClick={openChat}
-          className="animate-in fade-in slide-in-from-bottom-2 max-w-[14rem] rounded-2xl border border-gold/40 bg-charcoal/95 px-4 py-3 text-left text-sm text-white shadow-xl shadow-black/40"
+          className="absolute bottom-[calc(100%+0.75rem)] right-0 z-10 w-[14rem] rounded-2xl border border-gold/40 bg-charcoal/95 px-4 py-3 text-left text-sm text-white shadow-xl shadow-black/40"
         >
           <span className="font-semibold text-gold">Ask Me :)</span>
           <span className="mt-1 block text-xs text-white/70">
@@ -203,7 +210,7 @@ export function AskMeBot() {
       ) : null}
 
       {open ? (
-        <div className="flex h-[min(70vh,34rem)] w-[min(100vw-1.5rem,22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/50">
+        <div className="absolute bottom-[calc(100%+0.75rem)] right-0 z-20 flex h-[min(70vh,34rem)] w-[min(100vw-1.5rem,22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/50">
           <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-gold/20 to-transparent px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-full gold-gradient text-black">
@@ -397,7 +404,7 @@ export function AskMeBot() {
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openChat())}
-        className="flex h-14 w-14 items-center justify-center rounded-full gold-gradient text-black shadow-lg shadow-gold/20"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full gold-gradient text-black shadow-lg"
         aria-label={open ? "Close Ask Me" : "Open Ask Me"}
       >
         {open ? <X className="h-5 w-5" /> : <MessageSquareText className="h-5 w-5" />}

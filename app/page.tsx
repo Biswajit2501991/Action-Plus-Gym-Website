@@ -15,7 +15,6 @@ import { LeadForm } from "@/components/site/LeadForm";
 import { Footer } from "@/components/site/Footer";
 import { PopupOffer } from "@/components/site/PopupOffer";
 import { FloatingActions } from "@/components/site/FloatingActions";
-import { AskMeBot } from "@/components/site/AskMeBot";
 import { SITE_URL } from "@/lib/config";
 
 /** CMS-driven homepage — always fetch latest content from Supabase. */
@@ -93,7 +92,6 @@ export default async function HomePage() {
       ) : null}
       {sections.popup !== false ? <PopupOffer popup={content.popup} /> : null}
       <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
-      <AskMeBot />
     </>
   );
 }
