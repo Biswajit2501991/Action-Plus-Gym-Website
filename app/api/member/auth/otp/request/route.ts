@@ -11,12 +11,12 @@ import {
 import { randomUUID } from "crypto";
 import { hashOtp, randomOtp6, randomToken } from "@/lib/member-portal/crypto";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/member-portal/phone";
-import { sendMemberOtpSms } from "@/lib/member-portal/sms";
 import {
   assertPortalEligible,
   findMemberByMobile,
 } from "@/lib/member-portal/members";
 import { auditLog, requestMeta } from "@/lib/member-portal/session";
+import { buildGymVerifyWhatsAppUrl } from "@/lib/member-portal/whatsapp-verify";
 import { cookies } from "next/headers";
 
 const bodySchema = z.object({
@@ -25,6 +25,10 @@ const bodySchema = z.object({
   honeypot: z.string().optional(),
 });
 
+/**
+ * Staff-assisted WhatsApp verification (primary).
+ * Creates a pending challenge and a wa.me link to the gym WhatsApp number.
+ */
 export async function POST(req: NextRequest) {
   try {
     const json = await req.json();
@@ -76,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     if ((count || 0) >= MEMBER_OTP_HOURLY_LIMIT) {
       return NextResponse.json(
-        { ok: false, error: "Too many OTP requests. Try again later." },
+        { ok: false, error: "Too many verification requests. Try again later." },
         { status: 429 },
       );
     }
@@ -96,12 +100,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             ok: false,
-            error: `Please wait ${MEMBER_OTP_COOLDOWN_SEC}s before requesting another OTP.`,
+            error: `Please wait ${MEMBER_OTP_COOLDOWN_SEC}s before requesting again.`,
           },
           { status: 429 },
         );
       }
     }
+
+    // Expire any previous pending staff requests for this member
+    await svc.client
+      .from("member_portal_otp_challenges")
+      .update({ staff_status: "rejected", staff_note: "superseded" })
+      .eq("gym_id", portalGymId())
+      .eq("member_uuid", found.member.member_uuid)
+      .eq("staff_status", "pending");
 
     const otp = randomOtp6();
     const challengeId = randomUUID();
@@ -122,47 +134,46 @@ export async function POST(req: NextRequest) {
       ip,
       user_agent: userAgent,
       device_fingerprint: deviceId,
+      verification_channel: "whatsapp_staff",
+      staff_status: "pending",
+      otp_plain_for_staff: otp,
     });
 
     if (insErr) {
       console.error(insErr);
-      return NextResponse.json({ ok: false, error: "Could not create OTP" }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: "Could not create verification request" },
+        { status: 500 },
+      );
     }
 
-    const sent = await sendMemberOtpSms(mobile, otp);
-    if (!sent.ok) {
-      await auditLog({
-        memberUuid: found.member.member_uuid,
-        eventType: "otp_send_failed",
-        meta: { provider: sent.provider, error: sent.error },
-        ip,
-        userAgent,
-      });
-      return NextResponse.json({ ok: false, error: sent.error }, { status: 502 });
-    }
+    const whatsappUrl = buildGymVerifyWhatsAppUrl({
+      memberName: found.member.full_name,
+      memberMobile: mobile,
+      memberCode: found.member.member_code,
+      otp,
+    });
 
     await auditLog({
       memberUuid: found.member.member_uuid,
-      eventType: "otp_sent",
-      meta: { provider: sent.provider },
+      eventType: "whatsapp_verify_requested",
+      meta: { challengeId },
       ip,
       userAgent,
     });
 
-    const payload: Record<string, unknown> = {
+    return NextResponse.json({
       ok: true,
+      mode: "whatsapp_staff",
       challengeId,
       deviceId,
       expiresInSec: MEMBER_OTP_TTL_SEC,
       hasPin: Boolean(found.member.pin_hash),
       maskedMobile: `******${mobile.slice(-4)}`,
-    };
-
-    if (sent.provider === "dev") {
-      payload.devOtp = otp;
-    }
-
-    return NextResponse.json(payload);
+      memberName: found.member.full_name.split(" ")[0] || "Member",
+      whatsappUrl,
+      gymWhatsApp: "+917047157510",
+    });
   } catch (error) {
     console.error("otp/request", error);
     return NextResponse.json({ ok: false, error: "Unexpected error" }, { status: 500 });

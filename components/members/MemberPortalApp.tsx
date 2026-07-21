@@ -46,7 +46,15 @@ type Device = {
   current: boolean;
 };
 
-type Step = "mobile" | "otp" | "setPin" | "pinLogin" | "home" | "profile" | "card" | "devices";
+type Step =
+  | "mobile"
+  | "waiting"
+  | "setPin"
+  | "pinLogin"
+  | "home"
+  | "profile"
+  | "card"
+  | "devices";
 
 function deviceStorageKey() {
   return "apg_member_device_id";
@@ -56,7 +64,9 @@ function getOrCreateDeviceId() {
   if (typeof window === "undefined") return "";
   let id = localStorage.getItem(deviceStorageKey());
   if (!id) {
-    id = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    id =
+      crypto.randomUUID().replace(/-/g, "") +
+      crypto.randomUUID().replace(/-/g, "").slice(0, 8);
     localStorage.setItem(deviceStorageKey(), id);
   }
   return id;
@@ -71,7 +81,10 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
     },
     credentials: "include",
   });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string; ok?: boolean };
+  const data = (await res.json().catch(() => ({}))) as T & {
+    error?: string;
+    ok?: boolean;
+  };
   if (!res.ok || (data as { ok?: boolean }).ok === false) {
     throw new Error((data as { error?: string }).error || "Request failed");
   }
@@ -92,18 +105,17 @@ function formatDate(value: string | null | undefined) {
 export function MemberPortalApp() {
   const [step, setStep] = useState<Step>("mobile");
   const [mobile, setMobile] = useState("");
-  const [otp, setOtp] = useState("");
   const [pin, setPin] = useState("");
   const [challengeId, setChallengeId] = useState("");
   const [deviceId, setDeviceId] = useState("");
-  const [hasPin, setHasPin] = useState(false);
-  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [whatsappUrl, setWhatsappUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [member, setMember] = useState<MemberMe | null>(null);
   const [card, setCard] = useState<QrCard | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [booting, setBooting] = useState(true);
+  const [waitNote, setWaitNote] = useState("Waiting for gym staff to approve…");
 
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
@@ -131,61 +143,83 @@ export function MemberPortalApp() {
     };
   }, [loadMe]);
 
+  // Poll staff approval while waiting
+  useEffect(() => {
+    if (step !== "waiting" || !challengeId || !mobile) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const data = await api<{
+          ok: true;
+          status: string;
+          hasPin: boolean;
+        }>(
+          `/api/member/auth/otp/status?challengeId=${encodeURIComponent(challengeId)}&mobile=${encodeURIComponent(mobile)}`,
+        );
+        if (cancelled) return;
+        if (data.status === "approved") {
+          setWaitNote("Approved — signing you in…");
+          const done = await api<{ ok: true; needsPin: boolean }>(
+            "/api/member/auth/otp/complete",
+            {
+              method: "POST",
+              body: JSON.stringify({ mobile, challengeId, deviceId }),
+            },
+          );
+          if (done.needsPin) setStep("setPin");
+          else await loadMe();
+          return;
+        }
+        if (data.status === "rejected") {
+          setError("Verification was declined. Contact the gym or try again.");
+          setStep("mobile");
+          return;
+        }
+        if (data.status === "expired") {
+          setError("Verification expired. Please request again.");
+          setStep("mobile");
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [step, challengeId, mobile, deviceId, loadMe]);
+
   const greeting = useMemo(() => {
     const name = member?.fullName?.split(" ")[0] || "Member";
     return `Hello ${name}`;
   }, [member]);
 
-  async function requestOtp() {
+  async function requestVerify() {
     setError(null);
     setBusy(true);
-    setDevOtp(null);
     try {
       const data = await api<{
         ok: true;
         challengeId: string;
         deviceId: string;
+        whatsappUrl: string;
         hasPin: boolean;
-        devOtp?: string;
       }>("/api/member/auth/otp/request", {
         method: "POST",
         body: JSON.stringify({ mobile, deviceId }),
       });
       setChallengeId(data.challengeId);
       setDeviceId(data.deviceId || deviceId);
-      setHasPin(data.hasPin);
-      if (data.devOtp) setDevOtp(data.devOtp);
-      setStep("otp");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send OTP");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function verifyOtp() {
-    setError(null);
-    setBusy(true);
-    try {
-      const data = await api<{
-        ok: true;
-        needsPin: boolean;
-      }>("/api/member/auth/otp/verify", {
-        method: "POST",
-        body: JSON.stringify({
-          mobile,
-          otp,
-          challengeId,
-          deviceId,
-        }),
-      });
-      if (data.needsPin) {
-        setStep("setPin");
-      } else {
-        await loadMe();
+      setWhatsappUrl(data.whatsappUrl || "");
+      setWaitNote("Waiting for gym staff to approve…");
+      setStep("waiting");
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "OTP verification failed");
+      setError(e instanceof Error ? e.message : "Could not start verification");
     } finally {
       setBusy(false);
     }
@@ -232,7 +266,6 @@ export function MemberPortalApp() {
     }
     setMember(null);
     setCard(null);
-    setOtp("");
     setPin("");
     setStep("mobile");
     setBusy(false);
@@ -296,14 +329,18 @@ export function MemberPortalApp() {
         </p>
       ) : null}
 
-      {step === "mobile" || step === "otp" || step === "setPin" || step === "pinLogin" ? (
+      {step === "mobile" ||
+      step === "waiting" ||
+      step === "setPin" ||
+      step === "pinLogin" ? (
         <div className="rounded-3xl border border-white/10 bg-charcoal/60 p-6 md:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
             Member Portal
           </p>
           <h1 className="mt-2 font-display text-3xl text-white">Sign in securely</h1>
           <p className="mt-2 text-sm text-muted">
-            Verify your registered mobile number. No password — OTP and PIN only.
+            First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN
+            for next visits.
           </p>
 
           {(step === "mobile" || step === "pinLogin") && (
@@ -313,7 +350,7 @@ export function MemberPortalApp() {
                 className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-gold/50"
                 inputMode="numeric"
                 autoComplete="tel"
-                placeholder="10-digit WhatsApp number"
+                placeholder="10-digit registered mobile"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
               />
@@ -325,10 +362,10 @@ export function MemberPortalApp() {
               <button
                 type="button"
                 disabled={busy || mobile.replace(/\D/g, "").length < 10}
-                onClick={requestOtp}
+                onClick={requestVerify}
                 className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
               >
-                {busy ? "Sending…" : "Send OTP"}
+                {busy ? "Requesting…" : "Verify via gym WhatsApp"}
               </button>
               <button
                 type="button"
@@ -344,45 +381,42 @@ export function MemberPortalApp() {
             </div>
           ) : null}
 
-          {step === "otp" ? (
+          {step === "waiting" ? (
             <div className="mt-6 space-y-4">
+              <p className="text-sm text-white/85">{waitNote}</p>
               <p className="text-sm text-muted">
-                Enter the 6-digit OTP sent by SMS
-                {hasPin ? "" : " — then set your PIN"}.
+                A WhatsApp message was prepared for the gym (+91 70471 57510). Staff will approve
+                your number in Gym Manager — this page updates automatically.
               </p>
-              {devOtp ? (
-                <p className="rounded-xl border border-gold/30 bg-gold/10 px-3 py-2 text-xs text-gold">
-                  Dev OTP: <span className="font-mono font-semibold">{devOtp}</span>
-                </p>
+              {whatsappUrl ? (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full rounded-full border border-gold/40 px-5 py-3 text-center text-sm text-gold hover:bg-gold/10"
+                >
+                  Open WhatsApp to gym again
+                </a>
               ) : null}
-              <input
-                className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
-                inputMode="numeric"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              />
-              <button
-                type="button"
-                disabled={busy || otp.length !== 6}
-                onClick={verifyOtp}
-                className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
-              >
-                {busy ? "Verifying…" : "Verify OTP"}
-              </button>
+              <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold" />
+                Checking approval…
+              </div>
               <button
                 type="button"
                 className="w-full text-sm text-muted hover:text-gold"
                 onClick={() => setStep("mobile")}
               >
-                Change number
+                Cancel / change number
               </button>
             </div>
           ) : null}
 
           {step === "setPin" ? (
             <div className="mt-6 space-y-4">
-              <p className="text-sm text-muted">Create a 6-digit PIN for faster next login.</p>
+              <p className="text-sm text-muted">
+                Gym approved your number. Create a 6-digit PIN for faster next login.
+              </p>
               <input
                 className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
                 inputMode="numeric"
@@ -428,7 +462,7 @@ export function MemberPortalApp() {
                 className="w-full text-sm text-muted hover:text-gold"
                 onClick={() => setStep("mobile")}
               >
-                Use OTP instead
+                Verify via gym WhatsApp instead
               </button>
             </div>
           ) : null}
