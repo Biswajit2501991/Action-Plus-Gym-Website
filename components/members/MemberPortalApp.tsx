@@ -3,6 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LogOut, QrCode, Smartphone, User } from "lucide-react";
+import {
+  AttendancePanel,
+  BiometricPanel,
+  BookingsPanel,
+  ChatPanel,
+  NotificationsPanel,
+  PaymentsPanel,
+  PerksPanel,
+  TrainingPanel,
+} from "@/components/members/MemberPortalPhase2Panels";
 
 type MemberMe = {
   memberUuid: string;
@@ -54,7 +64,15 @@ type Step =
   | "home"
   | "profile"
   | "card"
-  | "devices";
+  | "devices"
+  | "payments"
+  | "attendance"
+  | "notifications"
+  | "chat"
+  | "training"
+  | "bookings"
+  | "perks"
+  | "biometric";
 
 function deviceStorageKey() {
   return "apg_member_device_id";
@@ -427,6 +445,17 @@ export function MemberPortalApp() {
                 disabled={busy || mobile.replace(/\D/g, "").length < 10}
                 onClick={() => {
                   setError(null);
+                  setStep("biometric");
+                }}
+                className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
+              >
+                Face ID / fingerprint
+              </button>
+              <button
+                type="button"
+                disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                onClick={() => {
+                  setError(null);
                   setStep("pinLogin");
                 }}
                 className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
@@ -572,7 +601,28 @@ export function MemberPortalApp() {
         </div>
       ) : null}
 
-      {member && (step === "home" || step === "profile" || step === "card" || step === "devices") ? (
+      {!member && step === "biometric" ? (
+        <BiometricPanel
+          onBack={() => setStep("mobile")}
+          mobile={mobile}
+          deviceId={deviceId}
+          onLoggedIn={() => void loadMe()}
+        />
+      ) : null}
+
+      {member &&
+      (step === "home" ||
+        step === "profile" ||
+        step === "card" ||
+        step === "devices" ||
+        step === "payments" ||
+        step === "attendance" ||
+        step === "notifications" ||
+        step === "chat" ||
+        step === "training" ||
+        step === "bookings" ||
+        step === "perks" ||
+        step === "biometric") ? (
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -627,6 +677,14 @@ export function MemberPortalApp() {
                 <NavTile icon={<User size={18} />} label="Profile" onClick={() => setStep("profile")} />
                 <NavTile icon={<QrCode size={18} />} label="QR Card" onClick={openCard} />
                 <NavTile icon={<Smartphone size={18} />} label="Devices" onClick={openDevices} />
+                <NavTile label="Payments" onClick={() => setStep("payments")} />
+                <NavTile label="Attendance" onClick={() => setStep("attendance")} />
+                <NavTile label="Alerts" onClick={() => setStep("notifications")} />
+                <NavTile label="Chat" onClick={() => setStep("chat")} />
+                <NavTile label="Training" onClick={() => setStep("training")} />
+                <NavTile label="Book" onClick={() => setStep("bookings")} />
+                <NavTile label="Perks" onClick={() => setStep("perks")} />
+                <NavTile label="Biometric" onClick={() => setStep("biometric")} />
               </div>
 
               <p className="text-center text-xs text-muted">
@@ -760,6 +818,26 @@ export function MemberPortalApp() {
               </button>
             </section>
           ) : null}
+
+          {step === "payments" ? <PaymentsPanel onBack={() => setStep("home")} /> : null}
+          {step === "attendance" ? (
+            <AttendancePanel onBack={() => setStep("home")} deviceId={deviceId} />
+          ) : null}
+          {step === "notifications" ? (
+            <NotificationsPanel onBack={() => setStep("home")} />
+          ) : null}
+          {step === "chat" ? <ChatPanel onBack={() => setStep("home")} /> : null}
+          {step === "training" ? <TrainingPanel onBack={() => setStep("home")} /> : null}
+          {step === "bookings" ? <BookingsPanel onBack={() => setStep("home")} /> : null}
+          {step === "perks" ? <PerksPanel onBack={() => setStep("home")} /> : null}
+          {step === "biometric" ? (
+            <BiometricPanel
+              onBack={() => setStep("home")}
+              mobile={mobile || member.mobile}
+              deviceId={deviceId}
+              onLoggedIn={() => void loadMe()}
+            />
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -771,7 +849,7 @@ function NavTile({
   label,
   onClick,
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   onClick: () => void;
 }) {
