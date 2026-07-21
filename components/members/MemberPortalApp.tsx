@@ -1,0 +1,660 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { LogOut, QrCode, Smartphone, User } from "lucide-react";
+
+type MemberMe = {
+  memberUuid: string;
+  memberCode: string;
+  fullName: string;
+  mobile: string;
+  email: string | null;
+  dob: string | null;
+  status: string;
+  planName: string | null;
+  amount: number | null;
+  joiningDate: string | null;
+  billingDate: string | null;
+  nextPaymentDate: string | null;
+  paymentBy: string | null;
+  remainingDays: number | null;
+  branch: string | null;
+  photoUrl: string | null;
+  emergencyContact: string | null;
+  bloodGroup: string | null;
+  hasPin: boolean;
+  portalStatus: string;
+};
+
+type QrCard = {
+  memberCode: string;
+  fullName: string;
+  status: string;
+  planName: string | null;
+  branch: string | null;
+  paymentBy: string | null;
+  photoUrl: string | null;
+  qrPayload: string;
+};
+
+type Device = {
+  id: string;
+  deviceId: string;
+  label: string | null;
+  lastSeenAt: string;
+  current: boolean;
+};
+
+type Step = "mobile" | "otp" | "setPin" | "pinLogin" | "home" | "profile" | "card" | "devices";
+
+function deviceStorageKey() {
+  return "apg_member_device_id";
+}
+
+function getOrCreateDeviceId() {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem(deviceStorageKey());
+  if (!id) {
+    id = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    localStorage.setItem(deviceStorageKey(), id);
+  }
+  return id;
+}
+
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    credentials: "include",
+  });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; ok?: boolean };
+  if (!res.ok || (data as { ok?: boolean }).ok === false) {
+    throw new Error((data as { error?: string }).error || "Request failed");
+  }
+  return data;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function MemberPortalApp() {
+  const [step, setStep] = useState<Step>("mobile");
+  const [mobile, setMobile] = useState("");
+  const [otp, setOtp] = useState("");
+  const [pin, setPin] = useState("");
+  const [challengeId, setChallengeId] = useState("");
+  const [deviceId, setDeviceId] = useState("");
+  const [hasPin, setHasPin] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [member, setMember] = useState<MemberMe | null>(null);
+  const [card, setCard] = useState<QrCard | null>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    setDeviceId(getOrCreateDeviceId());
+  }, []);
+
+  const loadMe = useCallback(async () => {
+    const data = await api<{ ok: true; member: MemberMe }>("/api/member/me");
+    setMember(data.member);
+    setStep("home");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadMe();
+      } catch {
+        if (!cancelled) setStep("mobile");
+      } finally {
+        if (!cancelled) setBooting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadMe]);
+
+  const greeting = useMemo(() => {
+    const name = member?.fullName?.split(" ")[0] || "Member";
+    return `Hello ${name}`;
+  }, [member]);
+
+  async function requestOtp() {
+    setError(null);
+    setBusy(true);
+    setDevOtp(null);
+    try {
+      const data = await api<{
+        ok: true;
+        challengeId: string;
+        deviceId: string;
+        hasPin: boolean;
+        devOtp?: string;
+      }>("/api/member/auth/otp/request", {
+        method: "POST",
+        body: JSON.stringify({ mobile, deviceId }),
+      });
+      setChallengeId(data.challengeId);
+      setDeviceId(data.deviceId || deviceId);
+      setHasPin(data.hasPin);
+      if (data.devOtp) setDevOtp(data.devOtp);
+      setStep("otp");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not send OTP");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyOtp() {
+    setError(null);
+    setBusy(true);
+    try {
+      const data = await api<{
+        ok: true;
+        needsPin: boolean;
+      }>("/api/member/auth/otp/verify", {
+        method: "POST",
+        body: JSON.stringify({
+          mobile,
+          otp,
+          challengeId,
+          deviceId,
+        }),
+      });
+      if (data.needsPin) {
+        setStep("setPin");
+      } else {
+        await loadMe();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "OTP verification failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setPinSubmit() {
+    setError(null);
+    setBusy(true);
+    try {
+      await api("/api/member/auth/pin/set", {
+        method: "POST",
+        body: JSON.stringify({ mobile, pin, challengeId, deviceId }),
+      });
+      await loadMe();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not set PIN");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pinLogin() {
+    setError(null);
+    setBusy(true);
+    try {
+      await api("/api/member/auth/pin/login", {
+        method: "POST",
+        body: JSON.stringify({ mobile, pin, deviceId }),
+      });
+      await loadMe();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "PIN login failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    setBusy(true);
+    try {
+      await api("/api/member/auth/logout", { method: "POST", body: "{}" });
+    } catch {
+      /* ignore */
+    }
+    setMember(null);
+    setCard(null);
+    setOtp("");
+    setPin("");
+    setStep("mobile");
+    setBusy(false);
+  }
+
+  async function openCard() {
+    setError(null);
+    setBusy(true);
+    try {
+      const data = await api<{ ok: true; card: QrCard }>("/api/member/qr");
+      setCard(data.card);
+      setStep("card");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load card");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openDevices() {
+    setError(null);
+    setBusy(true);
+    try {
+      const data = await api<{ ok: true; devices: Device[] }>("/api/member/devices");
+      setDevices(data.devices);
+      setStep("devices");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load devices");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeDevice(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/member/devices?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      await openDevices();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove device");
+      setBusy(false);
+    }
+  }
+
+  if (booting) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted">
+        Loading member portal…
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-lg px-5 pb-16 pt-8">
+      {error ? (
+        <p className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      ) : null}
+
+      {step === "mobile" || step === "otp" || step === "setPin" || step === "pinLogin" ? (
+        <div className="rounded-3xl border border-white/10 bg-charcoal/60 p-6 md:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+            Member Portal
+          </p>
+          <h1 className="mt-2 font-display text-3xl text-white">Sign in securely</h1>
+          <p className="mt-2 text-sm text-muted">
+            Verify your registered mobile number. No password — OTP and PIN only.
+          </p>
+
+          {(step === "mobile" || step === "pinLogin") && (
+            <label className="mt-6 block text-sm text-white/80">
+              Mobile number
+              <input
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-gold/50"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="10-digit WhatsApp number"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+              />
+            </label>
+          )}
+
+          {step === "mobile" ? (
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                onClick={requestOtp}
+                className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+              >
+                {busy ? "Sending…" : "Send OTP"}
+              </button>
+              <button
+                type="button"
+                disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                onClick={() => {
+                  setError(null);
+                  setStep("pinLogin");
+                }}
+                className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
+              >
+                Login with PIN
+              </button>
+            </div>
+          ) : null}
+
+          {step === "otp" ? (
+            <div className="mt-6 space-y-4">
+              <p className="text-sm text-muted">
+                Enter the 6-digit OTP sent by SMS
+                {hasPin ? "" : " — then set your PIN"}.
+              </p>
+              {devOtp ? (
+                <p className="rounded-xl border border-gold/30 bg-gold/10 px-3 py-2 text-xs text-gold">
+                  Dev OTP: <span className="font-mono font-semibold">{devOtp}</span>
+                </p>
+              ) : null}
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+              <button
+                type="button"
+                disabled={busy || otp.length !== 6}
+                onClick={verifyOtp}
+                className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+              >
+                {busy ? "Verifying…" : "Verify OTP"}
+              </button>
+              <button
+                type="button"
+                className="w-full text-sm text-muted hover:text-gold"
+                onClick={() => setStep("mobile")}
+              >
+                Change number
+              </button>
+            </div>
+          ) : null}
+
+          {step === "setPin" ? (
+            <div className="mt-6 space-y-4">
+              <p className="text-sm text-muted">Create a 6-digit PIN for faster next login.</p>
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
+                inputMode="numeric"
+                maxLength={6}
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+              <button
+                type="button"
+                disabled={busy || pin.length !== 6}
+                onClick={setPinSubmit}
+                className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+              >
+                {busy ? "Saving…" : "Save PIN & continue"}
+              </button>
+            </div>
+          ) : null}
+
+          {step === "pinLogin" ? (
+            <div className="mt-6 space-y-4">
+              <label className="block text-sm text-white/80">
+                6-digit PIN
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
+                  inputMode="numeric"
+                  maxLength={6}
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy || pin.length !== 6}
+                onClick={pinLogin}
+                className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+              >
+                {busy ? "Signing in…" : "Sign in"}
+              </button>
+              <button
+                type="button"
+                className="w-full text-sm text-muted hover:text-gold"
+                onClick={() => setStep("mobile")}
+              >
+                Use OTP instead
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {member && (step === "home" || step === "profile" || step === "card" || step === "devices") ? (
+        <div className="space-y-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+                Action Plus Gym
+              </p>
+              <h1 className="mt-1 font-display text-3xl text-white">{greeting}</h1>
+              <p className="mt-1 text-sm text-muted">{member.memberCode}</p>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-full border border-white/15 p-2.5 text-white/70 hover:border-gold/40 hover:text-gold"
+              aria-label="Log out"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+
+          {step === "home" ? (
+            <>
+              <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Today&apos;s status</p>
+                <p className="mt-2 font-display text-2xl text-gold">{member.status}</p>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-muted">Plan</p>
+                    <p className="text-white">{member.planName || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted">Remaining</p>
+                    <p className="text-white">
+                      {member.remainingDays == null
+                        ? "—"
+                        : member.remainingDays >= 0
+                          ? `${member.remainingDays} days`
+                          : `${Math.abs(member.remainingDays)} days overdue`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted">Next billing</p>
+                    <p className="text-white">{formatDate(member.nextPaymentDate || member.billingDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted">Branch</p>
+                    <p className="text-white">{member.branch || "—"}</p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid grid-cols-3 gap-2">
+                <NavTile icon={<User size={18} />} label="Profile" onClick={() => setStep("profile")} />
+                <NavTile icon={<QrCode size={18} />} label="QR Card" onClick={openCard} />
+                <NavTile icon={<Smartphone size={18} />} label="Devices" onClick={openDevices} />
+              </div>
+
+              <p className="text-center text-xs text-muted">
+                Membership details are managed by the gym.{" "}
+                <Link href="/contact" className="text-gold hover:underline">
+                  Contact us
+                </Link>{" "}
+                to update anything.
+              </p>
+            </>
+          ) : null}
+
+          {step === "profile" ? (
+            <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
+              <div className="flex items-center gap-4">
+                {member.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={member.photoUrl}
+                    alt=""
+                    className="h-20 w-20 rounded-2xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/5 text-gold">
+                    <User size={28} />
+                  </div>
+                )}
+                <div>
+                  <p className="font-display text-2xl text-white">{member.fullName}</p>
+                  <p className="text-sm text-muted">{member.memberCode}</p>
+                </div>
+              </div>
+              <dl className="mt-5 space-y-3 text-sm">
+                <Row label="Mobile" value={member.mobile} />
+                <Row label="Email" value={member.email || "—"} />
+                <Row label="DOB" value={formatDate(member.dob)} />
+                <Row label="Branch" value={member.branch || "—"} />
+                <Row label="Blood group" value={member.bloodGroup || "—"} />
+                <Row label="Emergency" value={member.emergencyContact || "—"} />
+                <Row label="Joined" value={formatDate(member.joiningDate)} />
+                <Row label="Valid until" value={formatDate(member.paymentBy)} />
+              </dl>
+              <button
+                type="button"
+                onClick={() => setStep("home")}
+                className="mt-6 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85"
+              >
+                Back
+              </button>
+            </section>
+          ) : null}
+
+          {step === "card" && card ? (
+            <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-charcoal to-black p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-gold">Membership card</p>
+              <div className="mt-4 flex items-center gap-4">
+                {card.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={card.photoUrl} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                ) : null}
+                <div>
+                  <p className="font-display text-xl text-white">{card.fullName}</p>
+                  <p className="text-sm text-muted">{card.memberCode}</p>
+                  <p className="text-sm text-gold">{card.status}</p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-center rounded-2xl bg-white p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(card.qrPayload)}`}
+                  alt="Membership QR"
+                  width={220}
+                  height={220}
+                  className="h-[220px] w-[220px]"
+                />
+              </div>
+              <dl className="mt-4 space-y-2 text-sm">
+                <Row label="Plan" value={card.planName || "—"} />
+                <Row label="Branch" value={card.branch || "—"} />
+                <Row label="Expiry" value={formatDate(card.paymentBy)} />
+              </dl>
+              <button
+                type="button"
+                onClick={() => setStep("home")}
+                className="mt-6 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85"
+              >
+                Back
+              </button>
+            </section>
+          ) : null}
+
+          {step === "devices" ? (
+            <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
+              <p className="text-sm text-muted">Up to 3 trusted devices. Remove unused ones anytime.</p>
+              <ul className="mt-4 space-y-3">
+                {devices.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-sm text-white">
+                        {d.label || "Device"}
+                        {d.current ? (
+                          <span className="ml-2 text-xs text-gold">(this device)</span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Last seen {formatDate(d.lastSeenAt)}
+                      </p>
+                    </div>
+                    {!d.current ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => removeDevice(d.id)}
+                        className="text-xs text-red-300 hover:text-red-200"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => setStep("home")}
+                className="mt-6 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85"
+              >
+                Back
+              </button>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NavTile({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-charcoal/40 px-3 py-4 text-xs text-white/85 hover:border-gold/40 hover:text-gold"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-2">
+      <dt className="text-muted">{label}</dt>
+      <dd className="text-right text-white">{value}</dd>
+    </div>
+  );
+}

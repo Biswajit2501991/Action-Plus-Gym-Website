@@ -50,6 +50,7 @@ export function Footer({
             <Link href="#services">Services</Link>
             <Link href="#pricing">Pricing</Link>
             <Link href="#trainers">Trainers</Link>
+            <Link href="/members">Member Portal</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>

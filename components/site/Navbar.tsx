@@ -60,6 +60,9 @@ export function Navbar({
           ))}
           <div className="flex items-center gap-2">
             <ThemeToggle compact />
+            <Button href="/members" className="!py-2.5 !text-xs">
+              Member Portal
+            </Button>
             <Button href="/contact" className="!py-2.5 !text-xs">
               Contact
             </Button>
@@ -95,6 +98,9 @@ export function Navbar({
                 {l.label}
               </Link>
             ))}
+            <Button href="/members" onClick={() => setOpen(false)}>
+              Member Portal
+            </Button>
             <Button href="/contact" onClick={() => setOpen(false)}>
               Contact
             </Button>
