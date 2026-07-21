@@ -16,7 +16,7 @@ import {
   findMemberByMobile,
 } from "@/lib/member-portal/members";
 import { auditLog, requestMeta } from "@/lib/member-portal/session";
-import { buildGymVerifyWhatsAppUrl } from "@/lib/member-portal/whatsapp-verify";
+import { buildGymVerifyWhatsAppLinks } from "@/lib/member-portal/whatsapp-verify";
 import { cookies } from "next/headers";
 
 const bodySchema = z.object({
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const whatsappUrl = buildGymVerifyWhatsAppUrl({
+    const links = buildGymVerifyWhatsAppLinks({
       memberName: found.member.full_name,
       memberMobile: mobile,
       memberCode: found.member.member_code,
@@ -171,7 +171,9 @@ export async function POST(req: NextRequest) {
       hasPin: Boolean(found.member.pin_hash),
       maskedMobile: `******${mobile.slice(-4)}`,
       memberName: found.member.full_name.split(" ")[0] || "Member",
-      whatsappUrl,
+      whatsappUrl: links.whatsappUrl,
+      whatsappAppUrl: links.whatsappAppUrl,
+      messageText: links.message,
       gymWhatsApp: "+917047157510",
     });
   } catch (error) {

@@ -109,6 +109,8 @@ export function MemberPortalApp() {
   const [challengeId, setChallengeId] = useState("");
   const [deviceId, setDeviceId] = useState("");
   const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [messageText, setMessageText] = useState("");
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [member, setMember] = useState<MemberMe | null>(null);
@@ -205,6 +207,7 @@ export function MemberPortalApp() {
         challengeId: string;
         deviceId: string;
         whatsappUrl: string;
+        messageText?: string;
         hasPin: boolean;
       }>("/api/member/auth/otp/request", {
         method: "POST",
@@ -213,11 +216,11 @@ export function MemberPortalApp() {
       setChallengeId(data.challengeId);
       setDeviceId(data.deviceId || deviceId);
       setWhatsappUrl(data.whatsappUrl || "");
+      setMessageText(data.messageText || "");
+      setCopied(false);
       setWaitNote("Waiting for gym staff to approve…");
       setStep("waiting");
-      if (data.whatsappUrl) {
-        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
-      }
+      // Do not auto-open WhatsApp — wa.me / SSL filters often show scary cert errors.
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start verification");
     } finally {
@@ -385,18 +388,45 @@ export function MemberPortalApp() {
             <div className="mt-6 space-y-4">
               <p className="text-sm text-white/85">{waitNote}</p>
               <p className="text-sm text-muted">
-                A WhatsApp message was prepared for the gym (+91 70471 57510). Staff will approve
-                your number in Gym Manager — this page updates automatically.
+                Your request is already in Gym Manager → <strong className="text-white/80">WhatsApp Verification</strong>.
+                Staff can approve there even if WhatsApp does not open on this device.
               </p>
-              {whatsappUrl ? (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block w-full rounded-full border border-gold/40 px-5 py-3 text-center text-sm text-gold hover:bg-gold/10"
-                >
-                  Open WhatsApp to gym again
-                </a>
+              <p className="text-xs text-muted">
+                Gym WhatsApp: +91 70471 57510
+              </p>
+              <div className="flex flex-col gap-2">
+                {whatsappUrl ? (
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full rounded-full border border-gold/40 px-5 py-3 text-center text-sm text-gold hover:bg-gold/10"
+                  >
+                    Notify gym on WhatsApp
+                  </a>
+                ) : null}
+                {messageText ? (
+                  <button
+                    type="button"
+                    className="w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(messageText);
+                        setCopied(true);
+                        window.setTimeout(() => setCopied(false), 2000);
+                      } catch {
+                        setError("Could not copy — select the message manually below.");
+                      }
+                    }}
+                  >
+                    {copied ? "Copied!" : "Copy message for WhatsApp"}
+                  </button>
+                ) : null}
+              </div>
+              {messageText ? (
+                <pre className="max-h-36 overflow-auto rounded-2xl border border-white/10 bg-black/40 p-3 text-[11px] leading-relaxed text-white/70 whitespace-pre-wrap">
+                  {messageText}
+                </pre>
               ) : null}
               <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted">
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold" />
