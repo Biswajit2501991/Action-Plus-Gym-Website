@@ -56,15 +56,13 @@ export async function POST(req: Request) {
   const yyyyMm = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
 
   // Members due today: next_payment_date date equals today OR day-of-month matches for billing_date
-  let membersQuery = svc.client
+  const { data: members, error: mErr } = await svc.client
     .from("members")
     .select("member_uuid, full_name, next_payment_date, billing_date, status, portal_enabled")
     .eq("gym_id", gymId)
     .eq("portal_enabled", true)
     .is("deleted_at", null)
     .ilike("status", "active");
-
-  const { data: members, error: mErr } = await membersQuery;
   if (mErr) {
     return NextResponse.json({ ok: false, error: mErr.message }, { status: 500 });
   }
