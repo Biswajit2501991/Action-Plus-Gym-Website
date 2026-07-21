@@ -287,6 +287,14 @@ export async function requireMemberSession(): Promise<
     await clearAuthCookies();
     return { ok: false, error: "Portal access disabled", status: 403 };
   }
+  if (member.portal_status === "revoked") {
+    await clearAuthCookies();
+    return {
+      ok: false,
+      error: "Access revoked. Please verify via WhatsApp again.",
+      status: 401,
+    };
+  }
 
   return { ok: true, claims, member: member as MemberRow };
 }
@@ -357,6 +365,14 @@ async function refreshFromCookies(): Promise<
   if (!member || !member.portal_enabled || member.portal_status === "disabled") {
     await clearAuthCookies();
     return { ok: false, error: "Portal access disabled", status: 403 };
+  }
+  if (member.portal_status === "revoked") {
+    await clearAuthCookies();
+    return {
+      ok: false,
+      error: "Access revoked. Please verify via WhatsApp again.",
+      status: 401,
+    };
   }
 
   const newRefresh = randomToken(32);

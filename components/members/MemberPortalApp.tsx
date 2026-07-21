@@ -106,9 +106,11 @@ export function MemberPortalApp() {
   const [step, setStep] = useState<Step>("mobile");
   const [mobile, setMobile] = useState("");
   const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [challengeId, setChallengeId] = useState("");
   const [deviceId, setDeviceId] = useState("");
   const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [whatsappAppUrl, setWhatsappAppUrl] = useState("");
   const [messageText, setMessageText] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export function MemberPortalApp() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [booting, setBooting] = useState(true);
   const [waitNote, setWaitNote] = useState("Waiting for gym staff to approve…");
+  const [needsReauth, setNeedsReauth] = useState(false);
 
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
@@ -134,8 +137,19 @@ export function MemberPortalApp() {
     (async () => {
       try {
         await loadMe();
-      } catch {
-        if (!cancelled) setStep("mobile");
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : "";
+          if (/revoked|expired|Unauthorized|Session/i.test(msg)) {
+            setNeedsReauth(true);
+            setError(
+              /revoked/i.test(msg)
+                ? "Access was revoked by the gym. Verify via WhatsApp again."
+                : null,
+            );
+          }
+          setStep("mobile");
+        }
       } finally {
         if (!cancelled) setBooting(false);
       }
@@ -144,6 +158,17 @@ export function MemberPortalApp() {
       cancelled = true;
     };
   }, [loadMe]);
+
+  function openWhatsAppLinks(webUrl: string, appUrl?: string) {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const target = isMobile && appUrl ? appUrl : webUrl;
+    if (!target) return;
+    // Direct open — primary goal is WhatsApp handoff after Verify click.
+    const opened = window.open(target, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      window.location.assign(target);
+    }
+  }
 
   // Poll staff approval while waiting
   useEffect(() => {
@@ -207,6 +232,7 @@ export function MemberPortalApp() {
         challengeId: string;
         deviceId: string;
         whatsappUrl: string;
+        whatsappAppUrl?: string;
         messageText?: string;
         hasPin: boolean;
       }>("/api/member/auth/otp/request", {
@@ -216,11 +242,13 @@ export function MemberPortalApp() {
       setChallengeId(data.challengeId);
       setDeviceId(data.deviceId || deviceId);
       setWhatsappUrl(data.whatsappUrl || "");
+      setWhatsappAppUrl(data.whatsappAppUrl || "");
       setMessageText(data.messageText || "");
       setCopied(false);
+      setNeedsReauth(false);
       setWaitNote("Waiting for gym staff to approve…");
       setStep("waiting");
-      // Do not auto-open WhatsApp — wa.me / SSL filters often show scary cert errors.
+      openWhatsAppLinks(data.whatsappUrl || "", data.whatsappAppUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start verification");
     } finally {
@@ -230,12 +258,21 @@ export function MemberPortalApp() {
 
   async function setPinSubmit() {
     setError(null);
+    if (pin.length !== 6) {
+      setError("Enter a 6-digit PIN.");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError("PIN and Confirm PIN do not match.");
+      return;
+    }
     setBusy(true);
     try {
       await api("/api/member/auth/pin/set", {
         method: "POST",
         body: JSON.stringify({ mobile, pin, challengeId, deviceId }),
       });
+      setConfirmPin("");
       await loadMe();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not set PIN");
@@ -254,7 +291,12 @@ export function MemberPortalApp() {
       });
       await loadMe();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "PIN login failed");
+      const msg = e instanceof Error ? e.message : "PIN login failed";
+      setError(msg);
+      if (/revoked|Verify via WhatsApp|PIN not set/i.test(msg)) {
+        setNeedsReauth(true);
+        setStep("mobile");
+      }
     } finally {
       setBusy(false);
     }
@@ -345,6 +387,12 @@ export function MemberPortalApp() {
             First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN
             for next visits.
           </p>
+          {needsReauth ? (
+            <p className="mt-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
+              Your portal access was revoked. Tap <strong>Verify via gym WhatsApp</strong> to
+              re-authenticate.
+            </p>
+          ) : null}
 
           {(step === "mobile" || step === "pinLogin") && (
             <label className="mt-6 block text-sm text-white/80">
@@ -368,7 +416,11 @@ export function MemberPortalApp() {
                 onClick={requestVerify}
                 className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
               >
-                {busy ? "Requesting…" : "Verify via gym WhatsApp"}
+                {busy
+                  ? "Opening WhatsApp…"
+                  : needsReauth
+                    ? "Re-verify via WhatsApp"
+                    : "Verify via gym WhatsApp"}
               </button>
               <button
                 type="button"
@@ -388,22 +440,22 @@ export function MemberPortalApp() {
             <div className="mt-6 space-y-4">
               <p className="text-sm text-white/85">{waitNote}</p>
               <p className="text-sm text-muted">
-                Your request is already in Gym Manager → <strong className="text-white/80">WhatsApp Verification</strong>.
-                Staff can approve there even if WhatsApp does not open on this device.
+                WhatsApp should open with a pre-filled message to the gym. If it did not,
+                use the button below. Staff can also approve in Gym Manager →{" "}
+                <strong className="text-white/80">WhatsApp Verification</strong>.
               </p>
               <p className="text-xs text-muted">
                 Gym WhatsApp: +91 70471 57510
               </p>
               <div className="flex flex-col gap-2">
                 {whatsappUrl ? (
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openWhatsAppLinks(whatsappUrl, whatsappAppUrl)}
                     className="block w-full rounded-full border border-gold/40 px-5 py-3 text-center text-sm text-gold hover:bg-gold/10"
                   >
-                    Notify gym on WhatsApp
-                  </a>
+                    Open WhatsApp message
+                  </button>
                 ) : null}
                 {messageText ? (
                   <button
@@ -447,17 +499,38 @@ export function MemberPortalApp() {
               <p className="text-sm text-muted">
                 Gym approved your number. Create a 6-digit PIN for faster next login.
               </p>
-              <input
-                className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
-                inputMode="numeric"
-                maxLength={6}
-                type="password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              />
+              <label className="block text-sm text-white/80">
+                PIN
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
+                  inputMode="numeric"
+                  maxLength={6}
+                  type="password"
+                  autoComplete="new-password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                />
+              </label>
+              <label className="block text-sm text-white/80">
+                Confirm PIN
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
+                  inputMode="numeric"
+                  maxLength={6}
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPin}
+                  onChange={(e) =>
+                    setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                />
+              </label>
+              {confirmPin.length === 6 && pin !== confirmPin ? (
+                <p className="text-center text-xs text-red-300">PINs do not match</p>
+              ) : null}
               <button
                 type="button"
-                disabled={busy || pin.length !== 6}
+                disabled={busy || pin.length !== 6 || confirmPin.length !== 6 || pin !== confirmPin}
                 onClick={setPinSubmit}
                 className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
               >

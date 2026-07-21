@@ -48,8 +48,20 @@ export async function POST(req: NextRequest) {
 
     if (!found.member.pin_hash) {
       return NextResponse.json(
-        { ok: false, error: "PIN not set yet. Login with OTP first." },
+        {
+          ok: false,
+          error: "PIN not set or access was revoked. Use Verify via WhatsApp.",
+        },
         { status: 400 },
+      );
+    }
+    if (found.member.portal_status === "revoked") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Access revoked. Please verify via WhatsApp again.",
+        },
+        { status: 403 },
       );
     }
 
