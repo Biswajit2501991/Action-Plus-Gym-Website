@@ -384,23 +384,33 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
       <h2 className="font-display text-2xl text-white">Training</h2>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <Block title="PT" empty="No PT assignment yet.">
-        {(data?.pt || []).map((p) => (
-          <p key={String(p.id)} className="text-sm text-white/85">
-            {String(p.trainer_name || "Trainer")} · {String(p.sessions_used || 0)}/
-            {String(p.sessions_total || "—")} sessions
-          </p>
-        ))}
+        {(data?.pt || []).map((p) => {
+          const trainer = String(p.trainer_name || "Trainer");
+          const plan = p.plan_name ? String(p.plan_name) : "";
+          const used = p.sessions_used;
+          const total = p.sessions_total;
+          const hasSessions =
+            used != null || (total != null && String(total).trim() !== "");
+          return (
+            <p key={String(p.id)} className="text-sm text-white/85 whitespace-pre-wrap">
+              {plan ? `${trainer} · ${plan}` : trainer}
+              {hasSessions
+                ? ` · ${String(used ?? "—")}/${String(total ?? "—")} sessions`
+                : ""}
+            </p>
+          );
+        })}
       </Block>
       <Block title="Workouts" empty="No workout plan assigned.">
         {(data?.workouts || []).map((w) => (
-          <p key={String(w.id)} className="text-sm text-white/85">
+          <p key={String(w.id)} className="text-sm text-white/85 whitespace-pre-wrap">
             {String(w.title)}
           </p>
         ))}
       </Block>
       <Block title="Diet" empty="No diet plan assigned.">
         {(data?.diets || []).map((d) => (
-          <p key={String(d.id)} className="text-sm text-white/85">
+          <p key={String(d.id)} className="text-sm text-white/85 whitespace-pre-wrap">
             {String(d.title)}
           </p>
         ))}
@@ -408,7 +418,8 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
       <Block title="Measurements" empty="No measurements yet.">
         {(data?.measurements || []).map((m) => (
           <p key={String(m.id)} className="text-sm text-white/85">
-            {formatDate(String(m.measured_at))} · {m.weight_kg != null ? `${m.weight_kg} kg` : "—"}
+            {formatDate(String(m.measured_at))} ·{" "}
+            {m.weight_kg != null ? `${m.weight_kg} kg` : "—"}
             {m.body_fat_pct != null ? ` · ${m.body_fat_pct}% bf` : ""}
           </p>
         ))}
