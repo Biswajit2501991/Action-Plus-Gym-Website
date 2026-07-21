@@ -5,6 +5,12 @@ import {
   startRegistration,
   startAuthentication,
 } from "@simplewebauthn/browser";
+import {
+  buildPtMonthCalendarCells,
+  parsePtDateKey,
+  PT_MONTH_LABELS,
+  PT_WEEKDAYS,
+} from "@/lib/member-portal/pt-calendar";
 
 type Payment = {
   id: string;
@@ -361,8 +367,25 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
     workouts: Array<Record<string, unknown>>;
     diets: Array<Record<string, unknown>>;
     measurements: Array<Record<string, unknown>>;
+    focusByDate?: Record<string, string>;
+    today?: string;
+    ptWorkoutNotes?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+
+  const todayParts = useMemo(() => {
+    const key = data?.today || new Date().toISOString().slice(0, 10);
+    return parsePtDateKey(key) || {
+      year: new Date().getFullYear(),
+      monthIndex: new Date().getMonth(),
+      day: new Date().getDate(),
+    };
+  }, [data?.today]);
+
+  const [viewYear, setViewYear] = useState(todayParts.year);
+  const [viewMonthIndex, setViewMonthIndex] = useState(todayParts.monthIndex);
 
   useEffect(() => {
     api<{
@@ -371,14 +394,48 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
       workouts: Array<Record<string, unknown>>;
       diets: Array<Record<string, unknown>>;
       measurements: Array<Record<string, unknown>>;
+      focusByDate?: Record<string, string>;
+      today?: string;
+      ptWorkoutNotes?: string;
     }>("/api/member/training")
-      .then(setData)
+      .then((res) => {
+        setData(res);
+        const parts = parsePtDateKey(res.today);
+        if (parts) {
+          setViewYear(parts.year);
+          setViewMonthIndex(parts.monthIndex);
+          setSelectedDayKey(res.today || null);
+        }
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
   }, []);
 
+  const focusByDate = data?.focusByDate || {};
+  const monthCells = useMemo(
+    () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, focusByDate),
+    [viewYear, viewMonthIndex, focusByDate],
+  );
+  const ptDaysThisMonth = monthCells.filter(
+    (c) => c.kind === "day" && !c.isSunday && c.hasFocus,
+  ).length;
+  const selectedFocus =
+    selectedDayKey && focusByDate[selectedDayKey]
+      ? String(focusByDate[selectedDayKey])
+      : "";
+
+  function shiftMonth(delta: number) {
+    const dt = new Date(viewYear, viewMonthIndex + delta, 1);
+    setViewYear(dt.getFullYear());
+    setViewMonthIndex(dt.getMonth());
+  }
+
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-5">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 rounded-full border border-gold/50 bg-gold/15 px-4 py-2 text-sm font-semibold text-gold shadow-[0_0_0_1px_rgba(212,175,55,0.25)]"
+      >
         ← Back
       </button>
       <h2 className="font-display text-2xl text-white">Training</h2>
@@ -387,17 +444,33 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
         {(data?.pt || []).map((p) => {
           const trainer = String(p.trainer_name || "Trainer");
           const plan = p.plan_name ? String(p.plan_name) : "";
-          const used = p.sessions_used;
-          const total = p.sessions_total;
-          const hasSessions =
-            used != null || (total != null && String(total).trim() !== "");
+          const used = Number(p.sessions_used);
+          const total = Number(p.sessions_total);
+          const hasPackage =
+            Number.isFinite(used) && Number.isFinite(total) && total > 0;
+          const scheduled = Number(p.scheduled_days);
           return (
-            <p key={String(p.id)} className="text-sm text-white/85 whitespace-pre-wrap">
-              {plan ? `${trainer} · ${plan}` : trainer}
-              {hasSessions
-                ? ` · ${String(used ?? "—")}/${String(total ?? "—")} sessions`
-                : ""}
-            </p>
+            <div key={String(p.id)} className="space-y-1 text-sm text-white/85">
+              <p>
+                <span className="text-muted">Trainer</span> · {trainer}
+                {plan ? (
+                  <>
+                    {" "}
+                    · <span className="text-muted">Plan</span> · {plan}
+                  </>
+                ) : null}
+              </p>
+              {hasPackage ? (
+                <p className="text-xs text-muted">
+                  Package sessions: {used}/{total}
+                </p>
+              ) : null}
+              {Number.isFinite(scheduled) && scheduled > 0 ? (
+                <p className="text-xs text-muted">
+                  {scheduled} workout day{scheduled === 1 ? "" : "s"} scheduled
+                </p>
+              ) : null}
+            </div>
           );
         })}
       </Block>
@@ -424,6 +497,119 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
           </p>
         ))}
       </Block>
+
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-3">
+        <button
+          type="button"
+          onClick={() => setCalendarOpen((v) => !v)}
+          className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+          aria-expanded={calendarOpen}
+        >
+          <div>
+            <p className="text-sm font-semibold text-white">Workout Scheduler & Calendar</p>
+            {!calendarOpen ? (
+              <p className="mt-0.5 text-xs text-emerald-200/80">
+                Expand for read-only view of your PT workout days
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <span>
+              Total PT days this month:{" "}
+              <span className="font-semibold text-white">{ptDaysThisMonth}</span>
+            </span>
+            <span className="font-semibold text-gold">{calendarOpen ? "Hide" : "Show"}</span>
+          </div>
+        </button>
+
+        {calendarOpen ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => shiftMonth(-1)}
+                  className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/85"
+                >
+                  ← Prev month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => shiftMonth(1)}
+                  className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/85"
+                >
+                  Next month →
+                </button>
+              </div>
+              <p className="text-sm font-semibold text-white">
+                {PT_MONTH_LABELS[viewMonthIndex]} {viewYear}
+              </p>
+            </div>
+            <p className="text-[11px] text-muted">
+              View only — your trainer sets the schedule in Gym Manager. Green = scheduled · Rose =
+              open. Tap a day to see the focus.
+            </p>
+            <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] text-muted sm:gap-2 sm:text-xs">
+              {PT_WEEKDAYS.map((d) => (
+                <div key={d} className="font-semibold">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+              {monthCells.map((entry) =>
+                entry.kind === "pad" ? (
+                  <div
+                    key={entry.key}
+                    className="min-h-11 rounded-lg border border-transparent px-1 py-1.5 sm:min-h-12"
+                    aria-hidden
+                  />
+                ) : (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    onClick={() => setSelectedDayKey(entry.key)}
+                    className={[
+                      "min-h-11 rounded-lg border px-1 py-1.5 text-[10px] sm:min-h-12 sm:text-xs",
+                      entry.isSunday
+                        ? "border-white/10 bg-white/5 text-muted"
+                        : entry.hasFocus
+                          ? "border-emerald-400/50 bg-emerald-950/40 text-emerald-200"
+                          : "border-rose-400/40 bg-rose-950/35 text-rose-200",
+                      selectedDayKey === entry.key ? "ring-2 ring-sky-400" : "",
+                    ].join(" ")}
+                    title={
+                      entry.focus
+                        ? `${entry.key}: ${entry.focus}`
+                        : `${entry.key}: No focus assigned`
+                    }
+                  >
+                    <div className="font-semibold">{entry.day}</div>
+                    <div className="mt-0.5 truncate">
+                      {entry.focus || (entry.isSunday ? "Sun" : "—")}
+                    </div>
+                  </button>
+                ),
+              )}
+            </div>
+            {selectedDayKey ? (
+              <p className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/85">
+                <span className="text-muted">{selectedDayKey}</span>
+                {" · "}
+                {selectedFocus || "No workout focus assigned"}
+              </p>
+            ) : null}
+            {data?.ptWorkoutNotes ? (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted">PT Workout Notes</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-white/85">
+                  {data.ptWorkoutNotes}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

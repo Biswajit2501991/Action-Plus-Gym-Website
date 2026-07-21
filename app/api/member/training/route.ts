@@ -13,7 +13,7 @@ type PlanJson = {
   calories?: string;
   protein?: string;
   water?: string;
-  sessions?: number | string;
+  sessions?: number | string | Array<Record<string, unknown>>;
   ptWorkoutNotes?: string;
 };
 
@@ -29,6 +29,18 @@ function todayKeyIndia() {
 
 function isPtPlanName(planName: string | null | undefined) {
   return /\bpt\b/i.test(String(planName || "").trim());
+}
+
+/** Only treat sessions as a package quota when it is a positive number (not a log array). */
+function packageSessionTotal(sessions: PlanJson["sessions"]): number | null {
+  if (typeof sessions === "number" && Number.isFinite(sessions) && sessions > 0) {
+    return sessions;
+  }
+  if (typeof sessions === "string" && /^\d+(\.\d+)?$/.test(sessions.trim())) {
+    const n = Number(sessions.trim());
+    return n > 0 ? n : null;
+  }
+  return null;
 }
 
 export async function GET() {
@@ -106,6 +118,10 @@ export async function GET() {
     ? [...dietsStub.data]
     : [];
 
+  let focusByDate: Record<string, string> = {};
+  let ptWorkoutNotes = "";
+  const today = todayKeyIndia();
+
   // Source of truth for Gym Manager PT Clients: pt_client_profiles.plan_json
   if (member?.id) {
     const { data: profileRow } = await svc.client
@@ -128,36 +144,37 @@ export async function GET() {
     ).trim();
     const planName = String(member.plan_name || "").trim();
     const onPtPlan = isPtPlanName(planName);
-    const focusByDate =
+    focusByDate =
       planJson.focusByDate && typeof planJson.focusByDate === "object"
-        ? planJson.focusByDate
+        ? Object.fromEntries(
+            Object.entries(planJson.focusByDate).map(([k, v]) => [
+              String(k),
+              String(v || "").trim(),
+            ]),
+          )
         : {};
-    const today = todayKeyIndia();
     const todayFocus = String(focusByDate[today] || "").trim();
     const workoutPlanText = String(planJson.workoutPlan || "").trim();
     const focusArea = String(planJson.focusArea || "").trim();
     const dietPlanText = String(planJson.dietPlan || "").trim();
-    const notes = String(planJson.ptWorkoutNotes || "").trim();
+    ptWorkoutNotes = String(planJson.ptWorkoutNotes || "").trim();
+    const scheduledDays = Object.values(focusByDate).filter(Boolean).length;
+    const sessionsTotal = packageSessionTotal(planJson.sessions);
 
-    if (onPtPlan || trainerName || Object.keys(focusByDate).length || workoutPlanText) {
-      const sessionsRaw = planJson.sessions;
-      const sessionsTotal =
-        sessionsRaw != null && String(sessionsRaw).trim() !== ""
-          ? Number(sessionsRaw) || String(sessionsRaw)
-          : null;
-
-      if (pt.length === 0) {
-        pt = [
-          {
-            id: profileRow?.id || `gm-pt-${member.id}`,
-            trainer_name: trainerName || "Assigned trainer",
-            plan_name: planName || null,
-            sessions_used: null,
-            sessions_total: sessionsTotal,
-            source: "pt_client_profiles",
-          },
-        ];
-      }
+    if (onPtPlan || trainerName || scheduledDays || workoutPlanText) {
+      // Prefer Gym Manager PT row over empty Phase 2 stubs (avoids fake 0/— sessions).
+      pt = [
+        {
+          id: profileRow?.id || `gm-pt-${member.id}`,
+          trainer_name: trainerName || "Assigned trainer",
+          plan_name: planName || null,
+          scheduled_days: scheduledDays,
+          sessions_used: null,
+          sessions_total: sessionsTotal,
+          source: "pt_client_profiles",
+        },
+        ...pt.filter((row) => String(row?.source || "") !== "pt_client_profiles"),
+      ];
     }
 
     if (workouts.length === 0) {
@@ -183,10 +200,10 @@ export async function GET() {
           kind: "focus_area",
         });
       }
-      if (notes) {
+      if (ptWorkoutNotes) {
         rows.push({
           id: `pt-notes-${member.id}`,
-          title: notes,
+          title: ptWorkoutNotes,
           kind: "notes",
         });
       }
@@ -213,6 +230,9 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
+    today,
+    focusByDate,
+    ptWorkoutNotes,
     pt,
     workouts,
     diets,

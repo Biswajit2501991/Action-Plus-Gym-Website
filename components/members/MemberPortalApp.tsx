@@ -645,8 +645,27 @@ export function MemberPortalApp() {
           {step === "home" ? (
             <>
               <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted">Today&apos;s status</p>
-                <p className="mt-2 font-display text-2xl text-gold">{member.status}</p>
+                <div className="flex items-start gap-4">
+                  {member.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={member.photoUrl}
+                      alt=""
+                      className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-gold/40"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-gold ring-1 ring-white/10">
+                      <User size={24} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                      Today&apos;s status
+                    </p>
+                    <p className="mt-1 font-display text-2xl text-gold">{member.status}</p>
+                    <p className="mt-0.5 truncate text-sm text-white/70">{member.fullName}</p>
+                  </div>
+                </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted">Plan</p>
@@ -664,7 +683,9 @@ export function MemberPortalApp() {
                   </div>
                   <div>
                     <p className="text-muted">Next billing</p>
-                    <p className="text-white">{formatDate(member.nextPaymentDate || member.billingDate)}</p>
+                    <p className="text-white">
+                      {formatDate(member.nextPaymentDate || member.billingDate)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted">Branch</p>
