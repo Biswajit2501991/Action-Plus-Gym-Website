@@ -78,6 +78,9 @@ html[data-theme="day"] {
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -85,7 +88,17 @@ body {
   color: var(--text);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
   min-height: 100vh;
+  overflow-x: hidden;
   transition: background 0.25s ease, color 0.2s ease;
+}
+
+/* Avoid Android Chrome auto-zoom on focus for portal forms (<16px triggers zoom). */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 h1,

@@ -718,7 +718,7 @@ export function MemberPortalApp() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg px-5 pb-16 pt-8">
+    <div className="mx-auto w-full min-w-0 max-w-lg overflow-x-hidden px-4 pb-20 pt-6 sm:px-5 sm:pb-16 sm:pt-8">
       {error ? (
         <p className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
@@ -760,7 +760,7 @@ export function MemberPortalApp() {
             <label className="mt-6 block text-sm text-white/80">
               Mobile number
               <input
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-gold/50"
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none focus:border-gold/50 sm:text-sm"
                 inputMode="numeric"
                 autoComplete="tel"
                 placeholder="10-digit registered mobile"
@@ -775,7 +775,7 @@ export function MemberPortalApp() {
               <label className="block text-sm text-white/80">
                 Name (as given in gym)
                 <input
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 lowercase text-white outline-none focus:border-gold/50"
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base lowercase text-white outline-none focus:border-gold/50 sm:text-sm"
                   autoComplete="name"
                   placeholder="Full name as registered"
                   value={fullName}
@@ -810,7 +810,7 @@ export function MemberPortalApp() {
                 <label className="block text-sm text-white/80">
                   DOB (DD/MM/YYYY)
                   <input
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-gold/50"
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none focus:border-gold/50 sm:text-sm"
                     inputMode="numeric"
                     placeholder="25/01/1991"
                     value={dob}
@@ -821,7 +821,7 @@ export function MemberPortalApp() {
                 <label className="block text-sm text-white/80">
                   Gmail
                   <input
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 lowercase text-white outline-none focus:border-gold/50"
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base lowercase text-white outline-none focus:border-gold/50 sm:text-sm"
                     type="email"
                     autoComplete="email"
                     placeholder="name@gmail.com"
@@ -1130,7 +1130,7 @@ export function MemberPortalApp() {
                 </div>
               </section>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-3">
                 <NavTile icon={<User size={18} />} label="Profile" onClick={() => setStep("profile")} />
                 <NavTile icon={<QrCode size={18} />} label="QR Card" onClick={openCard} />
                 <NavTile icon={<Smartphone size={18} />} label="Devices" onClick={openDevices} />
@@ -1328,7 +1328,7 @@ function NavTile({
     <button
       type="button"
       onClick={onClick}
-      className="relative flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-charcoal/40 px-3 py-4 text-xs text-white/85 hover:border-gold/40 hover:text-gold"
+      className="relative flex min-h-[4.5rem] touch-manipulation flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-charcoal/40 px-2 py-4 text-[11px] leading-tight text-white/85 hover:border-gold/40 hover:text-gold sm:px-3 sm:text-xs"
     >
       {badge ? (
         <span

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { DM_Sans, Syne } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -27,6 +27,17 @@ export const metadata: Metadata = {
   },
   description:
     "Premium gym training, personal coaching, and world-class facilities at Action Plus Gym.",
+};
+
+/** Mobile-first viewport for iOS + Android (incl. notch / gesture bars). */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#050505" },
+    { media: "(prefers-color-scheme: light)", color: "#050505" },
+  ],
 };
 
 export default function RootLayout({

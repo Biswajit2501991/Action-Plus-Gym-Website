@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 
 export default function MembersPortalPage() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_rgba(201,162,39,0.12),_transparent_55%),linear-gradient(180deg,#0a0a0a,#050505)]">
-      <header className="flex items-center justify-between px-5 py-5 md:px-8">
-        <Link href="/" className="font-display text-xl text-gold-gradient">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(ellipse_at_top,_rgba(201,162,39,0.12),_transparent_55%),linear-gradient(180deg,#0a0a0a,#050505)]">
+      <header className="flex items-center justify-between px-4 py-4 sm:px-5 sm:py-5 md:px-8">
+        <Link href="/" className="font-display text-lg text-gold-gradient sm:text-xl">
           Action Plus Gym
         </Link>
         <div className="flex items-center gap-3">
@@ -22,7 +22,7 @@ export default function MembersPortalPage() {
           </Link>
         </div>
       </header>
-      <main>
+      <main className="pb-[max(1rem,env(safe-area-inset-bottom))]">
         <MemberPortalApp />
       </main>
     </div>

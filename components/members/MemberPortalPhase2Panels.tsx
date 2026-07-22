@@ -653,7 +653,7 @@ export function TrainingPanel({
   }
 
   return (
-    <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-5">
+    <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-4 space-y-5 sm:p-5">
       <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Training</h2>
       {data?.planName ? (
@@ -670,7 +670,7 @@ export function TrainingPanel({
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
       {canEditWorkouts ? (
-      <div className="w-full min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-4 sm:p-5 space-y-5">
+      <div className="w-full min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-3.5 space-y-5 sm:p-5">
         <div>
           <p className="font-display text-lg tracking-wide text-white">My daily workouts</p>
           <p className="mt-1.5 text-xs leading-relaxed text-muted">
@@ -683,7 +683,7 @@ export function TrainingPanel({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
             Date
           </p>
-          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-white/12 bg-black/50 px-3 py-2.5">
+          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-white/12 bg-black/50 px-3 py-2">
             <p className="min-w-0 flex-1 truncate text-sm text-white">
               {logDate
                 ? (() => {
@@ -694,13 +694,13 @@ export function TrainingPanel({
                 : "Pick a date"}
             </p>
             {/*
-              iOS only opens the native date sheet when the <input type="date"> itself is tapped.
-              Overlay a real date input on the Change label (opacity 0) — no showPicker/click hacks.
+              Direct tap on <input type="date"> works on iOS Safari and Android Chrome.
+              ≥44px hit target; clip overflow so native date min-width cannot break the card.
             */}
-            <div className="relative shrink-0">
+            <div className="relative h-11 w-[4.75rem] shrink-0 overflow-hidden rounded-full">
               <span
                 aria-hidden
-                className={`inline-flex rounded-full border border-white/20 px-3 py-1 text-[11px] font-medium tracking-wide text-gold/90 ${
+                className={`pointer-events-none absolute inset-0 z-0 inline-flex items-center justify-center rounded-full border border-white/20 text-[11px] font-medium tracking-wide text-gold/90 ${
                   logBusy ? "opacity-50" : ""
                 }`}
               >
@@ -710,7 +710,8 @@ export function TrainingPanel({
                 type="date"
                 aria-label="Change workout date"
                 disabled={logBusy}
-                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                className="absolute inset-0 z-10 m-0 h-full w-full max-w-full cursor-pointer appearance-none border-0 bg-transparent p-0 opacity-0 disabled:cursor-not-allowed"
+                style={{ fontSize: 16, minWidth: 0, maxWidth: "100%" }}
                 value={logDate}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -746,7 +747,7 @@ export function TrainingPanel({
                         : [...prev, label],
                     )
                   }
-                  className={`rounded-full border px-3 py-1.5 text-[11px] tracking-wide transition ${
+                  className={`min-h-9 touch-manipulation rounded-full border px-3 py-2 text-[11px] tracking-wide transition ${
                     on
                       ? "border-gold/70 bg-gold/15 text-gold"
                       : "border-white/12 bg-white/[0.03] text-white/75 hover:border-white/25"
@@ -761,7 +762,7 @@ export function TrainingPanel({
             <button
               type="button"
               onClick={() => setExercisesExpanded((v) => !v)}
-              className="text-[11px] font-medium tracking-wide text-gold/90 underline-offset-2 hover:underline"
+              className="min-h-9 touch-manipulation text-[11px] font-medium tracking-wide text-gold/90 underline-offset-2 hover:underline"
             >
               {exercisesExpanded
                 ? "Show less"
@@ -776,7 +777,7 @@ export function TrainingPanel({
           </p>
           <textarea
             rows={2}
-            className="box-border block w-full min-w-0 max-w-full resize-none rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-gold/40"
+            className="box-border block w-full min-w-0 max-w-full resize-none rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-gold/40 sm:text-sm"
             value={logNotes}
             onChange={(e) => setLogNotes(e.target.value)}
             placeholder="Sets, reps, how it felt…"
@@ -788,7 +789,7 @@ export function TrainingPanel({
           type="button"
           disabled={logBusy || !logDate}
           onClick={() => void saveDailyLog()}
-          className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold tracking-wide text-black disabled:opacity-50"
+          className="min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold tracking-wide text-black disabled:opacity-50"
         >
           {logBusy
             ? "Saving…"
@@ -806,14 +807,14 @@ export function TrainingPanel({
             <div className="flex gap-1.5">
               <button
                 type="button"
-                className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] tracking-wide text-white/70"
+                className="min-h-9 touch-manipulation rounded-full border border-white/15 px-3 py-1.5 text-[10px] tracking-wide text-white/70"
                 onClick={() => shiftMonth(-1)}
               >
                 Prev
               </button>
               <button
                 type="button"
-                className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] tracking-wide text-white/70"
+                className="min-h-9 touch-manipulation rounded-full border border-white/15 px-3 py-1.5 text-[10px] tracking-wide text-white/70"
                 onClick={() => shiftMonth(1)}
               >
                 Next
@@ -825,7 +826,7 @@ export function TrainingPanel({
           </p>
           <div className="grid grid-cols-7 gap-1">
             {dailyMonthCells.map((cell) => {
-              if (cell.kind === "pad") return <div key={cell.key} className="min-h-9" />;
+              if (cell.kind === "pad") return <div key={cell.key} className="min-h-11" />;
               const active = cell.key === logDate;
               return (
                 <button
@@ -833,7 +834,7 @@ export function TrainingPanel({
                   type="button"
                   title={cell.focus || undefined}
                   onClick={() => setLogDate(cell.key)}
-                  className={`min-h-9 rounded-lg text-[11px] transition ${
+                  className={`min-h-11 touch-manipulation rounded-lg text-[11px] transition ${
                     cell.hasFocus
                       ? "bg-gold/20 text-gold"
                       : "bg-white/[0.04] text-white/65"
@@ -984,7 +985,7 @@ export function TrainingPanel({
                     type="button"
                     onClick={() => setSelectedDayKey(entry.key)}
                     className={[
-                      "min-h-11 rounded-lg border px-1 py-1.5 text-[10px] sm:min-h-12 sm:text-xs",
+                      "min-h-11 touch-manipulation rounded-lg border px-1 py-1.5 text-[10px] sm:min-h-12 sm:text-xs",
                       entry.isSunday
                         ? "border-white/10 bg-white/5 text-muted"
                         : entry.hasFocus
