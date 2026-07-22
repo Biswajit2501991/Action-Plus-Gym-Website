@@ -142,7 +142,7 @@ export function safeMemberPayload(
   branch: string | null,
   photoUrl: string | null,
 ) {
-  const endDate = member.payment_by || member.next_payment_date || null;
+  const endDate = member.next_payment_date || member.payment_by || null;
   const medical = member.medical_answers_json || {};
   return {
     memberUuid: member.member_uuid,

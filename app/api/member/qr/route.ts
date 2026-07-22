@@ -67,6 +67,7 @@ export async function GET() {
       planName: member.plan_name,
       branch,
       paymentBy: member.payment_by,
+      nextPaymentDate: member.next_payment_date,
       photoUrl,
       qrPayload,
     },

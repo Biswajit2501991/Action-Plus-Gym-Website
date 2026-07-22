@@ -81,23 +81,36 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
-export function PaymentsPanel({ onBack }: { onBack: () => void }) {
+export function PaymentsPanel({
+  onBack,
+  liveTick = 0,
+}: {
+  onBack: () => void;
+  liveTick?: number;
+}) {
   const [items, setItems] = useState<Payment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const data = await api<{ ok: true; items: Payment[] }>("/api/member/payments");
-        setItems(data.items || []);
+        if (!cancelled) {
+          setItems(data.items || []);
+          setError(null);
+        }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not load payments");
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load payments");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [liveTick]);
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
@@ -139,9 +152,11 @@ export function PaymentsPanel({ onBack }: { onBack: () => void }) {
 export function AttendancePanel({
   onBack,
   deviceId,
+  liveTick = 0,
 }: {
   onBack: () => void;
   deviceId: string;
+  liveTick?: number;
 }) {
   const [items, setItems] = useState<Attendance[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -158,7 +173,7 @@ export function AttendancePanel({
 
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-  }, [load]);
+  }, [load, liveTick]);
 
   async function checkIn() {
     setBusy(true);
@@ -378,7 +393,13 @@ export function ChatPanel({ onBack }: { onBack: () => void }) {
   );
 }
 
-export function TrainingPanel({ onBack }: { onBack: () => void }) {
+export function TrainingPanel({
+  onBack,
+  liveTick = 0,
+}: {
+  onBack: () => void;
+  liveTick?: number;
+}) {
   const [data, setData] = useState<{
     pt: Array<Record<string, unknown>>;
     workouts: Array<Record<string, unknown>>;
@@ -405,6 +426,7 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
   const [viewMonthIndex, setViewMonthIndex] = useState(todayParts.monthIndex);
 
   useEffect(() => {
+    let cancelled = false;
     api<{
       ok: true;
       pt: Array<Record<string, unknown>>;
@@ -416,16 +438,23 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
       ptWorkoutNotes?: string;
     }>("/api/member/training")
       .then((res) => {
+        if (cancelled) return;
         setData(res);
         const parts = parsePtDateKey(res.today);
         if (parts) {
           setViewYear(parts.year);
           setViewMonthIndex(parts.monthIndex);
-          setSelectedDayKey(res.today || null);
+          setSelectedDayKey((prev) => prev || res.today || null);
         }
+        setError(null);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-  }, []);
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveTick]);
 
   const focusByDate = useMemo(
     () => data?.focusByDate || {},
@@ -648,7 +677,13 @@ function Block({
   );
 }
 
-export function BookingsPanel({ onBack }: { onBack: () => void }) {
+export function BookingsPanel({
+  onBack,
+  liveTick = 0,
+}: {
+  onBack: () => void;
+  liveTick?: number;
+}) {
   const [slots, setSlots] = useState<
     Array<{ id: string; title: string; starts_at: string; capacity: number }>
   >([]);
@@ -668,7 +703,7 @@ export function BookingsPanel({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-  }, [load]);
+  }, [load, liveTick]);
 
   async function book(slotId: string) {
     setBusy(slotId);
@@ -723,7 +758,13 @@ export function BookingsPanel({ onBack }: { onBack: () => void }) {
   );
 }
 
-export function PerksPanel({ onBack }: { onBack: () => void }) {
+export function PerksPanel({
+  onBack,
+  liveTick = 0,
+}: {
+  onBack: () => void;
+  liveTick?: number;
+}) {
   const [data, setData] = useState<{
     locker: { locker_code: string; status: string } | null;
     referral: { code: string; points: number } | null;
@@ -732,14 +773,25 @@ export function PerksPanel({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     api<{
       ok: true;
       locker: { locker_code: string; status: string } | null;
       referral: { code: string; points: number } | null;
     }>("/api/member/perks")
-      .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-  }, []);
+      .then((res) => {
+        if (!cancelled) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveTick]);
 
   async function requestLocker() {
     try {

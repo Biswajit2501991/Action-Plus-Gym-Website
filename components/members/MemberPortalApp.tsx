@@ -47,6 +47,7 @@ type QrCard = {
   planName: string | null;
   branch: string | null;
   paymentBy: string | null;
+  nextPaymentDate: string | null;
   photoUrl: string | null;
   qrPayload: string;
 };
@@ -148,15 +149,28 @@ export function MemberPortalApp() {
   const [waitNote, setWaitNote] = useState("Waiting for gym staff to approve…");
   const [needsReauth, setNeedsReauth] = useState(false);
 
+  const [liveTick, setLiveTick] = useState(0);
+
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
   }, []);
 
-  const loadMe = useCallback(async () => {
+  /** Soft refresh — updates member data without forcing navigation to home. */
+  const refreshMember = useCallback(async () => {
     const data = await api<{ ok: true; member: MemberMe }>("/api/member/me");
-    setMember(data.member);
-    setStep("home");
+    setMember((prev) => {
+      const next = data.member;
+      if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
+      return next;
+    });
+    setLiveTick((t) => t + 1);
+    return data.member;
   }, []);
+
+  const loadMe = useCallback(async () => {
+    await refreshMember();
+    setStep("home");
+  }, [refreshMember]);
 
   const signOutIdle = useCallback(async () => {
     try {
@@ -191,6 +205,45 @@ export function MemberPortalApp() {
       window.clearInterval(timer);
     };
   }, [member, signOutIdle]);
+
+  // Live sync: poll while signed in + refresh when app returns to foreground.
+  useEffect(() => {
+    if (!member) return;
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        await refreshMember();
+        if (cancelled) return;
+        if (step === "card") {
+          const data = await api<{ ok: true; card: QrCard }>("/api/member/qr");
+          if (!cancelled) setCard(data.card);
+        }
+        if (step === "devices") {
+          const data = await api<{ ok: true; devices: Device[] }>("/api/member/devices");
+          if (!cancelled) setDevices(data.devices || []);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
+          setMember(null);
+          setStep("mobile");
+          setError(msg || "Session expired. Please sign in again.");
+        }
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void pull();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void pull();
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(id);
+    };
+  }, [member, refreshMember, step]);
 
   useEffect(() => {
     let cancelled = false;
@@ -726,7 +779,7 @@ export function MemberPortalApp() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted">Next billing</p>
+                    <p className="text-muted">Next Payment Date</p>
                     <p className="text-white">
                       {formatDate(member.nextPaymentDate || member.billingDate)}
                     </p>
@@ -791,7 +844,7 @@ export function MemberPortalApp() {
                 <Row label="Blood group" value={member.bloodGroup || "—"} />
                 <Row label="Emergency" value={member.emergencyContact || "—"} />
                 <Row label="Joined" value={formatDate(member.joiningDate)} />
-                <Row label="Valid until" value={formatDate(member.nextPaymentDate)} />
+                <Row label="Next Payment Date" value={formatDate(member.nextPaymentDate)} />
               </dl>
             </section>
           ) : null}
@@ -824,7 +877,7 @@ export function MemberPortalApp() {
               <dl className="mt-4 space-y-2 text-sm">
                 <Row label="Plan" value={card.planName || "—"} />
                 <Row label="Branch" value={card.branch || "—"} />
-                <Row label="Expiry" value={formatDate(card.paymentBy)} />
+                <Row label="Next Payment Date" value={formatDate(card.nextPaymentDate || card.paymentBy)} />
               </dl>
             </section>
           ) : null}
@@ -866,17 +919,29 @@ export function MemberPortalApp() {
             </section>
           ) : null}
 
-          {step === "payments" ? <PaymentsPanel onBack={() => setStep("home")} /> : null}
+          {step === "payments" ? (
+            <PaymentsPanel onBack={() => setStep("home")} liveTick={liveTick} />
+          ) : null}
           {step === "attendance" ? (
-            <AttendancePanel onBack={() => setStep("home")} deviceId={deviceId} />
+            <AttendancePanel
+              onBack={() => setStep("home")}
+              deviceId={deviceId}
+              liveTick={liveTick}
+            />
           ) : null}
           {step === "notifications" ? (
             <NotificationsPanel onBack={() => setStep("home")} />
           ) : null}
           {step === "chat" ? <ChatPanel onBack={() => setStep("home")} /> : null}
-          {step === "training" ? <TrainingPanel onBack={() => setStep("home")} /> : null}
-          {step === "bookings" ? <BookingsPanel onBack={() => setStep("home")} /> : null}
-          {step === "perks" ? <PerksPanel onBack={() => setStep("home")} /> : null}
+          {step === "training" ? (
+            <TrainingPanel onBack={() => setStep("home")} liveTick={liveTick} />
+          ) : null}
+          {step === "bookings" ? (
+            <BookingsPanel onBack={() => setStep("home")} liveTick={liveTick} />
+          ) : null}
+          {step === "perks" ? (
+            <PerksPanel onBack={() => setStep("home")} liveTick={liveTick} />
+          ) : null}
           {step === "biometric" ? (
             <BiometricPanel
               onBack={() => setStep("home")}
