@@ -13,6 +13,9 @@ import {
   PerksPanel,
   TrainingPanel,
 } from "@/components/members/MemberPortalPhase2Panels";
+import { PortalBackButton } from "@/components/members/PortalBackButton";
+
+const IDLE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 type MemberMe = {
   memberUuid: string;
@@ -101,10 +104,15 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const data = (await res.json().catch(() => ({}))) as T & {
     error?: string;
+    message?: string;
     ok?: boolean;
   };
   if (!res.ok || (data as { ok?: boolean }).ok === false) {
-    throw new Error((data as { error?: string }).error || "Request failed");
+    throw new Error(
+      (data as { message?: string }).message ||
+        (data as { error?: string }).error ||
+        `Request failed (${res.status})`,
+    );
   }
   return data;
 }
@@ -150,6 +158,40 @@ export function MemberPortalApp() {
     setStep("home");
   }, []);
 
+  const signOutIdle = useCallback(async () => {
+    try {
+      await api("/api/member/auth/logout", { method: "POST", body: "{}" });
+    } catch {
+      /* ignore */
+    }
+    setMember(null);
+    setCard(null);
+    setDevices([]);
+    setStep("mobile");
+    setError("Signed out after 2 hours of inactivity. Please sign in again.");
+  }, []);
+
+  // Track activity and auto-logout after 2 hours idle while signed in.
+  useEffect(() => {
+    if (!member) return;
+    let last = Date.now();
+    const mark = () => {
+      last = Date.now();
+    };
+    const windowEvents = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    for (const ev of windowEvents) window.addEventListener(ev, mark, { passive: true });
+    document.addEventListener("visibilitychange", mark);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - last >= IDLE_MS) void signOutIdle();
+    }, 30_000);
+    return () => {
+      for (const ev of windowEvents) window.removeEventListener(ev, mark);
+      document.removeEventListener("visibilitychange", mark);
+      window.clearInterval(timer);
+    };
+  }, [member, signOutIdle]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -158,12 +200,14 @@ export function MemberPortalApp() {
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : "";
-          if (/revoked|expired|Unauthorized|Session/i.test(msg)) {
+          if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
             setNeedsReauth(true);
             setError(
               /revoked/i.test(msg)
                 ? "Access was revoked by the gym. Verify via WhatsApp again."
-                : null,
+                : /inactivity/i.test(msg)
+                  ? msg
+                  : null,
             );
           }
           setStep("mobile");
@@ -748,13 +792,9 @@ export function MemberPortalApp() {
                 <Row label="Joined" value={formatDate(member.joiningDate)} />
                 <Row label="Valid until" value={formatDate(member.paymentBy)} />
               </dl>
-              <button
-                type="button"
-                onClick={() => setStep("home")}
-                className="mt-6 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85"
-              >
-                Back
-              </button>
+              <div className="mt-6">
+                <PortalBackButton onClick={() => setStep("home")} />
+              </div>
             </section>
           ) : null}
 
@@ -787,13 +827,9 @@ export function MemberPortalApp() {
                 <Row label="Branch" value={card.branch || "—"} />
                 <Row label="Expiry" value={formatDate(card.paymentBy)} />
               </dl>
-              <button
-                type="button"
-                onClick={() => setStep("home")}
-                className="mt-6 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85"
-              >
-                Back
-              </button>
+              <div className="mt-6">
+                <PortalBackButton onClick={() => setStep("home")} />
+              </div>
             </section>
           ) : null}
 
@@ -830,13 +866,9 @@ export function MemberPortalApp() {
                   </li>
                 ))}
               </ul>
-              <button
-                type="button"
-                onClick={() => setStep("home")}
-                className="mt-6 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/85"
-              >
-                Back
-              </button>
+              <div className="mt-6">
+                <PortalBackButton onClick={() => setStep("home")} />
+              </div>
             </section>
           ) : null}
 

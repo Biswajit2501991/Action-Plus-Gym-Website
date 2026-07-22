@@ -10,6 +10,10 @@ export const MEMBER_ACCESS_TTL_SEC = Number(
 export const MEMBER_REFRESH_TTL_SEC = Number(
   process.env.MEMBER_PORTAL_REFRESH_TTL_SEC || 24 * 60 * 60,
 );
+/** Idle timeout — no activity for this long forces re-login (client + server). */
+export const MEMBER_IDLE_TTL_SEC = Number(
+  process.env.MEMBER_PORTAL_IDLE_TTL_SEC || 2 * 60 * 60,
+);
 export const MEMBER_OTP_TTL_SEC = Number(
   process.env.MEMBER_PORTAL_OTP_TTL_SEC || 10 * 60,
 );

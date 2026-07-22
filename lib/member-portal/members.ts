@@ -8,7 +8,27 @@ import type { MemberRow } from "@/lib/member-portal/session";
 import { randomToken } from "@/lib/member-portal/crypto";
 
 const MEMBER_SELECT =
-  "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at";
+  "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, qr_token, pin_hash, portal_activated_at, last_portal_login_at, updated_at, deleted_at";
+
+/** Prefer Active/Hold portal-ready rows when the same mobile exists on multiple memberships (e.g. after branch move). */
+function pickBestMemberByMobile(rows: MemberRow[]): MemberRow | undefined {
+  if (!rows.length) return undefined;
+  const scored = rows.map((m) => {
+    const status = String(m.status || "").trim().toLowerCase();
+    let score = 0;
+    if (status === "active") score += 100;
+    else if (status === "hold") score += 50;
+    if (m.portal_enabled !== false && m.portal_status !== "disabled") score += 25;
+    if (m.portal_status === "active") score += 15;
+    if (m.portal_status === "pending") score += 5;
+    if (m.pin_hash) score += 10;
+    if (m.member_uuid) score += 5;
+    const updated = Date.parse(String((m as { updated_at?: string }).updated_at || "")) || 0;
+    return { m, score, updated };
+  });
+  scored.sort((a, b) => b.score - a.score || b.updated - a.updated);
+  return scored[0]?.m;
+}
 
 export async function findMemberByMobile(
   mobileInput: string,
@@ -27,28 +47,28 @@ export async function findMemberByMobile(
     .eq("gym_id", portalGymId())
     .is("deleted_at", null)
     .in("mobile", variants)
-    .limit(5);
+    .limit(20);
 
   if (error) {
     console.error(error);
     return { ok: false, error: "Lookup failed", status: 500 };
   }
 
-  // Also try suffix match if mobiles stored with spaces/formatting
-  let member = (data || [])[0] as MemberRow | undefined;
-  if (!member) {
+  let candidates = (data || []) as MemberRow[];
+  if (!candidates.length) {
     const { data: all } = await svc.client
       .from("members")
       .select(MEMBER_SELECT)
       .eq("gym_id", portalGymId())
       .is("deleted_at", null)
       .ilike("mobile", `%${mobile.slice(-10)}%`)
-      .limit(20);
-    member = (all || []).find(
+      .limit(40);
+    candidates = ((all || []) as MemberRow[]).filter(
       (m) => normalizeMobile(m.mobile) === mobile,
-    ) as MemberRow | undefined;
+    );
   }
 
+  const member = pickBestMemberByMobile(candidates);
   if (!member) {
     return { ok: false, error: "No membership found for this number", status: 404 };
   }

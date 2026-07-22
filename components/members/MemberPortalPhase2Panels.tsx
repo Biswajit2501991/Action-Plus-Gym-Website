@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   startRegistration,
   startAuthentication,
+  browserSupportsWebAuthn,
 } from "@simplewebauthn/browser";
 import {
   buildPtMonthCalendarCells,
@@ -11,6 +12,7 @@ import {
   PT_MONTH_LABELS,
   PT_WEEKDAYS,
 } from "@/lib/member-portal/pt-calendar";
+import { PortalBackButton } from "@/components/members/PortalBackButton";
 
 type Payment = {
   id: string;
@@ -37,12 +39,35 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const data = (await res.json().catch(() => ({}))) as T & {
     error?: string;
+    message?: string;
     ok?: boolean;
   };
   if (!res.ok || (data as { ok?: boolean }).ok === false) {
-    throw new Error((data as { error?: string }).error || "Request failed");
+    const msg =
+      (data as { message?: string }).message ||
+      (data as { error?: string }).error ||
+      `Request failed (${res.status})`;
+    throw new Error(msg);
   }
   return data;
+}
+
+function webAuthnErrorMessage(err: unknown) {
+  if (!(err instanceof Error)) return "Biometric failed";
+  const name = "name" in err ? String((err as DOMException).name || "") : "";
+  if (name === "NotAllowedError") {
+    return "Biometric was cancelled or not available. Unlock with Face ID / fingerprint and try again.";
+  }
+  if (name === "InvalidStateError") {
+    return "This device already has a passkey. Try Login with biometric.";
+  }
+  if (name === "NotSupportedError") {
+    return "This browser does not support Face ID / fingerprint. Use Chrome or Safari on a phone with biometrics.";
+  }
+  if (name === "SecurityError") {
+    return "Biometric blocked for this site. Open https://actionplusgym.com and try again.";
+  }
+  return err.message || "Biometric failed";
 }
 
 function formatDate(value: string | null | undefined) {
@@ -76,9 +101,7 @@ export function PaymentsPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Recent payments</h2>
       <p className="mt-1 text-sm text-muted">Last 3 payments from the gym ledger.</p>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
@@ -162,9 +185,7 @@ export function AttendancePanel({
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Attendance</h2>
       <p className="mt-1 text-sm text-muted">
         Scan the gym QR (or paste claim token) to check in. Staff can also scan your member QR.
@@ -241,9 +262,7 @@ export function NotificationsPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Billing reminders</h2>
       <p className="mt-1 text-sm text-muted">
         Allow browser notifications once. On your billing day the gym app can remind you automatically.
@@ -319,9 +338,7 @@ export function ChatPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Chat with gym</h2>
       {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
       <div className="mt-4 max-h-72 space-y-2 overflow-auto">
@@ -431,13 +448,7 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 rounded-full border border-gold/50 bg-gold/15 px-4 py-2 text-sm font-semibold text-gold shadow-[0_0_0_1px_rgba(212,175,55,0.25)]"
-      >
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Training</h2>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <Block title="PT" empty="No PT assignment yet.">
@@ -676,9 +687,7 @@ export function BookingsPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Bookings</h2>
       {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
       <ul className="mt-4 space-y-3">
@@ -743,9 +752,7 @@ export function PerksPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-4">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Lockers & referrals</h2>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {msg ? <p className="text-sm text-gold">{msg}</p> : null}
@@ -792,7 +799,25 @@ export function BiometricPanel({
   async function registerPasskey() {
     setBusy(true);
     setError(null);
+    setStatus(null);
     try {
+      if (!browserSupportsWebAuthn()) {
+        throw new Error(
+          "This browser does not support Face ID / fingerprint. On Android use Chrome; on iPhone use Safari.",
+        );
+      }
+      if (
+        typeof window !== "undefined" &&
+        window.PublicKeyCredential &&
+        "isUserVerifyingPlatformAuthenticatorAvailable" in PublicKeyCredential
+      ) {
+        const ok = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        if (!ok) {
+          throw new Error(
+            "No Face ID / fingerprint sensor available on this device, or biometrics are turned off in phone settings.",
+          );
+        }
+      }
       const opt = await api<{ ok: true; options: Parameters<typeof startRegistration>[0]["optionsJSON"] }>(
         "/api/member/auth/webauthn/register",
       );
@@ -803,7 +828,7 @@ export function BiometricPanel({
       });
       setStatus("Face ID / fingerprint saved for this device.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Registration failed");
+      setError(webAuthnErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -813,6 +838,11 @@ export function BiometricPanel({
     setBusy(true);
     setError(null);
     try {
+      if (!browserSupportsWebAuthn()) {
+        throw new Error(
+          "This browser does not support Face ID / fingerprint. On Android use Chrome; on iPhone use Safari.",
+        );
+      }
       const opt = await api<{
         ok: true;
         options: Parameters<typeof startAuthentication>[0]["optionsJSON"];
@@ -832,7 +862,7 @@ export function BiometricPanel({
       });
       onLoggedIn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Biometric login failed");
+      setError(webAuthnErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -840,12 +870,11 @@ export function BiometricPanel({
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-3">
-      <button type="button" className="text-sm text-gold" onClick={onBack}>
-        ← Back
-      </button>
+      <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Face ID / fingerprint</h2>
       <p className="text-sm text-muted">
-        Register after you are signed in, or use biometric login on this device.
+        Works on iPhone (Safari) and Android (Chrome) with screen lock biometrics.
+        Register while signed in, then use Login with biometric next time.
       </p>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {status ? <p className="text-sm text-gold">{status}</p> : null}

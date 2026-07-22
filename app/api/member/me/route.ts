@@ -19,20 +19,23 @@ export async function GET() {
   }
 
   const member = session.member;
-  const branch = await branchLabel(member.assigned_gym_code_id);
 
-  let photoUrl: string | null = member.photo_url || null;
-  if (member.photo_path) {
-    const svc = createServiceRoleClient();
-    if (svc.ok) {
+  const [branch, photoUrl] = await Promise.all([
+    branchLabel(member.assigned_gym_code_id),
+    (async (): Promise<string | null> => {
+      let url: string | null = member.photo_url || null;
+      if (!member.photo_path) return url;
+      const svc = createServiceRoleClient();
+      if (!svc.ok) return url;
       const { data } = await svc.client.storage
         .from("apg-media")
         .createSignedUrl(member.photo_path, 60 * 30);
-      if (data?.signedUrl) photoUrl = data.signedUrl;
-    }
-  }
+      return data?.signedUrl || url;
+    })(),
+  ]);
 
-  await auditLog({
+  // Fire-and-forget — do not delay home paint.
+  void auditLog({
     memberUuid: member.member_uuid,
     eventType: "profile_viewed",
   });

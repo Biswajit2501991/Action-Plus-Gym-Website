@@ -7,6 +7,7 @@ import {
   MEMBER_REFRESH_COOKIE,
   MEMBER_ACCESS_TTL_SEC,
   MEMBER_REFRESH_TTL_SEC,
+  MEMBER_IDLE_TTL_SEC,
   MEMBER_MAX_DEVICES,
   portalGymId,
 } from "@/lib/member-portal/config";
@@ -190,6 +191,7 @@ export async function issueSession(input: {
       device_id: deviceId,
       refresh_token_hash: refreshHash,
       expires_at: expiresAt,
+      last_used_at: new Date().toISOString(),
     })
     .select("id")
     .single();
@@ -260,7 +262,7 @@ export async function requireMemberSession(): Promise<
 
   const { data: session } = await svc.client
     .from("member_portal_sessions")
-    .select("id, revoked_at, expires_at")
+    .select("id, revoked_at, expires_at, last_used_at")
     .eq("id", claims.sid)
     .maybeSingle();
 
@@ -271,6 +273,28 @@ export async function requireMemberSession(): Promise<
   ) {
     await clearAuthCookies();
     return { ok: false, error: "Session expired", status: 401 };
+  }
+
+  const lastUsedMs = Date.parse(String(session.last_used_at || "")) || 0;
+  if (lastUsedMs > 0 && Date.now() - lastUsedMs > MEMBER_IDLE_TTL_SEC * 1000) {
+    await svc.client
+      .from("member_portal_sessions")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", session.id);
+    await clearAuthCookies();
+    return {
+      ok: false,
+      error: "Signed out after 2 hours of inactivity. Please sign in again.",
+      status: 401,
+    };
+  }
+
+  // Refresh idle clock (throttled: only if older than 2 minutes).
+  if (!lastUsedMs || Date.now() - lastUsedMs > 120_000) {
+    void svc.client
+      .from("member_portal_sessions")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("id", session.id);
   }
 
   const { data: member } = await svc.client
@@ -338,7 +362,7 @@ async function refreshFromCookies(): Promise<
   const hash = sha256(refresh);
   const { data: session } = await svc.client
     .from("member_portal_sessions")
-    .select("id, member_uuid, device_id, expires_at, revoked_at")
+    .select("id, member_uuid, device_id, expires_at, revoked_at, last_used_at")
     .eq("refresh_token_hash", hash)
     .eq("device_id", deviceId)
     .is("revoked_at", null)
@@ -350,6 +374,21 @@ async function refreshFromCookies(): Promise<
   ) {
     await clearAuthCookies();
     return { ok: false, error: "Session expired", status: 401 };
+  }
+
+  // Idle logout: no activity for MEMBER_IDLE_TTL_SEC (default 2 hours).
+  const lastUsedMs = Date.parse(String(session.last_used_at || "")) || 0;
+  if (lastUsedMs > 0 && Date.now() - lastUsedMs > MEMBER_IDLE_TTL_SEC * 1000) {
+    await svc.client
+      .from("member_portal_sessions")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", session.id);
+    await clearAuthCookies();
+    return {
+      ok: false,
+      error: "Signed out after 2 hours of inactivity. Please sign in again.",
+      status: 401,
+    };
   }
 
   const { data: member } = await svc.client
