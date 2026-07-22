@@ -17,6 +17,12 @@ import {
   readCachedMessages,
   writeCachedMessages,
 } from "@/lib/member-portal/chat-client";
+import {
+  readAttendanceCache,
+  readTrainingCache,
+  writeAttendanceCache,
+  writeTrainingCache,
+} from "@/lib/member-portal/panel-cache";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 
 type Payment = {
@@ -157,28 +163,44 @@ export function PaymentsPanel({
 export function AttendancePanel({
   onBack,
   deviceId,
+  memberUuid = "",
   liveTick = 0,
 }: {
   onBack: () => void;
   deviceId: string;
+  memberUuid?: string;
   liveTick?: number;
 }) {
-  const [items, setItems] = useState<Attendance[]>([]);
+  const month = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const [items, setItems] = useState<Attendance[]>(() => {
+    const cached = readAttendanceCache<Attendance[]>(memberUuid, month);
+    return Array.isArray(cached) ? cached : [];
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState("");
-  const month = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const data = await api<{ ok: true; items: Attendance[] }>(
-      `/api/member/attendance?month=${encodeURIComponent(month)}`,
-    );
-    setItems(data.items || []);
-  }, [month]);
+    setRefreshing(true);
+    try {
+      const data = await api<{ ok: true; items: Attendance[] }>(
+        `/api/member/attendance?month=${encodeURIComponent(month)}`,
+      );
+      const next = data.items || [];
+      setItems(next);
+      writeAttendanceCache(memberUuid, month, next);
+      setError(null);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [month, memberUuid]);
 
   useEffect(() => {
+    const cached = readAttendanceCache<Attendance[]>(memberUuid, month);
+    if (cached) setItems(cached);
     load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-  }, [load, liveTick]);
+  }, [load, liveTick, memberUuid, month]);
 
   async function checkIn() {
     setBusy(true);
@@ -211,6 +233,9 @@ export function AttendancePanel({
         Scan the gym QR (or paste claim token) to check in. Staff can also scan your member QR.
       </p>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+      {refreshing && items.length ? (
+        <p className="mt-2 text-[10px] text-muted">Updating…</p>
+      ) : null}
       <div className="mt-4 space-y-2">
         <input
           className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white"
@@ -234,7 +259,11 @@ export function AttendancePanel({
             {new Date(i.checked_in_at).toLocaleString("en-IN")} · {i.source}
           </li>
         ))}
-        {!items.length ? <li className="text-sm text-muted">No check-ins yet.</li> : null}
+        {!items.length ? (
+          <li className="text-sm text-muted">
+            {refreshing ? "Loading…" : "No check-ins yet."}
+          </li>
+        ) : null}
       </ul>
     </section>
   );
@@ -439,27 +468,33 @@ export function ChatPanel({
   );
 }
 
+type TrainingData = {
+  pt: Array<Record<string, unknown>>;
+  workouts: Array<Record<string, unknown>>;
+  diets: Array<Record<string, unknown>>;
+  measurements: Array<Record<string, unknown>>;
+  focusByDate?: Record<string, string>;
+  today?: string;
+  ptWorkoutNotes?: string;
+  dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
+  exerciseTypes?: string[];
+  onPtPlan?: boolean;
+  canEditWorkouts?: boolean;
+  planName?: string | null;
+};
+
 export function TrainingPanel({
   onBack,
+  memberUuid = "",
   liveTick = 0,
 }: {
   onBack: () => void;
+  memberUuid?: string;
   liveTick?: number;
 }) {
-  const [data, setData] = useState<{
-    pt: Array<Record<string, unknown>>;
-    workouts: Array<Record<string, unknown>>;
-    diets: Array<Record<string, unknown>>;
-    measurements: Array<Record<string, unknown>>;
-    focusByDate?: Record<string, string>;
-    today?: string;
-    ptWorkoutNotes?: string;
-    dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
-    exerciseTypes?: string[];
-    onPtPlan?: boolean;
-    canEditWorkouts?: boolean;
-    planName?: string | null;
-  } | null>(null);
+  const [data, setData] = useState<TrainingData | null>(() =>
+    readTrainingCache<TrainingData>(memberUuid),
+  );
   const [error, setError] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
@@ -468,6 +503,8 @@ export function TrainingPanel({
   const [logNotes, setLogNotes] = useState("");
   const [logBusy, setLogBusy] = useState(false);
   const [logMsg, setLogMsg] = useState<string | null>(null);
+  const [exercisesExpanded, setExercisesExpanded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const todayParts = useMemo(() => {
     const key = data?.today || new Date().toISOString().slice(0, 10);
@@ -484,43 +521,44 @@ export function TrainingPanel({
   const canEditWorkouts = data?.canEditWorkouts === true;
   const onPtPlan = data?.onPtPlan === true;
 
+  const applyTraining = useCallback(
+    (res: TrainingData) => {
+      setData(res);
+      writeTrainingCache(memberUuid, res);
+      const parts = parsePtDateKey(res.today);
+      if (parts) {
+        setViewYear(parts.year);
+        setViewMonthIndex(parts.monthIndex);
+        setSelectedDayKey((prev) => prev || res.today || null);
+      }
+      setLogDate((prev) => prev || res.today || "");
+      setError(null);
+    },
+    [memberUuid],
+  );
+
   const reload = useCallback(async () => {
-    const res = await api<{
-      ok: true;
-      pt: Array<Record<string, unknown>>;
-      workouts: Array<Record<string, unknown>>;
-      diets: Array<Record<string, unknown>>;
-      measurements: Array<Record<string, unknown>>;
-      focusByDate?: Record<string, string>;
-      today?: string;
-      ptWorkoutNotes?: string;
-      dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
-      exerciseTypes?: string[];
-      onPtPlan?: boolean;
-      canEditWorkouts?: boolean;
-      planName?: string | null;
-    }>("/api/member/training");
-    setData(res);
-    const parts = parsePtDateKey(res.today);
-    if (parts) {
-      setViewYear(parts.year);
-      setViewMonthIndex(parts.monthIndex);
-      setSelectedDayKey((prev) => prev || res.today || null);
+    setRefreshing(true);
+    try {
+      const res = await api<TrainingData & { ok: true }>("/api/member/training");
+      applyTraining(res);
+      return res;
+    } finally {
+      setRefreshing(false);
     }
-    setLogDate((prev) => prev || res.today || "");
-    setError(null);
-    return res;
-  }, []);
+  }, [applyTraining]);
 
   useEffect(() => {
     let cancelled = false;
+    const cached = readTrainingCache<TrainingData>(memberUuid);
+    if (cached) applyTraining(cached);
     reload().catch((e) => {
       if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
     });
     return () => {
       cancelled = true;
     };
-  }, [liveTick, reload]);
+  }, [liveTick, reload, memberUuid, applyTraining]);
 
   useEffect(() => {
     if (!logDate || !data?.dailyByDate) return;
@@ -571,6 +609,17 @@ export function TrainingPanel({
         "Rest day",
       ];
 
+  const PREVIEW_EXERCISE_COUNT = 8;
+  const visibleExercises = useMemo(() => {
+    if (exercisesExpanded || exerciseOptions.length <= PREVIEW_EXERCISE_COUNT) {
+      return exerciseOptions;
+    }
+    const preview = exerciseOptions.slice(0, PREVIEW_EXERCISE_COUNT);
+    const selectedOutside = logExercises.filter((x) => !preview.includes(x));
+    return [...preview, ...selectedOutside];
+  }, [exercisesExpanded, exerciseOptions, logExercises]);
+  const hasMoreExercises = exerciseOptions.length > PREVIEW_EXERCISE_COUNT;
+
   function shiftMonth(delta: number) {
     const dt = new Date(viewYear, viewMonthIndex + delta, 1);
     setViewYear(dt.getFullYear());
@@ -604,7 +653,7 @@ export function TrainingPanel({
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-5">
+    <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-5">
       <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Training</h2>
       {data?.planName ? (
@@ -615,67 +664,112 @@ export function TrainingPanel({
             : " · Log your own workouts"}
         </p>
       ) : null}
+      {refreshing && data ? (
+        <p className="text-[10px] text-muted">Updating…</p>
+      ) : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
       {canEditWorkouts ? (
-      <div className="rounded-2xl border border-gold/30 bg-black/30 p-4 space-y-3">
+      <div className="w-full min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-4 sm:p-5 space-y-5">
         <div>
-          <p className="text-sm font-semibold text-white">My daily workouts</p>
-          <p className="mt-1 text-xs text-muted">
-            Log what you trained today. Pick from the list or clear a day. History stays until the
-            gym removes it.
+          <p className="font-display text-lg tracking-wide text-white">My daily workouts</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted">
+            Choose a day, pick what you trained, add a note if you like. History stays until the gym
+            removes it.
           </p>
         </div>
-        <label className="block text-xs text-white/70">
-          Date
-          <input
-            type="date"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-            value={logDate}
-            onChange={(e) => setLogDate(e.target.value)}
-          />
-        </label>
-        <div className="flex flex-wrap gap-1.5">
-          {exerciseOptions.map((label) => {
-            const on = logExercises.includes(label);
-            return (
-              <button
-                key={label}
-                type="button"
-                disabled={logBusy}
-                onClick={() =>
-                  setLogExercises((prev) =>
-                    prev.includes(label)
-                      ? prev.filter((x) => x !== label)
-                      : [...prev, label],
-                  )
-                }
-                className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                  on
-                    ? "border-gold bg-gold/20 text-gold"
-                    : "border-white/15 text-white/80"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+
+        <div className="w-full min-w-0 max-w-full space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+            Date
+          </p>
+          <label className="relative block w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-white/12 bg-black/50">
+            <span className="pointer-events-none block truncate px-3 py-3 text-sm text-white">
+              {logDate
+                ? (() => {
+                    const parts = parsePtDateKey(logDate);
+                    if (!parts) return logDate;
+                    return `${parts.day} ${PT_MONTH_LABELS[parts.monthIndex]?.slice(0, 3) || ""} ${parts.year}`;
+                  })()
+                : "Pick a date"}
+            </span>
+            <input
+              type="date"
+              aria-label="Workout date"
+              className="absolute inset-0 z-10 h-full w-full max-w-full cursor-pointer opacity-0"
+              value={logDate}
+              onChange={(e) => setLogDate(e.target.value)}
+            />
+          </label>
         </div>
-        <label className="block text-xs text-white/70">
-          Notes (optional)
-          <input
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+
+        <div className="min-w-0 space-y-2.5">
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+              Workout
+            </p>
+            {logExercises.length ? (
+              <p className="text-[10px] text-muted">{logExercises.length} selected</p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {visibleExercises.map((label) => {
+              const on = logExercises.includes(label);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={logBusy}
+                  onClick={() =>
+                    setLogExercises((prev) =>
+                      prev.includes(label)
+                        ? prev.filter((x) => x !== label)
+                        : [...prev, label],
+                    )
+                  }
+                  className={`rounded-full border px-3 py-1.5 text-[11px] tracking-wide transition ${
+                    on
+                      ? "border-gold/70 bg-gold/15 text-gold"
+                      : "border-white/12 bg-white/[0.03] text-white/75 hover:border-white/25"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {hasMoreExercises ? (
+            <button
+              type="button"
+              onClick={() => setExercisesExpanded((v) => !v)}
+              className="text-[11px] font-medium tracking-wide text-gold/90 underline-offset-2 hover:underline"
+            >
+              {exercisesExpanded
+                ? "Show less"
+                : `See all (${exerciseOptions.length})`}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="min-w-0 space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+            + Notes
+          </p>
+          <textarea
+            rows={2}
+            className="box-border block w-full min-w-0 max-w-full resize-none rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-gold/40"
             value={logNotes}
             onChange={(e) => setLogNotes(e.target.value)}
             placeholder="Sets, reps, how it felt…"
             disabled={logBusy}
           />
-        </label>
+        </div>
+
         <button
           type="button"
           disabled={logBusy || !logDate}
           onClick={() => void saveDailyLog()}
-          className="rounded-full gold-gradient px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+          className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold tracking-wide text-black disabled:opacity-50"
         >
           {logBusy
             ? "Saving…"
@@ -685,29 +779,34 @@ export function TrainingPanel({
         </button>
         {logMsg ? <p className="text-xs text-amber-200/90">{logMsg}</p> : null}
 
-        <div className="pt-2">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-medium text-white/80">Your log calendar</p>
-            <div className="flex gap-1">
+        <div className="min-w-0 space-y-3 border-t border-white/10 pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+              Your log calendar
+            </p>
+            <div className="flex gap-1.5">
               <button
                 type="button"
-                className="rounded-lg border border-white/15 px-2 py-0.5 text-[10px] text-white/70"
+                className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] tracking-wide text-white/70"
                 onClick={() => shiftMonth(-1)}
               >
                 Prev
               </button>
               <button
                 type="button"
-                className="rounded-lg border border-white/15 px-2 py-0.5 text-[10px] text-white/70"
+                className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] tracking-wide text-white/70"
                 onClick={() => shiftMonth(1)}
               >
                 Next
               </button>
             </div>
           </div>
+          <p className="text-center text-xs font-medium text-white/80">
+            {PT_MONTH_LABELS[viewMonthIndex]} {viewYear}
+          </p>
           <div className="grid grid-cols-7 gap-1">
             {dailyMonthCells.map((cell) => {
-              if (cell.kind === "pad") return <div key={cell.key} className="min-h-8" />;
+              if (cell.kind === "pad") return <div key={cell.key} className="min-h-9" />;
               const active = cell.key === logDate;
               return (
                 <button
@@ -715,11 +814,11 @@ export function TrainingPanel({
                   type="button"
                   title={cell.focus || undefined}
                   onClick={() => setLogDate(cell.key)}
-                  className={`min-h-8 rounded-md text-[10px] ${
+                  className={`min-h-9 rounded-lg text-[11px] transition ${
                     cell.hasFocus
-                      ? "bg-gold/25 text-gold"
-                      : "bg-white/5 text-white/70"
-                  } ${active ? "ring-1 ring-gold" : ""}`}
+                      ? "bg-gold/20 text-gold"
+                      : "bg-white/[0.04] text-white/65"
+                  } ${active ? "ring-1 ring-gold/80" : ""}`}
                 >
                   {cell.day}
                 </button>

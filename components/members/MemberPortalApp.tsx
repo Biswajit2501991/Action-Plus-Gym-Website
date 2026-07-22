@@ -1143,6 +1143,7 @@ export function MemberPortalApp() {
             <AttendancePanel
               onBack={() => setStep("home")}
               deviceId={deviceId}
+              memberUuid={member.memberUuid}
               liveTick={liveTick}
             />
           ) : null}
@@ -1157,7 +1158,11 @@ export function MemberPortalApp() {
             />
           ) : null}
           {step === "training" ? (
-            <TrainingPanel onBack={() => setStep("home")} liveTick={liveTick} />
+            <TrainingPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+              liveTick={liveTick}
+            />
           ) : null}
           {step === "bookings" ? (
             <BookingsPanel onBack={() => setStep("home")} liveTick={liveTick} />
