@@ -764,7 +764,8 @@ export function MemberPortalApp() {
 
           {step === "profile" ? (
             <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-              <div className="flex items-center gap-4">
+              <PortalBackButton onClick={() => setStep("home")} />
+              <div className="mt-4 flex items-center gap-4">
                 {member.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -792,15 +793,13 @@ export function MemberPortalApp() {
                 <Row label="Joined" value={formatDate(member.joiningDate)} />
                 <Row label="Valid until" value={formatDate(member.paymentBy)} />
               </dl>
-              <div className="mt-6">
-                <PortalBackButton onClick={() => setStep("home")} />
-              </div>
             </section>
           ) : null}
 
           {step === "card" && card ? (
             <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-charcoal to-black p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-gold">Membership card</p>
+              <PortalBackButton onClick={() => setStep("home")} />
+              <p className="mt-4 text-xs uppercase tracking-[0.18em] text-gold">Membership card</p>
               <div className="mt-4 flex items-center gap-4">
                 {card.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -827,15 +826,13 @@ export function MemberPortalApp() {
                 <Row label="Branch" value={card.branch || "—"} />
                 <Row label="Expiry" value={formatDate(card.paymentBy)} />
               </dl>
-              <div className="mt-6">
-                <PortalBackButton onClick={() => setStep("home")} />
-              </div>
             </section>
           ) : null}
 
           {step === "devices" ? (
             <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-              <p className="text-sm text-muted">Up to 3 trusted devices. Remove unused ones anytime.</p>
+              <PortalBackButton onClick={() => setStep("home")} />
+              <p className="mt-4 text-sm text-muted">Up to 3 trusted devices. Remove unused ones anytime.</p>
               <ul className="mt-4 space-y-3">
                 {devices.map((d) => (
                   <li
@@ -866,9 +863,6 @@ export function MemberPortalApp() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-6">
-                <PortalBackButton onClick={() => setStep("home")} />
-              </div>
             </section>
           ) : null}
 
