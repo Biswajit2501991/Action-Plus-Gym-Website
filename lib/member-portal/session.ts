@@ -125,17 +125,20 @@ export async function issueSession(input: {
   const { data: devices, error: devicesErr } = await svc.client
     .from("member_portal_devices")
     .select("id, device_id, revoked_at")
-    .eq("member_uuid", memberUuid)
-    .is("revoked_at", null);
+    .eq("member_uuid", memberUuid);
 
   if (devicesErr) {
     console.error(devicesErr);
     return { ok: false, error: "Could not load devices", status: 500 };
   }
 
-  const active = devices || [];
-  const existing = active.find((d) => d.device_id === deviceId);
-  if (!existing && active.length >= MEMBER_MAX_DEVICES) {
+  const allDevices = devices || [];
+  const active = allDevices.filter((d) => !d.revoked_at);
+  // Include revoked rows — unique (member_uuid, device_id) still applies, so re-login
+  // must reactivate rather than insert a duplicate.
+  const existing = allDevices.find((d) => d.device_id === deviceId);
+  const wouldAddActiveSlot = !existing || Boolean(existing.revoked_at);
+  if (wouldAddActiveSlot && active.length >= MEMBER_MAX_DEVICES) {
     return {
       ok: false,
       error: `Maximum ${MEMBER_MAX_DEVICES} devices allowed. Remove a device from Settings or ask the gym.`,
@@ -150,15 +153,20 @@ export async function issueSession(input: {
   ).toISOString();
 
   if (existing) {
-    await svc.client
+    const { error: updDevErr } = await svc.client
       .from("member_portal_devices")
       .update({
         last_seen_at: new Date().toISOString(),
         refresh_token_hash: refreshHash,
         label: input.deviceLabel || undefined,
         trusted: true,
+        revoked_at: null,
       })
       .eq("id", existing.id);
+    if (updDevErr) {
+      console.error(updDevErr);
+      return { ok: false, error: "Could not register device", status: 500 };
+    }
   } else {
     const { error: insDevErr } = await svc.client.from("member_portal_devices").insert({
       gym_id: gymId,
@@ -168,10 +176,30 @@ export async function issueSession(input: {
       trusted: true,
       refresh_token_hash: refreshHash,
       last_seen_at: new Date().toISOString(),
+      revoked_at: null,
     });
     if (insDevErr) {
-      console.error(insDevErr);
-      return { ok: false, error: "Could not register device", status: 500 };
+      // Race: another request may have inserted the same device_id — reactivate it.
+      if (String(insDevErr.code || "") === "23505" || /duplicate key/i.test(String(insDevErr.message || ""))) {
+        const { error: raceErr } = await svc.client
+          .from("member_portal_devices")
+          .update({
+            last_seen_at: new Date().toISOString(),
+            refresh_token_hash: refreshHash,
+            label: input.deviceLabel || guessDeviceLabel(input.userAgent),
+            trusted: true,
+            revoked_at: null,
+          })
+          .eq("member_uuid", memberUuid)
+          .eq("device_id", deviceId);
+        if (raceErr) {
+          console.error(insDevErr, raceErr);
+          return { ok: false, error: "Could not register device", status: 500 };
+        }
+      } else {
+        console.error(insDevErr);
+        return { ok: false, error: "Could not register device", status: 500 };
+      }
     }
   }
 
