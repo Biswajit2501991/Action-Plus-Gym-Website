@@ -12,6 +12,11 @@ import {
   PT_MONTH_LABELS,
   PT_WEEKDAYS,
 } from "@/lib/member-portal/pt-calendar";
+import {
+  markChatSeen,
+  readCachedMessages,
+  writeCachedMessages,
+} from "@/lib/member-portal/chat-client";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 
 type Payment = {
@@ -305,10 +310,18 @@ function urlBase64ToUint8Array(base64String: string) {
   return out;
 }
 
-export function ChatPanel({ onBack }: { onBack: () => void }) {
+export function ChatPanel({
+  onBack,
+  memberUuid,
+  onSeen,
+}: {
+  onBack: () => void;
+  memberUuid?: string;
+  onSeen?: () => void;
+}) {
   const [messages, setMessages] = useState<
     Array<{ id: string; sender: string; body: string; staff_name?: string; created_at: string }>
-  >([]);
+  >(() => (memberUuid ? readCachedMessages(memberUuid) || [] : []));
   const [retentionDays, setRetentionDays] = useState(7);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -325,18 +338,35 @@ export function ChatPanel({ onBack }: { onBack: () => void }) {
         created_at: string;
       }>;
       retentionDays?: number;
+      memberUuid?: string;
     }>("/api/member/chat");
-    setMessages(data.messages || []);
+    const next = data.messages || [];
+    setMessages(next);
+    const uuid = data.memberUuid || memberUuid;
+    if (uuid) {
+      writeCachedMessages(uuid, next);
+      const latest = next.length ? next[next.length - 1]?.created_at : undefined;
+      markChatSeen(uuid, latest);
+      onSeen?.();
+    }
     if (typeof data.retentionDays === "number" && data.retentionDays > 0) {
       setRetentionDays(data.retentionDays);
     }
-  }, []);
+  }, [memberUuid, onSeen]);
 
   useEffect(() => {
+    if (memberUuid) {
+      const cached = readCachedMessages(memberUuid);
+      if (cached?.length) setMessages(cached);
+    }
     load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-    const id = window.setInterval(() => void load().catch(() => null), 8000);
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      void load().catch(() => null);
+    };
+    const id = window.setInterval(tick, 8000);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, [load, memberUuid]);
 
   async function send() {
     if (!text.trim()) return;

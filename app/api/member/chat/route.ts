@@ -16,10 +16,16 @@ async function getRetentionDays(client: any, gymId: string) {
 }
 
 /**
- * One continuous chat per member: reuse the latest thread (any status),
- * reopen answered threads, and never orphan history by creating a parallel open thread.
+ * One continuous chat per member: reuse the latest thread (any status).
+ * Only reopen answered → open when the member sends (POST), not on read (GET),
+ * so staff "awaiting reply" status stays accurate.
  */
-async function getOrCreateThread(memberUuid: string, gymId: string) {
+async function getOrCreateThread(
+  memberUuid: string,
+  gymId: string,
+  opts?: { reopen?: boolean; createIfMissing?: boolean },
+) {
+  const createIfMissing = opts?.createIfMissing !== false;
   const svc = createServiceRoleClient();
   if (!svc.ok) return { ok: false as const, error: svc.error };
   const { data: existing } = await svc.client
@@ -32,7 +38,7 @@ async function getOrCreateThread(memberUuid: string, gymId: string) {
     .maybeSingle();
 
   if (existing) {
-    if (existing.status !== "open") {
+    if (opts?.reopen && existing.status !== "open") {
       await svc.client
         .from("member_portal_chat_threads")
         .update({ status: "open", updated_at: new Date().toISOString() })
@@ -41,6 +47,10 @@ async function getOrCreateThread(memberUuid: string, gymId: string) {
       existing.status = "open";
     }
     return { ok: true as const, thread: existing, client: svc.client };
+  }
+
+  if (!createIfMissing) {
+    return { ok: true as const, thread: null, client: svc.client };
   }
 
   const { data: created, error } = await svc.client
@@ -91,12 +101,26 @@ export async function GET() {
   }
 
   const gymId = portalGymId();
-  const threadRes = await getOrCreateThread(session.member.member_uuid, gymId);
+  const threadRes = await getOrCreateThread(session.member.member_uuid, gymId, {
+    createIfMissing: false,
+    reopen: false,
+  });
   if (!threadRes.ok) {
     return NextResponse.json({ ok: false, error: threadRes.error }, { status: 500 });
   }
 
   try {
+    if (!threadRes.thread) {
+      const retentionDays = await getRetentionDays(threadRes.client, gymId);
+      return NextResponse.json({
+        ok: true,
+        thread: null,
+        messages: [],
+        retentionDays,
+        memberUuid: session.member.member_uuid,
+      });
+    }
+
     const [messages, retentionDays] = await Promise.all([
       loadAllMessagesForMember(
         threadRes.client,
@@ -106,12 +130,15 @@ export async function GET() {
       getRetentionDays(threadRes.client, gymId),
     ]);
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       thread: threadRes.thread,
       messages,
       retentionDays,
+      memberUuid: session.member.member_uuid,
     });
+    res.headers.set("Cache-Control", "private, max-age=2");
+    return res;
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "load-failed" },
@@ -141,9 +168,15 @@ export async function POST(req: Request) {
   }
 
   const gymId = portalGymId();
-  const threadRes = await getOrCreateThread(session.member.member_uuid, gymId);
-  if (!threadRes.ok) {
-    return NextResponse.json({ ok: false, error: threadRes.error }, { status: 500 });
+  const threadRes = await getOrCreateThread(session.member.member_uuid, gymId, {
+    createIfMissing: true,
+    reopen: true,
+  });
+  if (!threadRes.ok || !threadRes.thread) {
+    return NextResponse.json(
+      { ok: false, error: threadRes.ok ? "create-failed" : threadRes.error },
+      { status: 500 },
+    );
   }
 
   const { data, error } = await threadRes.client

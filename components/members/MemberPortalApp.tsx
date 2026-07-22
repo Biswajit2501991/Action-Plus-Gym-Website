@@ -14,6 +14,7 @@ import {
   TrainingPanel,
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
+import { hasUnreadStaffChat } from "@/lib/member-portal/chat-client";
 
 const IDLE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -155,6 +156,7 @@ export function MemberPortalApp() {
   const [identityFactor, setIdentityFactor] = useState<"dob" | "email">("dob");
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
+  const [chatUnread, setChatUnread] = useState(false);
 
   const [liveTick, setLiveTick] = useState(0);
 
@@ -179,6 +181,37 @@ export function MemberPortalApp() {
       cancelled = true;
     };
   }, []);
+
+  const refreshChatUnread = useCallback(async () => {
+    if (!member?.memberUuid) {
+      setChatUnread(false);
+      return;
+    }
+    try {
+      const data = await api<{
+        ok: true;
+        latestStaffAt: string | null;
+        memberUuid: string;
+      }>("/api/member/chat/unread");
+      setChatUnread(
+        hasUnreadStaffChat(data.memberUuid || member.memberUuid, data.latestStaffAt),
+      );
+    } catch {
+      /* ignore badge errors */
+    }
+  }, [member?.memberUuid]);
+
+  useEffect(() => {
+    if (!member?.memberUuid || step === "chat") {
+      if (step === "chat") setChatUnread(false);
+      return;
+    }
+    void refreshChatUnread();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshChatUnread();
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, [member?.memberUuid, step, refreshChatUnread]);
 
   /** Soft refresh — updates member data without forcing navigation to home. */
   const refreshMember = useCallback(async () => {
@@ -967,7 +1000,14 @@ export function MemberPortalApp() {
                 <NavTile label="Payments" onClick={() => setStep("payments")} />
                 <NavTile label="Attendance" onClick={() => setStep("attendance")} />
                 <NavTile label="Alerts" onClick={() => setStep("notifications")} />
-                <NavTile label="Chat" onClick={() => setStep("chat")} />
+                <NavTile
+                  label="Chat"
+                  badge={chatUnread}
+                  onClick={() => {
+                    setChatUnread(false);
+                    setStep("chat");
+                  }}
+                />
                 <NavTile label="Training" onClick={() => setStep("training")} />
                 <NavTile label="Book" onClick={() => setStep("bookings")} />
                 <NavTile label="Perks" onClick={() => setStep("perks")} />
@@ -1101,7 +1141,13 @@ export function MemberPortalApp() {
           {step === "notifications" ? (
             <NotificationsPanel onBack={() => setStep("home")} />
           ) : null}
-          {step === "chat" ? <ChatPanel onBack={() => setStep("home")} /> : null}
+          {step === "chat" ? (
+            <ChatPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+              onSeen={() => setChatUnread(false)}
+            />
+          ) : null}
           {step === "training" ? (
             <TrainingPanel onBack={() => setStep("home")} liveTick={liveTick} />
           ) : null}
@@ -1129,17 +1175,25 @@ function NavTile({
   icon,
   label,
   onClick,
+  badge,
 }: {
   icon?: React.ReactNode;
   label: string;
   onClick: () => void;
+  badge?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-charcoal/40 px-3 py-4 text-xs text-white/85 hover:border-gold/40 hover:text-gold"
+      className="relative flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-charcoal/40 px-3 py-4 text-xs text-white/85 hover:border-gold/40 hover:text-gold"
     >
+      {badge ? (
+        <span
+          className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-gold shadow-[0_0_8px_rgba(212,175,55,0.8)]"
+          aria-label="New chat message"
+        />
+      ) : null}
       {icon}
       {label}
     </button>
