@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   startRegistration,
   startAuthentication,
@@ -505,7 +505,6 @@ export function TrainingPanel({
   const [logMsg, setLogMsg] = useState<string | null>(null);
   const [exercisesExpanded, setExercisesExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const todayParts = useMemo(() => {
     const key = data?.today || new Date().toISOString().slice(0, 10);
@@ -684,7 +683,7 @@ export function TrainingPanel({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
             Date
           </p>
-          <div className="relative flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-white/12 bg-black/50 px-3 py-2.5">
+          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-white/12 bg-black/50 px-3 py-2.5">
             <p className="min-w-0 flex-1 truncate text-sm text-white">
               {logDate
                 ? (() => {
@@ -694,36 +693,31 @@ export function TrainingPanel({
                   })()
                 : "Pick a date"}
             </p>
-            <button
-              type="button"
-              disabled={logBusy}
-              onClick={() => {
-                const el = dateInputRef.current;
-                if (!el) return;
-                try {
-                  if (typeof el.showPicker === "function") {
-                    void el.showPicker();
-                    return;
-                  }
-                } catch {
-                  /* fall through */
-                }
-                el.click();
-              }}
-              className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-[11px] font-medium tracking-wide text-gold/90"
-            >
-              Change
-            </button>
-            {/* 1×1 clipped input — never participates in layout width (iOS date overflow fix). */}
-            <input
-              ref={dateInputRef}
-              type="date"
-              aria-label="Workout date"
-              tabIndex={-1}
-              className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0"
-              value={logDate}
-              onChange={(e) => setLogDate(e.target.value)}
-            />
+            {/*
+              iOS only opens the native date sheet when the <input type="date"> itself is tapped.
+              Overlay a real date input on the Change label (opacity 0) — no showPicker/click hacks.
+            */}
+            <div className="relative shrink-0">
+              <span
+                aria-hidden
+                className={`inline-flex rounded-full border border-white/20 px-3 py-1 text-[11px] font-medium tracking-wide text-gold/90 ${
+                  logBusy ? "opacity-50" : ""
+                }`}
+              >
+                Change
+              </span>
+              <input
+                type="date"
+                aria-label="Change workout date"
+                disabled={logBusy}
+                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                value={logDate}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next) setLogDate(next);
+                }}
+              />
+            </div>
           </div>
           <p className="text-[10px] text-muted">Or tap a day on the calendar below.</p>
         </div>
