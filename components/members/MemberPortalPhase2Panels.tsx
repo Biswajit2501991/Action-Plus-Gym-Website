@@ -309,6 +309,7 @@ export function ChatPanel({ onBack }: { onBack: () => void }) {
   const [messages, setMessages] = useState<
     Array<{ id: string; sender: string; body: string; staff_name?: string; created_at: string }>
   >([]);
+  const [retentionDays, setRetentionDays] = useState(7);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -323,8 +324,12 @@ export function ChatPanel({ onBack }: { onBack: () => void }) {
         staff_name?: string;
         created_at: string;
       }>;
+      retentionDays?: number;
     }>("/api/member/chat");
     setMessages(data.messages || []);
+    if (typeof data.retentionDays === "number" && data.retentionDays > 0) {
+      setRetentionDays(data.retentionDays);
+    }
   }, []);
 
   useEffect(() => {
@@ -355,6 +360,9 @@ export function ChatPanel({ onBack }: { onBack: () => void }) {
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
       <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Chat with gym</h2>
+      <p className="mt-2 text-xs text-amber-200/90">
+        Chat will be erased after {retentionDays} day{retentionDays === 1 ? "" : "s"}.
+      </p>
       {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
       <div className="mt-4 max-h-72 space-y-2 overflow-auto">
         {messages.map((m) => (

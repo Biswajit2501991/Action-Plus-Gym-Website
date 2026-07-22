@@ -148,11 +148,36 @@ export function MemberPortalApp() {
   const [booting, setBooting] = useState(true);
   const [waitNote, setWaitNote] = useState("Waiting for gym staff to approve…");
   const [needsReauth, setNeedsReauth] = useState(false);
+  const [authMethod, setAuthMethod] = useState<"whatsapp_staff" | "auto_identity">(
+    "whatsapp_staff",
+  );
+  const [fullName, setFullName] = useState("");
+  const [identityFactor, setIdentityFactor] = useState<"dob" | "email">("dob");
+  const [dob, setDob] = useState("");
+  const [email, setEmail] = useState("");
 
   const [liveTick, setLiveTick] = useState(0);
 
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ ok: true; authMethod: "whatsapp_staff" | "auto_identity" }>(
+      "/api/member/auth/method",
+    )
+      .then((data) => {
+        if (!cancelled && data.authMethod === "auto_identity") {
+          setAuthMethod("auto_identity");
+        }
+      })
+      .catch(() => {
+        /* keep default WhatsApp */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /** Soft refresh — updates member data without forcing navigation to home. */
@@ -371,6 +396,56 @@ export function MemberPortalApp() {
     }
   }
 
+  async function requestAutoVerify() {
+    setError(null);
+    const name = fullName.trim();
+    if (name.length < 2) {
+      setError("Enter your name as registered at the gym.");
+      return;
+    }
+    if (identityFactor === "dob" && !dob.trim()) {
+      setError("Enter date of birth as DD/MM/YYYY.");
+      return;
+    }
+    if (identityFactor === "email" && !email.trim()) {
+      setError("Enter your registered Gmail / email.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await api<{
+        ok: true;
+        challengeId: string;
+        deviceId: string;
+        hasPin: boolean;
+        needsPin: boolean;
+      }>("/api/member/auth/auto/verify", {
+        method: "POST",
+        body: JSON.stringify({
+          mobile,
+          fullName: name,
+          dob: identityFactor === "dob" ? dob.trim() : undefined,
+          email: identityFactor === "email" ? email.trim() : undefined,
+          deviceId,
+        }),
+      });
+      setChallengeId(data.challengeId);
+      setDeviceId(data.deviceId || deviceId);
+      setNeedsReauth(false);
+      setPin("");
+      setConfirmPin("");
+      if (data.needsPin || !data.hasPin) {
+        setStep("setPin");
+      } else {
+        setStep("pinLogin");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not verify details");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function setPinSubmit() {
     setError(null);
     if (pin.length !== 6) {
@@ -499,13 +574,20 @@ export function MemberPortalApp() {
           </p>
           <h1 className="mt-2 font-display text-3xl text-white">Sign in securely</h1>
           <p className="mt-2 text-sm text-muted">
-            First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN
-            for next visits.
+            {authMethod === "auto_identity"
+              ? "Enter your registered mobile, name, and DOB or Gmail. Then set a 6-digit PIN for next visits."
+              : "First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN for next visits."}
           </p>
           {needsReauth ? (
             <p className="mt-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
-              Your portal access was revoked. Tap <strong>Verify via gym WhatsApp</strong> to
-              re-authenticate.
+              Your portal access was revoked.{" "}
+              {authMethod === "auto_identity" ? (
+                <>Verify your details again to re-authenticate.</>
+              ) : (
+                <>
+                  Tap <strong>Verify via gym WhatsApp</strong> to re-authenticate.
+                </>
+              )}
             </p>
           ) : null}
 
@@ -523,20 +605,103 @@ export function MemberPortalApp() {
             </label>
           )}
 
+          {step === "mobile" && authMethod === "auto_identity" ? (
+            <div className="mt-4 space-y-4">
+              <label className="block text-sm text-white/80">
+                Name (as given in gym)
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 lowercase text-white outline-none focus:border-gold/50"
+                  autoComplete="name"
+                  placeholder="Full name as registered"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value.toLowerCase())}
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIdentityFactor("dob")}
+                  className={`flex-1 rounded-full px-3 py-2 text-xs font-medium ${
+                    identityFactor === "dob"
+                      ? "bg-gold/20 text-gold border border-gold/40"
+                      : "border border-white/15 text-white/70"
+                  }`}
+                >
+                  Date of birth
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIdentityFactor("email")}
+                  className={`flex-1 rounded-full px-3 py-2 text-xs font-medium ${
+                    identityFactor === "email"
+                      ? "bg-gold/20 text-gold border border-gold/40"
+                      : "border border-white/15 text-white/70"
+                  }`}
+                >
+                  Gmail
+                </button>
+              </div>
+              {identityFactor === "dob" ? (
+                <label className="block text-sm text-white/80">
+                  DOB (DD/MM/YYYY)
+                  <input
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-gold/50"
+                    inputMode="numeric"
+                    placeholder="25/01/1991"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                  />
+                </label>
+              ) : (
+                <label className="block text-sm text-white/80">
+                  Gmail
+                  <input
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 lowercase text-white outline-none focus:border-gold/50"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="name@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value.toLowerCase())}
+                  />
+                </label>
+              )}
+            </div>
+          ) : null}
+
           {step === "mobile" ? (
             <div className="mt-6 flex flex-col gap-3">
-              <button
-                type="button"
-                disabled={busy || mobile.replace(/\D/g, "").length < 10}
-                onClick={requestVerify}
-                className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
-              >
-                {busy
-                  ? "Opening WhatsApp…"
-                  : needsReauth
-                    ? "Re-verify via WhatsApp"
-                    : "Verify via gym WhatsApp"}
-              </button>
+              {authMethod === "auto_identity" ? (
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    mobile.replace(/\D/g, "").length < 10 ||
+                    fullName.trim().length < 2 ||
+                    (identityFactor === "dob" ? !dob.trim() : !email.trim())
+                  }
+                  onClick={() => void requestAutoVerify()}
+                  className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  {busy
+                    ? "Verifying…"
+                    : needsReauth
+                      ? "Re-verify & continue"
+                      : "Verify & continue"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                  onClick={requestVerify}
+                  className="rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  {busy
+                    ? "Opening WhatsApp…"
+                    : needsReauth
+                      ? "Re-verify via WhatsApp"
+                      : "Verify via gym WhatsApp"}
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busy || mobile.replace(/\D/g, "").length < 10}
@@ -623,7 +788,9 @@ export function MemberPortalApp() {
           {step === "setPin" ? (
             <div className="mt-6 space-y-4">
               <p className="text-sm text-muted">
-                Gym approved your number. Create a 6-digit PIN for faster next login.
+                {authMethod === "auto_identity"
+                  ? "Identity verified. Create a 6-digit PIN for faster next login."
+                  : "Gym approved your number. Create a 6-digit PIN for faster next login."}
               </p>
               <label className="block text-sm text-white/80">
                 PIN
@@ -691,7 +858,9 @@ export function MemberPortalApp() {
                 className="w-full text-sm text-muted hover:text-gold"
                 onClick={() => setStep("mobile")}
               >
-                Verify via gym WhatsApp instead
+                {authMethod === "auto_identity"
+                  ? "Verify with details instead"
+                  : "Verify via gym WhatsApp instead"}
               </button>
             </div>
           ) : null}

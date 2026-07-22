@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         .eq("id", challenge.id);
     }
 
-    if (found.member.pin_hash) {
+    if (found.member.pin_hash && found.member.portal_status !== "revoked") {
       return NextResponse.json(
         { ok: false, error: "PIN already set. Use PIN login or OTP." },
         { status: 400 },

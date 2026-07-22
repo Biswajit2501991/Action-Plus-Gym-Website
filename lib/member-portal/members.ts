@@ -30,10 +30,10 @@ function pickBestMemberByMobile(rows: MemberRow[]): MemberRow | undefined {
   return scored[0]?.m;
 }
 
-export async function findMemberByMobile(
+async function listMembersByMobile(
   mobileInput: string,
 ): Promise<
-  | { ok: true; member: MemberRow }
+  | { ok: true; mobile: string; members: MemberRow[] }
   | { ok: false; error: string; status: number }
 > {
   const mobile = normalizeMobile(mobileInput);
@@ -68,7 +68,19 @@ export async function findMemberByMobile(
     );
   }
 
-  const member = pickBestMemberByMobile(candidates);
+  return { ok: true, mobile, members: candidates };
+}
+
+export async function findMemberByMobile(
+  mobileInput: string,
+): Promise<
+  | { ok: true; member: MemberRow }
+  | { ok: false; error: string; status: number }
+> {
+  const listed = await listMembersByMobile(mobileInput);
+  if (!listed.ok) return listed;
+
+  const member = pickBestMemberByMobile(listed.members);
   if (!member) {
     return { ok: false, error: "No membership found for this number", status: 404 };
   }
@@ -78,14 +90,27 @@ export async function findMemberByMobile(
     return { ok: false, error: "Member portal not ready. Contact the gym.", status: 503 };
   }
   if (!member.qr_token) {
-    await svc.client
-      .from("members")
-      .update({ qr_token: randomToken(32) })
-      .eq("id", member.id);
+    const svc = createServiceRoleClient();
+    if (svc.ok) {
+      await svc.client
+        .from("members")
+        .update({ qr_token: randomToken(32) })
+        .eq("id", member.id);
+    }
     member.qr_token = "pending";
   }
 
   return { ok: true, member };
+}
+
+/** All memberships for a mobile (used by auto-identity auth). */
+export async function findMembersByMobile(
+  mobileInput: string,
+): Promise<
+  | { ok: true; mobile: string; members: MemberRow[] }
+  | { ok: false; error: string; status: number }
+> {
+  return listMembersByMobile(mobileInput);
 }
 
 export function assertPortalEligible(
