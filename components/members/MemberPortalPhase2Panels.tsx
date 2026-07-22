@@ -454,10 +454,17 @@ export function TrainingPanel({
     focusByDate?: Record<string, string>;
     today?: string;
     ptWorkoutNotes?: string;
+    dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
+    exerciseTypes?: string[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [logDate, setLogDate] = useState("");
+  const [logExercises, setLogExercises] = useState<string[]>([]);
+  const [logNotes, setLogNotes] = useState("");
+  const [logBusy, setLogBusy] = useState(false);
+  const [logMsg, setLogMsg] = useState<string | null>(null);
 
   const todayParts = useMemo(() => {
     const key = data?.today || new Date().toISOString().slice(0, 10);
@@ -471,9 +478,8 @@ export function TrainingPanel({
   const [viewYear, setViewYear] = useState(todayParts.year);
   const [viewMonthIndex, setViewMonthIndex] = useState(todayParts.monthIndex);
 
-  useEffect(() => {
-    let cancelled = false;
-    api<{
+  const reload = useCallback(async () => {
+    const res = await api<{
       ok: true;
       pt: Array<Record<string, unknown>>;
       workouts: Array<Record<string, unknown>>;
@@ -482,33 +488,57 @@ export function TrainingPanel({
       focusByDate?: Record<string, string>;
       today?: string;
       ptWorkoutNotes?: string;
-    }>("/api/member/training")
-      .then((res) => {
-        if (cancelled) return;
-        setData(res);
-        const parts = parsePtDateKey(res.today);
-        if (parts) {
-          setViewYear(parts.year);
-          setViewMonthIndex(parts.monthIndex);
-          setSelectedDayKey((prev) => prev || res.today || null);
-        }
-        setError(null);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
-      });
+      dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
+      exerciseTypes?: string[];
+    }>("/api/member/training");
+    setData(res);
+    const parts = parsePtDateKey(res.today);
+    if (parts) {
+      setViewYear(parts.year);
+      setViewMonthIndex(parts.monthIndex);
+      setSelectedDayKey((prev) => prev || res.today || null);
+    }
+    setLogDate((prev) => prev || res.today || "");
+    setError(null);
+    return res;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    reload().catch((e) => {
+      if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
+    });
     return () => {
       cancelled = true;
     };
-  }, [liveTick]);
+  }, [liveTick, reload]);
+
+  useEffect(() => {
+    if (!logDate || !data?.dailyByDate) return;
+    const row = data.dailyByDate[logDate];
+    setLogExercises(row?.exercises ? [...row.exercises] : []);
+    setLogNotes(row?.notes || "");
+  }, [logDate, data?.dailyByDate]);
 
   const focusByDate = useMemo(
     () => data?.focusByDate || {},
     [data?.focusByDate],
   );
+  const dailyFocusMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [k, v] of Object.entries(data?.dailyByDate || {})) {
+      if (v.exercises?.length) map[k] = v.exercises.join(", ");
+    }
+    return map;
+  }, [data?.dailyByDate]);
+
   const monthCells = useMemo(
     () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, focusByDate),
     [viewYear, viewMonthIndex, focusByDate],
+  );
+  const dailyMonthCells = useMemo(
+    () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, dailyFocusMap),
+    [viewYear, viewMonthIndex, dailyFocusMap],
   );
   const ptDaysThisMonth = monthCells.filter(
     (c) => c.kind === "day" && !c.isSunday && c.hasFocus,
@@ -518,10 +548,50 @@ export function TrainingPanel({
       ? String(focusByDate[selectedDayKey])
       : "";
 
+  const exerciseOptions = data?.exerciseTypes?.length
+    ? data.exerciseTypes
+    : [
+        "Back",
+        "Chest",
+        "Legs",
+        "Shoulder",
+        "Cardio",
+        "Freehand + Cardio",
+        "Yoga",
+        "Full Body",
+        "Rest day",
+      ];
+
   function shiftMonth(delta: number) {
     const dt = new Date(viewYear, viewMonthIndex + delta, 1);
     setViewYear(dt.getFullYear());
     setViewMonthIndex(dt.getMonth());
+  }
+
+  async function saveDailyLog() {
+    if (!logDate) return;
+    setLogBusy(true);
+    setLogMsg(null);
+    try {
+      await api("/api/member/training", {
+        method: "POST",
+        body: JSON.stringify({
+          workoutDate: logDate,
+          exercises: logExercises,
+          notes: logNotes,
+        }),
+      });
+      setLogMsg(
+        logExercises.length || logNotes.trim()
+          ? "Workout saved for this day."
+          : "Workout cleared for this day.",
+      );
+      await reload();
+    } catch (e) {
+      setLogMsg(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setLogBusy(false);
+    }
   }
 
   return (
@@ -529,6 +599,118 @@ export function TrainingPanel({
       <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Training</h2>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
+
+      <div className="rounded-2xl border border-gold/30 bg-black/30 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-white">My daily workouts</p>
+          <p className="mt-1 text-xs text-muted">
+            Log what you trained today. Pick from the list or clear a day. History stays until the
+            gym removes it.
+          </p>
+        </div>
+        <label className="block text-xs text-white/70">
+          Date
+          <input
+            type="date"
+            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+            value={logDate}
+            onChange={(e) => setLogDate(e.target.value)}
+          />
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {exerciseOptions.map((label) => {
+            const on = logExercises.includes(label);
+            return (
+              <button
+                key={label}
+                type="button"
+                disabled={logBusy}
+                onClick={() =>
+                  setLogExercises((prev) =>
+                    prev.includes(label)
+                      ? prev.filter((x) => x !== label)
+                      : [...prev, label],
+                  )
+                }
+                className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                  on
+                    ? "border-gold bg-gold/20 text-gold"
+                    : "border-white/15 text-white/80"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <label className="block text-xs text-white/70">
+          Notes (optional)
+          <input
+            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+            value={logNotes}
+            onChange={(e) => setLogNotes(e.target.value)}
+            placeholder="Sets, reps, how it felt…"
+            disabled={logBusy}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={logBusy || !logDate}
+          onClick={() => void saveDailyLog()}
+          className="rounded-full gold-gradient px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+        >
+          {logBusy
+            ? "Saving…"
+            : logExercises.length || logNotes.trim()
+              ? "Save workout"
+              : "Clear this day"}
+        </button>
+        {logMsg ? <p className="text-xs text-amber-200/90">{logMsg}</p> : null}
+
+        <div className="pt-2">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium text-white/80">Your log calendar</p>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="rounded-lg border border-white/15 px-2 py-0.5 text-[10px] text-white/70"
+                onClick={() => shiftMonth(-1)}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-white/15 px-2 py-0.5 text-[10px] text-white/70"
+                onClick={() => shiftMonth(1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {dailyMonthCells.map((cell) => {
+              if (cell.kind === "pad") return <div key={cell.key} className="min-h-8" />;
+              const active = cell.key === logDate;
+              return (
+                <button
+                  key={cell.key}
+                  type="button"
+                  title={cell.focus || undefined}
+                  onClick={() => setLogDate(cell.key)}
+                  className={`min-h-8 rounded-md text-[10px] ${
+                    cell.hasFocus
+                      ? "bg-gold/25 text-gold"
+                      : "bg-white/5 text-white/70"
+                  } ${active ? "ring-1 ring-gold" : ""}`}
+                >
+                  {cell.day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <Block title="PT" empty="No PT assignment yet.">
         {(data?.pt || []).map((p) => {
           const trainer = String(p.trainer_name || "Trainer");

@@ -228,6 +228,48 @@ export async function GET() {
     }
   }
 
+  const [dailyRes, exerciseRes] = await Promise.all([
+    svc.client
+      .from("member_daily_workouts")
+      .select("workout_date, exercises, notes, source, updated_at")
+      .eq("gym_id", gymId)
+      .eq("member_uuid", uuid)
+      .order("workout_date", { ascending: false })
+      .limit(400),
+    svc.client
+      .from("settings_lookup_values")
+      .select("value")
+      .eq("gym_id", gymId)
+      .eq("category", "exerciseTypes")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(100),
+  ]);
+
+  const dailyByDate: Record<
+    string,
+    { exercises: string[]; notes: string; source?: string }
+  > = {};
+  for (const row of dailyRes.data || []) {
+    const key = String(row.workout_date).slice(0, 10);
+    dailyByDate[key] = {
+      exercises: Array.isArray(row.exercises) ? row.exercises.map(String) : [],
+      notes: String(row.notes || ""),
+      source: row.source ? String(row.source) : undefined,
+    };
+  }
+
+  const exerciseTypes = [
+    ...new Set(
+      (exerciseRes.data || [])
+        .map((r: { value?: string }) => String(r.value || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!exerciseTypes.length) {
+    exerciseTypes.push(...DEFAULT_EXERCISE_TYPES);
+  }
+
   return NextResponse.json({
     ok: true,
     today,
@@ -237,5 +279,117 @@ export async function GET() {
     workouts,
     diets,
     measurements: measurements.data || [],
+    dailyByDate,
+    exerciseTypes,
   });
+}
+
+const DEFAULT_EXERCISE_TYPES = [
+  "Back",
+  "Chest",
+  "Legs",
+  "Shoulder",
+  "Cardio",
+  "Freehand + Cardio",
+  "Yoga",
+  "Running",
+  "Rest day",
+  "Full Body",
+];
+
+function normalizeExercises(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    const label = String(raw || "").trim().slice(0, 80);
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
+export async function POST(req: Request) {
+  const session = await requireMemberSession();
+  if (!session.ok) {
+    return NextResponse.json(
+      { ok: false, error: session.error },
+      { status: session.status },
+    );
+  }
+
+  const status = String(session.member.status || "").trim().toLowerCase();
+  if (status === "deactivated" || status === "cancelled") {
+    return NextResponse.json(
+      { ok: false, error: "Membership is not active for workout logging." },
+      { status: 403 },
+    );
+  }
+
+  let body: { workoutDate?: string; exercises?: string[]; notes?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "invalid-json" }, { status: 400 });
+  }
+
+  const workoutDate = String(body.workoutDate || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(workoutDate)) {
+    return NextResponse.json(
+      { ok: false, error: "workoutDate must be YYYY-MM-DD" },
+      { status: 400 },
+    );
+  }
+
+  const exercises = normalizeExercises(body.exercises);
+  const notes = String(body.notes || "").trim().slice(0, 1000);
+
+  const svc = createServiceRoleClient();
+  if (!svc.ok) {
+    return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
+  }
+
+  const gymId = portalGymId();
+  const uuid = session.member.member_uuid;
+
+  if (!exercises.length && !notes) {
+    const { error } = await svc.client
+      .from("member_daily_workouts")
+      .delete()
+      .eq("gym_id", gymId)
+      .eq("member_uuid", uuid)
+      .eq("workout_date", workoutDate);
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, cleared: true, workoutDate });
+  }
+
+  const { data, error } = await svc.client
+    .from("member_daily_workouts")
+    .upsert(
+      {
+        gym_id: gymId,
+        member_uuid: uuid,
+        workout_date: workoutDate,
+        exercises,
+        notes,
+        recorded_by: "member",
+        source: "portal",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "gym_id,member_uuid,workout_date" },
+    )
+    .select("id, workout_date, exercises, notes, source, updated_at")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, item: data });
 }
