@@ -427,7 +427,10 @@ export function TrainingPanel({ onBack }: { onBack: () => void }) {
       .catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
   }, []);
 
-  const focusByDate = data?.focusByDate || {};
+  const focusByDate = useMemo(
+    () => data?.focusByDate || {},
+    [data?.focusByDate],
+  );
   const monthCells = useMemo(
     () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, focusByDate),
     [viewYear, viewMonthIndex, focusByDate],

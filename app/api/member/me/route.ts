@@ -23,7 +23,7 @@ export async function GET() {
   const [branch, photoUrl] = await Promise.all([
     branchLabel(member.assigned_gym_code_id),
     (async (): Promise<string | null> => {
-      let url: string | null = member.photo_url || null;
+      const url: string | null = member.photo_url || null;
       if (!member.photo_path) return url;
       const svc = createServiceRoleClient();
       if (!svc.ok) return url;
