@@ -456,6 +456,9 @@ export function TrainingPanel({
     ptWorkoutNotes?: string;
     dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
     exerciseTypes?: string[];
+    onPtPlan?: boolean;
+    canEditWorkouts?: boolean;
+    planName?: string | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -478,6 +481,9 @@ export function TrainingPanel({
   const [viewYear, setViewYear] = useState(todayParts.year);
   const [viewMonthIndex, setViewMonthIndex] = useState(todayParts.monthIndex);
 
+  const canEditWorkouts = data?.canEditWorkouts === true;
+  const onPtPlan = data?.onPtPlan === true;
+
   const reload = useCallback(async () => {
     const res = await api<{
       ok: true;
@@ -490,6 +496,9 @@ export function TrainingPanel({
       ptWorkoutNotes?: string;
       dailyByDate?: Record<string, { exercises: string[]; notes: string }>;
       exerciseTypes?: string[];
+      onPtPlan?: boolean;
+      canEditWorkouts?: boolean;
+      planName?: string | null;
     }>("/api/member/training");
     setData(res);
     const parts = parsePtDateKey(res.today);
@@ -569,7 +578,7 @@ export function TrainingPanel({
   }
 
   async function saveDailyLog() {
-    if (!logDate) return;
+    if (!logDate || !canEditWorkouts) return;
     setLogBusy(true);
     setLogMsg(null);
     try {
@@ -598,8 +607,17 @@ export function TrainingPanel({
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-5">
       <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Training</h2>
+      {data?.planName ? (
+        <p className="text-xs text-muted">
+          Plan · <span className="text-white/85">{data.planName}</span>
+          {onPtPlan
+            ? " · Trainer schedule (view only)"
+            : " · Log your own workouts"}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
+      {canEditWorkouts ? (
       <div className="rounded-2xl border border-gold/30 bg-black/30 p-4 space-y-3">
         <div>
           <p className="text-sm font-semibold text-white">My daily workouts</p>
@@ -710,7 +728,10 @@ export function TrainingPanel({
           </div>
         </div>
       </div>
+      ) : null}
 
+      {onPtPlan ? (
+        <>
       <Block title="PT" empty="No PT assignment yet.">
         {(data?.pt || []).map((p) => {
           const trainer = String(p.trainer_name || "Trainer");
@@ -759,6 +780,9 @@ export function TrainingPanel({
           </p>
         ))}
       </Block>
+        </>
+      ) : null}
+
       <Block title="Measurements" empty="No measurements yet.">
         {(data?.measurements || []).map((m) => (
           <p key={String(m.id)} className="text-sm text-white/85">
@@ -769,6 +793,7 @@ export function TrainingPanel({
         ))}
       </Block>
 
+      {onPtPlan ? (
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-3">
         <button
           type="button"
@@ -881,6 +906,7 @@ export function TrainingPanel({
           </div>
         ) : null}
       </div>
+      ) : null}
     </section>
   );
 }

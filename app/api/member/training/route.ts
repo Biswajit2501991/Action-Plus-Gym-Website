@@ -74,6 +74,11 @@ export async function GET() {
     );
   }
 
+  const planNameLive = String(member?.plan_name || "").trim();
+  const onPtPlan = isPtPlanName(planNameLive);
+  /** Basic (non-PT) members may log their own daily workouts; PT is trainer-managed read-only. */
+  const canEditWorkouts = !onPtPlan;
+
   // Keep Phase 2 stub tables as optional extras (never overwrite GM PT source of truth).
   const [ptStub, workoutsStub, dietsStub, measurements] = await Promise.all([
     svc.client
@@ -142,8 +147,6 @@ export async function GET() {
         profileRow?.trainer_staff_code ||
         "",
     ).trim();
-    const planName = String(member.plan_name || "").trim();
-    const onPtPlan = isPtPlanName(planName);
     focusByDate =
       planJson.focusByDate && typeof planJson.focusByDate === "object"
         ? Object.fromEntries(
@@ -161,13 +164,14 @@ export async function GET() {
     const scheduledDays = Object.values(focusByDate).filter(Boolean).length;
     const sessionsTotal = packageSessionTotal(planJson.sessions);
 
-    if (onPtPlan || trainerName || scheduledDays || workoutPlanText) {
+    // Only surface PT assignment while the member is on a PT plan (profile data stays in DB).
+    if (onPtPlan && (trainerName || scheduledDays || workoutPlanText || todayFocus)) {
       // Prefer Gym Manager PT row over empty Phase 2 stubs (avoids fake 0/— sessions).
       pt = [
         {
           id: profileRow?.id || `gm-pt-${member.id}`,
           trainer_name: trainerName || "Assigned trainer",
-          plan_name: planName || null,
+          plan_name: planNameLive || null,
           scheduled_days: scheduledDays,
           sessions_used: null,
           sessions_total: sessionsTotal,
@@ -177,7 +181,13 @@ export async function GET() {
       ];
     }
 
-    if (workouts.length === 0) {
+    // Trainer schedule / diet / notes: expose only while on PT (read-only for the member).
+    if (!onPtPlan) {
+      focusByDate = {};
+      ptWorkoutNotes = "";
+    }
+
+    if (onPtPlan && workouts.length === 0) {
       const rows: Array<Record<string, unknown>> = [];
       if (todayFocus) {
         rows.push({
@@ -210,7 +220,7 @@ export async function GET() {
       workouts = rows;
     }
 
-    if (diets.length === 0 && dietPlanText) {
+    if (onPtPlan && diets.length === 0 && dietPlanText) {
       const macros = [
         planJson.calories ? `${planJson.calories} kcal` : "",
         planJson.protein ? `${planJson.protein} protein` : "",
@@ -225,6 +235,11 @@ export async function GET() {
           kind: "diet_plan",
         },
       ];
+    }
+
+    if (!onPtPlan) {
+      // Hide trainer-managed PT UI for basic plans; pt_client_profiles rows stay in DB.
+      pt = [];
     }
   }
 
@@ -273,6 +288,9 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     today,
+    planName: planNameLive || null,
+    onPtPlan,
+    canEditWorkouts,
     focusByDate,
     ptWorkoutNotes,
     pt,
@@ -322,14 +340,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const status = String(session.member.status || "").trim().toLowerCase();
-  if (status === "deactivated" || status === "cancelled") {
-    return NextResponse.json(
-      { ok: false, error: "Membership is not active for workout logging." },
-      { status: 403 },
-    );
-  }
-
   let body: { workoutDate?: string; exercises?: string[]; notes?: string };
   try {
     body = await req.json();
@@ -355,6 +365,41 @@ export async function POST(req: Request) {
 
   const gymId = portalGymId();
   const uuid = session.member.member_uuid;
+
+  // Fresh plan/status from DB so plan switches take effect immediately.
+  const { data: memberLive, error: memberErr } = await svc.client
+    .from("members")
+    .select("plan_name, status")
+    .eq("gym_id", gymId)
+    .eq("member_uuid", uuid)
+    .maybeSingle();
+  if (memberErr) {
+    return NextResponse.json(
+      { ok: false, error: memberErr.message || "member-lookup-failed" },
+      { status: 500 },
+    );
+  }
+
+  const status = String(memberLive?.status || session.member.status || "")
+    .trim()
+    .toLowerCase();
+  if (status === "deactivated" || status === "cancelled") {
+    return NextResponse.json(
+      { ok: false, error: "Membership is not active for workout logging." },
+      { status: 403 },
+    );
+  }
+
+  if (isPtPlanName(memberLive?.plan_name)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Your plan is PT — training is set by your trainer and cannot be edited here.",
+      },
+      { status: 403 },
+    );
+  }
 
   if (!exercises.length && !notes) {
     const { error } = await svc.client
