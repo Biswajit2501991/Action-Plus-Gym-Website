@@ -791,7 +791,7 @@ export function MemberPortalApp() {
                 <Row label="Blood group" value={member.bloodGroup || "—"} />
                 <Row label="Emergency" value={member.emergencyContact || "—"} />
                 <Row label="Joined" value={formatDate(member.joiningDate)} />
-                <Row label="Valid until" value={formatDate(member.paymentBy)} />
+                <Row label="Valid until" value={formatDate(member.nextPaymentDate)} />
               </dl>
             </section>
           ) : null}
