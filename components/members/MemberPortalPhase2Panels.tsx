@@ -345,8 +345,16 @@ export function ChatPanel({
     const uuid = data.memberUuid || memberUuid;
     if (uuid) {
       writeCachedMessages(uuid, next);
-      const latest = next.length ? next[next.length - 1]?.created_at : undefined;
-      markChatSeen(uuid, latest);
+      const latestStaff = [...next].reverse().find((m) => m.sender === "staff");
+      const latestAny = next.length ? next[next.length - 1] : null;
+      const watermarkMs = Math.max(
+        Date.now(),
+        latestAny ? Date.parse(String(latestAny.created_at).replace(" ", "T")) || 0 : 0,
+        latestStaff
+          ? Date.parse(String(latestStaff.created_at).replace(" ", "T")) || 0
+          : 0,
+      );
+      markChatSeen(uuid, watermarkMs, latestStaff?.id || null);
       onSeen?.();
     }
     if (typeof data.retentionDays === "number" && data.retentionDays > 0) {

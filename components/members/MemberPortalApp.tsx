@@ -191,11 +191,19 @@ export function MemberPortalApp() {
       const data = await api<{
         ok: true;
         latestStaffAt: string | null;
+        latestStaffId?: string | null;
+        latestStaffAtMs?: number | null;
         memberUuid: string;
       }>("/api/member/chat/unread");
-      setChatUnread(
-        hasUnreadStaffChat(data.memberUuid || member.memberUuid, data.latestStaffAt),
+      const uuid = data.memberUuid || member.memberUuid;
+      const unread = hasUnreadStaffChat(
+        uuid,
+        data.latestStaffAtMs != null
+          ? String(data.latestStaffAtMs)
+          : data.latestStaffAt,
+        data.latestStaffId,
       );
+      setChatUnread(unread);
     } catch {
       /* ignore badge errors */
     }
@@ -209,9 +217,9 @@ export function MemberPortalApp() {
     void refreshChatUnread();
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void refreshChatUnread();
-    }, 15_000);
+    }, 8_000);
     return () => window.clearInterval(id);
-  }, [member?.memberUuid, step, refreshChatUnread]);
+  }, [member?.memberUuid, step, refreshChatUnread, liveTick]);
 
   /** Soft refresh — updates member data without forcing navigation to home. */
   const refreshMember = useCallback(async () => {
@@ -1190,9 +1198,12 @@ function NavTile({
     >
       {badge ? (
         <span
-          className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-gold shadow-[0_0_8px_rgba(212,175,55,0.8)]"
-          aria-label="New chat message"
-        />
+          className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black shadow-[0_0_10px_rgba(212,175,55,0.85)]"
+          aria-label="New chat message from gym"
+        >
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-black/70" />
+          New
+        </span>
       ) : null}
       {icon}
       {label}
