@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   startRegistration,
   startAuthentication,
@@ -505,6 +505,7 @@ export function TrainingPanel({
   const [logMsg, setLogMsg] = useState<string | null>(null);
   const [exercisesExpanded, setExercisesExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const todayParts = useMemo(() => {
     const key = data?.today || new Date().toISOString().slice(0, 10);
@@ -679,12 +680,12 @@ export function TrainingPanel({
           </p>
         </div>
 
-        <div className="w-full min-w-0 max-w-full space-y-2">
+        <div className="w-full min-w-0 max-w-full space-y-2 overflow-x-hidden">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
             Date
           </p>
-          <label className="relative block w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-white/12 bg-black/50">
-            <span className="pointer-events-none block truncate px-3 py-3 text-sm text-white">
+          <div className="relative flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-white/12 bg-black/50 px-3 py-2.5">
+            <p className="min-w-0 flex-1 truncate text-sm text-white">
               {logDate
                 ? (() => {
                     const parts = parsePtDateKey(logDate);
@@ -692,15 +693,39 @@ export function TrainingPanel({
                     return `${parts.day} ${PT_MONTH_LABELS[parts.monthIndex]?.slice(0, 3) || ""} ${parts.year}`;
                   })()
                 : "Pick a date"}
-            </span>
+            </p>
+            <button
+              type="button"
+              disabled={logBusy}
+              onClick={() => {
+                const el = dateInputRef.current;
+                if (!el) return;
+                try {
+                  if (typeof el.showPicker === "function") {
+                    void el.showPicker();
+                    return;
+                  }
+                } catch {
+                  /* fall through */
+                }
+                el.click();
+              }}
+              className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-[11px] font-medium tracking-wide text-gold/90"
+            >
+              Change
+            </button>
+            {/* 1×1 clipped input — never participates in layout width (iOS date overflow fix). */}
             <input
+              ref={dateInputRef}
               type="date"
               aria-label="Workout date"
-              className="absolute inset-0 z-10 h-full w-full max-w-full cursor-pointer opacity-0"
+              tabIndex={-1}
+              className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0"
               value={logDate}
               onChange={(e) => setLogDate(e.target.value)}
             />
-          </label>
+          </div>
+          <p className="text-[10px] text-muted">Or tap a day on the calendar below.</p>
         </div>
 
         <div className="min-w-0 space-y-2.5">
