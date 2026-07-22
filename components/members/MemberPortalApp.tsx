@@ -15,6 +15,11 @@ import {
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { hasUnreadStaffChat } from "@/lib/member-portal/chat-client";
+import {
+  clearKnownDeviceProfile,
+  readKnownDeviceProfile,
+  writeKnownDeviceProfile,
+} from "@/lib/member-portal/known-device";
 
 const IDLE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -157,12 +162,37 @@ export function MemberPortalApp() {
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [chatUnread, setChatUnread] = useState(false);
+  const [knownDevice, setKnownDevice] = useState(false);
 
   const [liveTick, setLiveTick] = useState(0);
 
-  useEffect(() => {
-    setDeviceId(getOrCreateDeviceId());
-  }, []);
+  const rememberThisDevice = useCallback(
+    (mobileValue: string, id: string, hasPin = true) => {
+      const normalized = String(mobileValue || "").replace(/\D/g, "");
+      const did = String(id || deviceId || "").trim();
+      if (normalized.length < 10 || !did) return;
+      writeKnownDeviceProfile({
+        deviceId: did,
+        mobile: normalized.slice(-10),
+        hasPin,
+        savedAt: Date.now(),
+      });
+      setKnownDevice(true);
+    },
+    [deviceId],
+  );
+
+  const switchToFullRegistration = useCallback(() => {
+    clearKnownDeviceProfile(deviceId);
+    setKnownDevice(false);
+    setFullName("");
+    setDob("");
+    setEmail("");
+    setPin("");
+    setConfirmPin("");
+    setError(null);
+    setStep("mobile");
+  }, [deviceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,9 +264,93 @@ export function MemberPortalApp() {
   }, []);
 
   const loadMe = useCallback(async () => {
-    await refreshMember();
+    const m = await refreshMember();
+    if (m?.mobile) {
+      rememberThisDevice(String(m.mobile), getOrCreateDeviceId(), true);
+    }
     setStep("home");
-  }, [refreshMember]);
+  }, [refreshMember, rememberThisDevice]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const id = getOrCreateDeviceId();
+      if (!cancelled) setDeviceId(id);
+
+      try {
+        await loadMe();
+        return;
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "";
+        if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
+          setNeedsReauth(/revoked/i.test(msg));
+          setError(
+            /revoked/i.test(msg)
+              ? "Access was revoked by the gym. Verify again to continue."
+              : /inactivity/i.test(msg)
+                ? msg
+                : null,
+          );
+        }
+
+        let status: {
+          registered?: boolean;
+          hasPin?: boolean;
+          mobile?: string | null;
+          blocked?: boolean;
+          reason?: string;
+        } | null = null;
+        try {
+          status = await api<{
+            ok: true;
+            registered: boolean;
+            hasPin: boolean;
+            mobile?: string | null;
+            blocked?: boolean;
+            reason?: string;
+          }>(`/api/member/auth/device-status?deviceId=${encodeURIComponent(id)}`);
+        } catch {
+          status = null;
+        }
+
+        if (cancelled) return;
+
+        if (status?.blocked) {
+          clearKnownDeviceProfile(id);
+          setKnownDevice(false);
+          setNeedsReauth(true);
+          setError(status.reason || "Portal access is not available.");
+          setStep("mobile");
+          return;
+        }
+
+        const local = readKnownDeviceProfile(id);
+        if (status?.hasPin && status.mobile) {
+          rememberThisDevice(status.mobile, id, true);
+          setMobile(status.mobile);
+          setStep("pinLogin");
+          return;
+        }
+
+        if (local?.hasPin && local.mobile) {
+          setKnownDevice(true);
+          setMobile(String(local.mobile).slice(-10));
+          setStep("pinLogin");
+          return;
+        }
+
+        setStep("mobile");
+      } finally {
+        if (!cancelled) setBooting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Boot once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signOutIdle = useCallback(async () => {
     try {
@@ -247,9 +361,16 @@ export function MemberPortalApp() {
     setMember(null);
     setCard(null);
     setDevices([]);
-    setStep("mobile");
+    const known = readKnownDeviceProfile(deviceId || getOrCreateDeviceId());
+    if (known?.hasPin && known.mobile) {
+      setMobile(known.mobile);
+      setKnownDevice(true);
+      setStep("pinLogin");
+    } else {
+      setStep("mobile");
+    }
     setError("Signed out after 2 hours of inactivity. Please sign in again.");
-  }, []);
+  }, [deviceId]);
 
   // Track activity and auto-logout after 2 hours idle while signed in.
   useEffect(() => {
@@ -292,7 +413,19 @@ export function MemberPortalApp() {
         const msg = e instanceof Error ? e.message : "";
         if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
           setMember(null);
-          setStep("mobile");
+          const known = readKnownDeviceProfile(deviceId || getOrCreateDeviceId());
+          if (known?.hasPin && known.mobile && !/revoked/i.test(msg)) {
+            setMobile(known.mobile);
+            setKnownDevice(true);
+            setStep("pinLogin");
+          } else {
+            if (/revoked/i.test(msg)) {
+              clearKnownDeviceProfile(deviceId);
+              setKnownDevice(false);
+              setNeedsReauth(true);
+            }
+            setStep("mobile");
+          }
           setError(msg || "Session expired. Please sign in again.");
         }
       }
@@ -310,35 +443,6 @@ export function MemberPortalApp() {
       window.clearInterval(id);
     };
   }, [member, refreshMember, step]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        await loadMe();
-      } catch (e) {
-        if (!cancelled) {
-          const msg = e instanceof Error ? e.message : "";
-          if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
-            setNeedsReauth(true);
-            setError(
-              /revoked/i.test(msg)
-                ? "Access was revoked by the gym. Verify via WhatsApp again."
-                : /inactivity/i.test(msg)
-                  ? msg
-                  : null,
-            );
-          }
-          setStep("mobile");
-        }
-      } finally {
-        if (!cancelled) setBooting(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadMe]);
 
   function openWhatsAppLinks(webUrl: string, appUrl?: string) {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -375,7 +479,10 @@ export function MemberPortalApp() {
             },
           );
           if (done.needsPin) setStep("setPin");
-          else await loadMe();
+          else {
+            rememberThisDevice(mobile, deviceId, true);
+            await loadMe();
+          }
           return;
         }
         if (data.status === "rejected") {
@@ -478,6 +585,7 @@ export function MemberPortalApp() {
       if (data.needsPin || !data.hasPin) {
         setStep("setPin");
       } else {
+        rememberThisDevice(mobile, data.deviceId || deviceId, true);
         setStep("pinLogin");
       }
     } catch (e) {
@@ -503,6 +611,7 @@ export function MemberPortalApp() {
         method: "POST",
         body: JSON.stringify({ mobile, pin, challengeId, deviceId }),
       });
+      rememberThisDevice(mobile, deviceId, true);
       setConfirmPin("");
       await loadMe();
     } catch (e) {
@@ -520,11 +629,14 @@ export function MemberPortalApp() {
         method: "POST",
         body: JSON.stringify({ mobile, pin, deviceId }),
       });
+      rememberThisDevice(mobile, deviceId, true);
       await loadMe();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "PIN login failed";
       setError(msg);
-      if (/revoked|Verify via WhatsApp|PIN not set/i.test(msg)) {
+      if (/revoked|Verify via WhatsApp|PIN not set|Could not register device/i.test(msg)) {
+        clearKnownDeviceProfile(deviceId);
+        setKnownDevice(false);
         setNeedsReauth(true);
         setStep("mobile");
       }
@@ -543,7 +655,15 @@ export function MemberPortalApp() {
     setMember(null);
     setCard(null);
     setPin("");
-    setStep("mobile");
+    // Keep known-device hint so next visit is PIN-only, not full registration.
+    const known = readKnownDeviceProfile(deviceId);
+    if (known?.hasPin && known.mobile) {
+      setMobile(known.mobile);
+      setKnownDevice(true);
+      setStep("pinLogin");
+    } else {
+      setStep("mobile");
+    }
     setBusy(false);
   }
 
@@ -613,11 +733,15 @@ export function MemberPortalApp() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
             Member Portal
           </p>
-          <h1 className="mt-2 font-display text-3xl text-white">Sign in securely</h1>
+          <h1 className="mt-2 font-display text-3xl text-white">
+            {step === "pinLogin" || knownDevice ? "Welcome back" : "Sign in securely"}
+          </h1>
           <p className="mt-2 text-sm text-muted">
-            {authMethod === "auto_identity"
-              ? "Enter your registered mobile, name, and DOB or Gmail. Then set a 6-digit PIN for next visits."
-              : "First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN for next visits."}
+            {step === "pinLogin" || knownDevice
+              ? "This phone is already registered. Enter your mobile and 6-digit PIN."
+              : authMethod === "auto_identity"
+                ? "First time on this phone: enter mobile, name, and DOB or Gmail. Then set a 6-digit PIN for next visits."
+                : "First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN for next visits."}
           </p>
           {needsReauth ? (
             <p className="mt-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
@@ -646,7 +770,7 @@ export function MemberPortalApp() {
             </label>
           )}
 
-          {step === "mobile" && authMethod === "auto_identity" ? (
+          {step === "mobile" && authMethod === "auto_identity" && !knownDevice ? (
             <div className="mt-4 space-y-4">
               <label className="block text-sm text-white/80">
                 Name (as given in gym)
@@ -897,11 +1021,16 @@ export function MemberPortalApp() {
               <button
                 type="button"
                 className="w-full text-sm text-muted hover:text-gold"
-                onClick={() => setStep("mobile")}
+                onClick={() => {
+                  if (knownDevice) switchToFullRegistration();
+                  else setStep("mobile");
+                }}
               >
-                {authMethod === "auto_identity"
-                  ? "Verify with details instead"
-                  : "Verify via gym WhatsApp instead"}
+                {knownDevice
+                  ? "Not you? First-time setup / different number"
+                  : authMethod === "auto_identity"
+                    ? "Verify with details instead"
+                    : "Verify via gym WhatsApp instead"}
               </button>
             </div>
           ) : null}
