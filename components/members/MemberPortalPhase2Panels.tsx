@@ -1376,6 +1376,38 @@ export function PerksPanel({
     }
   }
 
+  function shareReferralOnWhatsApp() {
+    const code = String(data?.referral?.code || "").trim();
+    if (!code) {
+      setError("Referral code is not ready yet. Try again in a moment.");
+      return;
+    }
+    const text = [
+      "Join Action Plus Gym with my referral code:",
+      code,
+      "",
+      "Show this code at the gym when you register — I earn referral points when you join.",
+    ].join("\n");
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      // Popup blocked — navigate in same tab as fallback.
+      window.location.href = url;
+    }
+  }
+
+  async function copyReferralCode() {
+    const code = String(data?.referral?.code || "").trim();
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setMsg("Referral code copied.");
+      setError(null);
+    } catch {
+      setError("Could not copy. Long-press the code to copy.");
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5 space-y-4">
       <PortalBackButton onClick={onBack} />
@@ -1402,6 +1434,27 @@ export function PerksPanel({
         <p className="text-xs uppercase tracking-wide text-muted">Your referral code</p>
         <p className="mt-1 font-mono text-lg text-gold">{data?.referral?.code || "—"}</p>
         <p className="text-sm text-muted">{data?.referral?.points ?? 0} points</p>
+        {data?.referral?.code ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={shareReferralOnWhatsApp}
+              className="rounded-full bg-[#25D366] px-4 py-2 text-sm font-medium text-white"
+            >
+              Share on WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={() => void copyReferralCode()}
+              className="rounded-full border border-gold/40 px-4 py-2 text-sm text-gold"
+            >
+              Copy code
+            </button>
+          </div>
+        ) : null}
+        <p className="mt-2 text-xs text-muted">
+          Friends show this code when joining. Gym staff record it so you earn points.
+        </p>
       </div>
     </section>
   );
