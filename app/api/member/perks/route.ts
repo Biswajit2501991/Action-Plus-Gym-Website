@@ -28,14 +28,14 @@ export async function GET() {
     .eq("member_uuid", uuid)
     .maybeSingle();
 
-  let { data: referral } = await svc.client
+  let { data: referralRow } = await svc.client
     .from("member_referral_codes")
     .select("code, points")
     .eq("gym_id", gymId)
     .eq("member_uuid", uuid)
     .maybeSingle();
 
-  if (!referral) {
+  if (!referralRow) {
     const code = `AP${String(session.member.member_code || "")
       .replace(/\W/g, "")
       .slice(-6)
@@ -50,21 +50,47 @@ export async function GET() {
       })
       .select("code, points")
       .maybeSingle();
-    referral = created;
+    referralRow = created;
   }
+
+  // Available portal points = pending referral credit only (matches Gym Manager).
+  // member_referral_codes.points stays as lifetime earned history and is never wiped.
+  const { data: pendingEvents } = await svc.client
+    .from("member_referral_events")
+    .select("referrer_credit_inr")
+    .eq("gym_id", gymId)
+    .eq("referrer_uuid", uuid)
+    .eq("referrer_credit_status", "pending");
+
+  const pendingCreditInr = (Array.isArray(pendingEvents) ? pendingEvents : []).reduce(
+    (sum, row) => sum + (Number(row?.referrer_credit_inr) || 0),
+    0,
+  );
+  const lifetimePoints = Math.max(0, Number(referralRow?.points) || 0);
 
   const { data: events } = await svc.client
     .from("member_referral_events")
-    .select("id, points, note, created_at")
+    .select("id, points, note, created_at, referrer_credit_inr, referrer_credit_status")
     .eq("gym_id", gymId)
     .eq("referrer_uuid", uuid)
     .order("created_at", { ascending: false })
     .limit(20);
 
+  const referral = referralRow
+    ? {
+        code: referralRow.code,
+        /** Available / unused referral points (pending credit). */
+        points: pendingCreditInr,
+        /** Lifetime earned points (never decremented). */
+        lifetimePoints,
+        pendingCreditInr,
+      }
+    : null;
+
   return NextResponse.json({
     ok: true,
     locker: locker || null,
-    referral: referral || null,
+    referral,
     referralEvents: events || [],
   });
 }

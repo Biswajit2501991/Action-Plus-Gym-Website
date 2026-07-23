@@ -1338,7 +1338,12 @@ export function PerksPanel({
 }) {
   const [data, setData] = useState<{
     locker: { locker_code: string; status: string } | null;
-    referral: { code: string; points: number } | null;
+    referral: {
+      code: string;
+      points: number;
+      lifetimePoints?: number;
+      pendingCreditInr?: number;
+    } | null;
   } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1348,7 +1353,12 @@ export function PerksPanel({
     api<{
       ok: true;
       locker: { locker_code: string; status: string } | null;
-      referral: { code: string; points: number } | null;
+      referral: {
+        code: string;
+        points: number;
+        lifetimePoints?: number;
+        pendingCreditInr?: number;
+      } | null;
     }>("/api/member/perks")
       .then((res) => {
         if (!cancelled) {
@@ -1433,7 +1443,7 @@ export function PerksPanel({
       <div>
         <p className="text-xs uppercase tracking-wide text-muted">Your referral code</p>
         <p className="mt-1 font-mono text-lg text-gold">{data?.referral?.code || "—"}</p>
-        <p className="text-sm text-muted">{data?.referral?.points ?? 0} points</p>
+        <p className="text-sm text-muted">{data?.referral?.points ?? 0} available points</p>
         {data?.referral?.code ? (
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -1453,7 +1463,8 @@ export function PerksPanel({
           </div>
         ) : null}
         <p className="mt-2 text-xs text-muted">
-          Friends show this code when joining. Gym staff record it so you earn points.
+          Friends show this code when joining. Available points match your pending referral
+          credit and go to 0 after it is used on billing.
         </p>
       </div>
     </section>
