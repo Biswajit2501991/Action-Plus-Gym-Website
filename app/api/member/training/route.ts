@@ -8,6 +8,7 @@ import {
   visibleBasicWorkoutLabels,
   type PortalSections,
 } from "@/lib/member-portal/portal-ui-config";
+import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 
 type PlanJson = {
   trainerId?: string;
@@ -96,15 +97,19 @@ export async function GET() {
   const planNameLive = String(member?.plan_name || "").trim();
   const onPtPlan = isPtPlanName(planNameLive);
 
-  const { data: portalSettingsRow } = await svc.client
-    .from("member_portal_settings")
-    .select("basic_workout_options, portal_sections")
-    .eq("gym_id", gymId)
-    .maybeSingle();
+  const [{ data: portalSettingsRow }, exerciseTypesLookup] = await Promise.all([
+    svc.client
+      .from("member_portal_settings")
+      .select("basic_workout_options, portal_sections")
+      .eq("gym_id", gymId)
+      .maybeSingle(),
+    fetchExerciseTypeLookupValues(svc.client),
+  ]);
 
   const portalSections: PortalSections = portalSectionsFromSettings({
     portal_sections: portalSettingsRow?.portal_sections,
     basic_workout_options: portalSettingsRow?.basic_workout_options,
+    exerciseTypes: exerciseTypesLookup,
   });
   const basicExerciseTypes = visibleBasicWorkoutLabels(
     portalSettingsRow?.basic_workout_options,

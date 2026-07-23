@@ -13,6 +13,7 @@ import {
   DEFAULT_PORTAL_SECTIONS,
   portalSectionsFromSettings,
 } from "@/lib/member-portal/portal-ui-config";
+import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 
 export async function GET() {
   const session = await requireMemberSession();
@@ -42,14 +43,18 @@ export async function GET() {
       if (!svc.ok) return DEFAULT_PORTAL_SECTIONS;
       const gymId = portalGymId();
       if (!gymId) return DEFAULT_PORTAL_SECTIONS;
-      const { data } = await svc.client
-        .from("member_portal_settings")
-        .select("portal_sections, basic_workout_options")
-        .eq("gym_id", gymId)
-        .maybeSingle();
+      const [{ data }, exerciseTypes] = await Promise.all([
+        svc.client
+          .from("member_portal_settings")
+          .select("portal_sections, basic_workout_options")
+          .eq("gym_id", gymId)
+          .maybeSingle(),
+        fetchExerciseTypeLookupValues(svc.client),
+      ]);
       return portalSectionsFromSettings({
         portal_sections: data?.portal_sections,
         basic_workout_options: data?.basic_workout_options,
+        exerciseTypes,
       });
     })(),
   ]);

@@ -129,10 +129,32 @@ const HOME_TILE_KEYS: (keyof PortalSections)[] = [
   "homeBiometric",
 ];
 
-/** Merge portal_sections with optional __tile__: sentinels from workout options. */
+/** Decode `__pht__:v1:<bits>` markers stored in settings_lookup_values.exerciseTypes. */
+export function homeTilesFromExerciseTypeMarkers(
+  exerciseTypes: unknown,
+): Partial<PortalSections> {
+  const list = Array.isArray(exerciseTypes) ? exerciseTypes.map(String) : [];
+  const token = list.find((v) => v.startsWith("__pht__:v1:"));
+  if (!token) return {};
+  const bits = token.slice("__pht__:v1:".length);
+  const out: Partial<PortalSections> = {};
+  HOME_TILE_KEYS.forEach((key, i) => {
+    if (bits[i] === "0") out[key] = false;
+    else if (bits[i] === "1") out[key] = true;
+  });
+  return out;
+}
+
+/**
+ * Merge portal_sections with durable fallbacks:
+ * 1) `__pht__:` markers in exerciseTypes (works on current prod without new Express)
+ * 2) `__tile__:` sentinels in basic_workout_options
+ * 3) portal_sections jsonb (when backend persists full keys)
+ */
 export function portalSectionsFromSettings(input: {
   portal_sections?: unknown;
   basic_workout_options?: unknown;
+  exerciseTypes?: unknown;
 }): PortalSections {
   const homeFromOptions: Partial<PortalSections> = {};
   for (const row of normalizeBasicWorkoutOptions(input.basic_workout_options)) {
@@ -140,7 +162,13 @@ export function portalSectionsFromSettings(input: {
     const key = row.label.slice(HOME_TILE_OPTION_PREFIX.length) as keyof PortalSections;
     if (HOME_TILE_KEYS.includes(key)) homeFromOptions[key] = row.visible;
   }
-  const base = { ...DEFAULT_PORTAL_SECTIONS, ...homeFromOptions };
+  const fromMarkers = homeTilesFromExerciseTypeMarkers(input.exerciseTypes);
+  // Markers first, then tile sentinels, then explicit portal_sections (highest priority).
+  const base = {
+    ...DEFAULT_PORTAL_SECTIONS,
+    ...fromMarkers,
+    ...homeFromOptions,
+  };
   return normalizePortalSections({
     ...base,
     ...(input.portal_sections && typeof input.portal_sections === "object"
