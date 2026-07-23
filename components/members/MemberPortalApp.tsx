@@ -12,6 +12,7 @@ import {
   PaymentsPanel,
   PerksPanel,
   TrainingPanel,
+  WeightTrackerPanel,
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { hasUnreadStaffChat } from "@/lib/member-portal/chat-client";
@@ -80,6 +81,7 @@ type Step =
   | "notifications"
   | "chat"
   | "training"
+  | "weight"
   | "bookings"
   | "perks"
   | "biometric";
@@ -1056,6 +1058,7 @@ export function MemberPortalApp() {
         step === "notifications" ||
         step === "chat" ||
         step === "training" ||
+        step === "weight" ||
         step === "bookings" ||
         step === "perks" ||
         step === "biometric") ? (
@@ -1146,6 +1149,9 @@ export function MemberPortalApp() {
                   }}
                 />
                 <NavTile label="Training" onClick={() => setStep("training")} />
+                {!/\bpt\b/i.test(String(member.planName || "")) ? (
+                  <NavTile label="Weight Tracker" onClick={() => setStep("weight")} />
+                ) : null}
                 <NavTile label="Book" onClick={() => setStep("bookings")} />
                 <NavTile label="Perks" onClick={() => setStep("perks")} />
                 <NavTile label="Biometric" onClick={() => setStep("biometric")} />
@@ -1292,6 +1298,9 @@ export function MemberPortalApp() {
               memberUuid={member.memberUuid}
               liveTick={liveTick}
             />
+          ) : null}
+          {step === "weight" ? (
+            <WeightTrackerPanel onBack={() => setStep("home")} />
           ) : null}
           {step === "bookings" ? (
             <BookingsPanel onBack={() => setStep("home")} liveTick={liveTick} />

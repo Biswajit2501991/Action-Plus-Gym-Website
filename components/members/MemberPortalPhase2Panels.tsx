@@ -1381,3 +1381,247 @@ export function BiometricPanel({
     </section>
   );
 }
+
+type WeightLog = {
+  id: string;
+  date: string;
+  weightKg: number | null;
+  notes?: string;
+  recordedBy?: string;
+};
+
+function formatWeightDate(iso: string) {
+  const key = String(iso || "").slice(0, 10);
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return key || "—";
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
+
+/** Basic-member Weight Tracker — logs to member_measurements (shared with Gym Manager). */
+export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
+  const [logs, setLogs] = useState<WeightLog[]>([]);
+  const [canEdit, setCanEdit] = useState(true);
+  const [date, setDate] = useState("");
+  const [weight, setWeight] = useState("");
+  const [currentKg, setCurrentKg] = useState<number | null>(null);
+  const [changeKg, setChangeKg] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<null | { kind: "loss" | "gain" | "same"; delta: number }>(
+    null,
+  );
+
+  const reload = useCallback(async () => {
+    const data = await api<{
+      ok: true;
+      canEdit: boolean;
+      logs: WeightLog[];
+      currentKg: number | null;
+      changeKg: number | null;
+      today: string;
+    }>("/api/member/weight");
+    setCanEdit(Boolean(data.canEdit));
+    setLogs(Array.isArray(data.logs) ? data.logs : []);
+    setCurrentKg(data.currentKg);
+    setChangeKg(data.changeKg);
+    setDate((prev) => prev || data.today || "");
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    reload()
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load weight"))
+      .finally(() => setLoading(false));
+  }, [reload]);
+
+  async function addWeight() {
+    if (!canEdit || busy) return;
+    const kg = Number(String(weight).trim());
+    if (!Number.isFinite(kg) || kg <= 0) {
+      setError("Enter a valid weight in kg.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api<{
+        ok: true;
+        currentKg: number;
+        previousKg: number | null;
+        changeKg: number | null;
+      }>("/api/member/weight", {
+        method: "POST",
+        body: JSON.stringify({ date, weightKg: kg }),
+      });
+      setWeight("");
+      await reload();
+      const delta = res.changeKg;
+      if (delta != null && delta !== 0) {
+        setFeedback({
+          kind: delta < 0 ? "loss" : "gain",
+          delta,
+        });
+      } else if (delta === 0) {
+        setFeedback({ kind: "same", delta: 0 });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save weight");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const changeLabel =
+    changeKg == null
+      ? "NA"
+      : changeKg === 0
+        ? "0 kg"
+        : `${changeKg > 0 ? "+" : ""}${changeKg} kg`;
+
+  return (
+    <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-4 space-y-5 sm:p-5">
+      <PortalBackButton onClick={onBack} />
+      <div>
+        <h2 className="font-display text-2xl text-white">Weight Tracker</h2>
+        <p className="mt-1 text-sm text-muted">
+          Log your weight. Staff can see your progress in Gym Manager → Workout.
+        </p>
+      </div>
+
+      {loading ? <p className="text-sm text-muted">Loading…</p> : null}
+      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+
+      {!canEdit ? (
+        <p className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
+          Weight Tracker is for Basic members. On a PT plan, your trainer tracks weight in Gym
+          Manager.
+        </p>
+      ) : (
+        <div className="space-y-4 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-3.5 sm:p-5">
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+              Date
+            </p>
+            <input
+              type="date"
+              className="box-border w-full min-w-0 rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base text-white outline-none focus:border-gold/40 sm:text-sm"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              disabled={busy}
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+              Weight (kg)
+            </p>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="1"
+              max="400"
+              placeholder="e.g. 72.5"
+              className="box-border w-full min-w-0 rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base text-white outline-none focus:border-gold/40 sm:text-sm"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              disabled={busy}
+            />
+          </div>
+          <button
+            type="button"
+            disabled={busy || !weight.trim()}
+            onClick={() => void addWeight()}
+            className="min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+          >
+            {busy ? "Saving…" : "Add Weight"}
+          </button>
+          <p className="text-sm text-white/85">
+            Current:{" "}
+            <span className="text-gold">{currentKg != null ? `${currentKg} kg` : "NA"}</span>
+            {" · "}
+            Change: <span className="text-gold">{changeLabel}</span>
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+          History
+        </p>
+        {!logs.length ? (
+          <p className="rounded-xl border border-dashed border-white/15 px-4 py-6 text-center text-sm text-muted">
+            No weight logs yet.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {logs.map((log) => (
+              <li
+                key={log.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+              >
+                <span className="text-muted">{formatWeightDate(log.date)}</span>
+                <span className="font-medium text-white">
+                  {log.weightKg != null ? `${log.weightKg} kg` : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {feedback ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-5"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setFeedback(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl border border-gold/40 bg-charcoal p-6 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {feedback.kind === "loss" ? (
+              <>
+                <div className="weight-celebrate text-5xl" aria-hidden>
+                  🎉
+                </div>
+                <p className="mt-3 font-display text-2xl text-gold">Great progress!</p>
+                <p className="mt-2 text-sm text-white/85">
+                  You lost <strong className="text-gold">{Math.abs(feedback.delta)} kg</strong>. Keep
+                  going — the gym is proud of you.
+                </p>
+                <div className="weight-confetti mt-4" aria-hidden />
+              </>
+            ) : feedback.kind === "gain" ? (
+              <>
+                <div className="text-5xl" aria-hidden>
+                  💪
+                </div>
+                <p className="mt-3 font-display text-2xl text-gold">Stay consistent</p>
+                <p className="mt-2 text-sm text-white/85">
+                  Up <strong className="text-gold">{feedback.delta} kg</strong> since last log.
+                  Small steps — train, hydrate, and check in again soon. You’ve got this.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-display text-2xl text-gold">Steady</p>
+                <p className="mt-2 text-sm text-white/85">
+                  Same as last time. Consistency beats extremes — keep logging.
+                </p>
+              </>
+            )}
+            <button
+              type="button"
+              className="mt-5 w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
+              onClick={() => setFeedback(null)}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}

@@ -354,3 +354,34 @@ html[data-theme="day"] ::selection {
   background: rgba(168, 132, 28, 0.28);
   color: #1c222b;
 }
+
+/* Weight Tracker celebration (loss) */
+@keyframes weightCelebratePulse {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  40% {
+    transform: scale(1.18) rotate(-6deg);
+  }
+  70% {
+    transform: scale(1.08) rotate(4deg);
+  }
+}
+.weight-celebrate {
+  animation: weightCelebratePulse 0.9s ease-in-out infinite;
+}
+.weight-confetti {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #c9a227,
+    #e0c15a,
+    #7dd3a0,
+    #c9a227,
+    #e0c15a
+  );
+  background-size: 200% 100%;
+  animation: weightCelebratePulse 1.2s linear infinite;
+}
