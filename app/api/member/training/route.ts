@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
-import { portalGymId } from "@/lib/member-portal/config";
+import { portalGymId, PORTAL_MEMBERSHIP_STATUS_ERROR, isPortalAllowedMembershipStatus } from "@/lib/member-portal/config";
 import {
   normalizePortalSections,
   portalSectionsFromSettings,
@@ -427,9 +427,9 @@ export async function POST(req: Request) {
   const status = String(memberLive?.status || session.member.status || "")
     .trim()
     .toLowerCase();
-  if (status === "deactivated" || status === "cancelled") {
+  if (!isPortalAllowedMembershipStatus(status)) {
     return NextResponse.json(
-      { ok: false, error: "Membership is not active for workout logging." },
+      { ok: false, error: PORTAL_MEMBERSHIP_STATUS_ERROR },
       { status: 403 },
     );
   }

@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import {
-  ALLOWED_MEMBER_STATUSES,
+  PORTAL_MEMBERSHIP_STATUS_ERROR,
+  isPortalAllowedMembershipStatus,
   portalGymId,
 } from "@/lib/member-portal/config";
 import { mobileMatchVariants, normalizeMobile } from "@/lib/member-portal/phone";
@@ -123,11 +124,10 @@ export function assertPortalEligible(
       status: 403,
     };
   }
-  const status = String(member.status || "").trim().toLowerCase();
-  if (!ALLOWED_MEMBER_STATUSES.has(status)) {
+  if (!isPortalAllowedMembershipStatus(member.status)) {
     return {
       ok: false,
-      error: "This membership status cannot use the portal. Contact the gym.",
+      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
       status: 403,
     };
   }

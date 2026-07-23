@@ -10,6 +10,8 @@ import {
   MEMBER_REFRESH_TTL_SEC,
   MEMBER_IDLE_TTL_SEC,
   MEMBER_MAX_DEVICES,
+  PORTAL_MEMBERSHIP_STATUS_ERROR,
+  isPortalAllowedMembershipStatus,
   portalGymId,
 } from "@/lib/member-portal/config";
 import { randomToken, sha256 } from "@/lib/member-portal/crypto";
@@ -109,6 +111,50 @@ export async function clearAuthCookies() {
   jar.delete(MEMBER_DEVICE_COOKIE);
 }
 
+/**
+ * Shared gate for issued sessions / API access.
+ * Never clears PIN — only blocks while status is not Active/Hold.
+ */
+function evaluatePortalMemberAccess(
+  member: MemberRow | null | undefined,
+): { ok: true; member: MemberRow } | { ok: false; error: string; status: number } {
+  if (!member) {
+    return { ok: false, error: "Unauthorized", status: 401 };
+  }
+  if (!member.portal_enabled || member.portal_status === "disabled") {
+    return { ok: false, error: "Portal access disabled", status: 403 };
+  }
+  if (member.portal_status === "revoked") {
+    return {
+      ok: false,
+      error: "Access revoked. Please verify via WhatsApp again.",
+      status: 401,
+    };
+  }
+  if (!isPortalAllowedMembershipStatus(member.status)) {
+    return {
+      ok: false,
+      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
+      status: 403,
+    };
+  }
+  return { ok: true, member };
+}
+
+async function revokeSessionAndClearCookies(
+  client: SupabaseClient,
+  sessionId: string | null | undefined,
+) {
+  if (sessionId) {
+    await client
+      .from("member_portal_sessions")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .is("revoked_at", null);
+  }
+  await clearAuthCookies();
+}
+
 export async function issueSession(input: {
   member: MemberRow;
   deviceId: string;
@@ -116,6 +162,11 @@ export async function issueSession(input: {
   ip?: string;
   userAgent?: string;
 }): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const access = evaluatePortalMemberAccess(input.member);
+  if (!access.ok) {
+    return { ok: false, error: access.error, status: access.status };
+  }
+
   const svc = createServiceRoleClient();
   if (!svc.ok) return { ok: false, error: svc.error, status: 500 };
 
@@ -400,15 +451,24 @@ export async function requireMemberSession(): Promise<
     .maybeSingle();
 
   if (!member || !member.portal_enabled || member.portal_status === "disabled") {
-    await clearAuthCookies();
+    await revokeSessionAndClearCookies(svc.client, session.id);
     return { ok: false, error: "Portal access disabled", status: 403 };
   }
   if (member.portal_status === "revoked") {
-    await clearAuthCookies();
+    await revokeSessionAndClearCookies(svc.client, session.id);
     return {
       ok: false,
       error: "Access revoked. Please verify via WhatsApp again.",
       status: 401,
+    };
+  }
+  if (!isPortalAllowedMembershipStatus(member.status)) {
+    // Kick out immediately when status leaves Active/Hold. PIN is left intact.
+    await revokeSessionAndClearCookies(svc.client, session.id);
+    return {
+      ok: false,
+      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
+      status: 403,
     };
   }
 
@@ -417,8 +477,8 @@ export async function requireMemberSession(): Promise<
 
 async function requireMemberSessionAfterRefresh() {
   const jar = await cookies();
-  const access = jar.get(MEMBER_ACCESS_COOKIE)?.value;
-  const claims = access ? verifyMemberAccess(access) : null;
+  const accessToken = jar.get(MEMBER_ACCESS_COOKIE)?.value;
+  const claims = accessToken ? verifyMemberAccess(accessToken) : null;
   if (!claims) return { ok: false as const, error: "Unauthorized", status: 401 };
 
   const svc = createServiceRoleClient();
@@ -435,7 +495,12 @@ async function requireMemberSessionAfterRefresh() {
     .maybeSingle();
 
   if (!member) return { ok: false as const, error: "Unauthorized", status: 401 };
-  return { ok: true as const, claims, member: member as MemberRow };
+  const eligibility = evaluatePortalMemberAccess(member as MemberRow);
+  if (!eligibility.ok) {
+    await revokeSessionAndClearCookies(svc.client, claims.sid);
+    return { ok: false as const, error: eligibility.error, status: eligibility.status };
+  }
+  return { ok: true as const, claims, member: eligibility.member };
 }
 
 async function refreshFromCookies(): Promise<
@@ -494,15 +559,23 @@ async function refreshFromCookies(): Promise<
     .maybeSingle();
 
   if (!member || !member.portal_enabled || member.portal_status === "disabled") {
-    await clearAuthCookies();
+    await revokeSessionAndClearCookies(svc.client, session.id);
     return { ok: false, error: "Portal access disabled", status: 403 };
   }
   if (member.portal_status === "revoked") {
-    await clearAuthCookies();
+    await revokeSessionAndClearCookies(svc.client, session.id);
     return {
       ok: false,
       error: "Access revoked. Please verify via WhatsApp again.",
       status: 401,
+    };
+  }
+  if (!isPortalAllowedMembershipStatus(member.status)) {
+    await revokeSessionAndClearCookies(svc.client, session.id);
+    return {
+      ok: false,
+      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
+      status: 403,
     };
   }
 

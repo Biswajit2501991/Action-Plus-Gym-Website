@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceRoleClient } from "@/lib/supabase/service";
-import { portalGymId } from "@/lib/member-portal/config";
+import {
+  PORTAL_MEMBERSHIP_STATUS_ERROR,
+  isPortalAllowedMembershipStatus,
+  portalGymId,
+} from "@/lib/member-portal/config";
 import { normalizeMobile } from "@/lib/member-portal/phone";
 
 const querySchema = z.object({
@@ -59,7 +63,7 @@ export async function GET(req: NextRequest) {
 
     const { data: member, error: memberErr } = await svc.client
       .from("members")
-      .select("member_uuid, mobile, pin_hash, portal_status, status, deleted_at")
+      .select("member_uuid, mobile, pin_hash, portal_status, portal_enabled, status, deleted_at")
       .eq("gym_id", gymId)
       .eq("member_uuid", device.member_uuid)
       .is("deleted_at", null)
@@ -75,10 +79,10 @@ export async function GET(req: NextRequest) {
     const status = String(member.status || "").trim().toLowerCase();
     const portalStatus = String(member.portal_status || "").trim().toLowerCase();
     if (
-      status === "deactivated" ||
-      status === "cancelled" ||
+      !isPortalAllowedMembershipStatus(status) ||
       portalStatus === "disabled" ||
-      portalStatus === "revoked"
+      portalStatus === "revoked" ||
+      member.portal_enabled === false
     ) {
       return NextResponse.json({
         ok: true,
@@ -88,7 +92,9 @@ export async function GET(req: NextRequest) {
         reason:
           portalStatus === "revoked"
             ? "Access was revoked. Verify again to continue."
-            : "Membership is not active for portal login.",
+            : portalStatus === "disabled" || member.portal_enabled === false
+              ? "Portal access is disabled for this membership. Contact the gym."
+              : PORTAL_MEMBERSHIP_STATUS_ERROR,
       });
     }
 

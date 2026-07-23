@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
-import { portalGymId } from "@/lib/member-portal/config";
+import {
+  PORTAL_MEMBERSHIP_STATUS_ERROR,
+  isPortalAllowedMembershipStatus,
+  portalGymId,
+} from "@/lib/member-portal/config";
 
 function isPtPlanName(planName: string | null | undefined) {
   return /\bpt\b/i.test(String(planName || "").trim());
@@ -158,9 +162,13 @@ export async function POST(req: Request) {
     }
 
     const status = String(member?.status || "").trim().toLowerCase();
-    if (status === "deactivated" || status === "cancelled") {
+    if (!isPortalAllowedMembershipStatus(status)) {
       return NextResponse.json(
-        { ok: false, error: "member-inactive", message: "Membership is not active." },
+        {
+          ok: false,
+          error: "member-inactive",
+          message: PORTAL_MEMBERSHIP_STATUS_ERROR,
+        },
         { status: 403 },
       );
     }

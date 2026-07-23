@@ -23,6 +23,14 @@ export const MEMBER_OTP_HOURLY_LIMIT = 8;
 
 export const ALLOWED_MEMBER_STATUSES = new Set(["active", "hold"]);
 
+/** Membership status gate for Member Portal — Active / Hold only. Does not touch PIN. */
+export function isPortalAllowedMembershipStatus(status: unknown): boolean {
+  return ALLOWED_MEMBER_STATUSES.has(String(status || "").trim().toLowerCase());
+}
+
+export const PORTAL_MEMBERSHIP_STATUS_ERROR =
+  "Only Active or Hold memberships can use the Member Portal. Contact the gym.";
+
 export function portalGymId() {
   return GYM_ID;
 }
