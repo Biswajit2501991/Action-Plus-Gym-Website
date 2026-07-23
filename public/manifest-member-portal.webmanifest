@@ -1,0 +1,25 @@
+{
+  "name": "Action Plus Gym — Member Portal",
+  "short_name": "Action Plus",
+  "description": "Membership card, billing reminders, training, and gym chat.",
+  "start_url": "/members",
+  "scope": "/members",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

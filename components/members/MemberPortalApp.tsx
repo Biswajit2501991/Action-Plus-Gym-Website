@@ -1196,7 +1196,7 @@ export function MemberPortalApp() {
           ) : null}
 
           {step === "card" && card ? (
-            <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-charcoal to-black p-5">
+            <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-charcoal to-[var(--bg)] p-5">
               <PortalBackButton onClick={() => setStep("home")} />
               <p className="mt-4 text-xs uppercase tracking-[0.18em] text-gold">Membership card</p>
               <div className="mt-4 flex items-center gap-4">

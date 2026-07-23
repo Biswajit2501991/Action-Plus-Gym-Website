@@ -2,9 +2,10 @@
 
 /**
  * Canonical member-portal Back control.
- * Dark pill + gold border/text — matches the Training section look everywhere.
+ * Night: dark gold pill. Day: cream card with classic gold rim (theme CSS).
  */
 const BACK_CLASS = [
+  "portal-back-btn",
   "inline-flex items-center justify-center gap-2",
   "rounded-full",
   "border border-[#b49a4c]",

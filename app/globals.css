@@ -30,31 +30,33 @@ html[data-theme="night"] {
 }
 
 html[data-theme="day"] {
-  --bg: #e9eef3;
+  /* Upmarket classic day: cool limestone + charcoal ink + club gold (not cream/terracotta). */
+  --bg: #eef1f4;
   --bg-elevated: #ffffff;
-  --charcoal: #f3f6f9;
-  --charcoal-soft: #e4e9ef;
-  --gold: #b8921f;
-  --gold-soft: #c9a227;
-  --gold-dim: #8a7018;
-  --text: #141820;
-  --text-muted: #5a6570;
-  --border: rgba(184, 146, 31, 0.35);
-  --glass: rgba(255, 255, 255, 0.86);
+  --charcoal: #ffffff;
+  --charcoal-soft: #e7ebf0;
+  --gold: #a8841c;
+  --gold-soft: #c4a03a;
+  --gold-dim: #7a6414;
+  --text: #1c222b;
+  --text-muted: #5c6673;
+  --border: rgba(168, 132, 28, 0.32);
+  --glass: rgba(255, 255, 255, 0.9);
   --page-gradient:
-    radial-gradient(1100px 520px at 8% -8%, rgba(184, 146, 31, 0.14), transparent 55%),
-    radial-gradient(800px 420px at 92% 0%, rgba(40, 70, 100, 0.08), transparent 50%),
-    linear-gradient(180deg, #f4f7fa 0%, #e9eef3 45%, #f2f5f8 100%);
-  --admin-shell: #e9eef3;
-  --panel-border: rgba(20, 24, 32, 0.1);
-  --ink: #141820;
-  --ink-soft: rgba(20, 24, 32, 0.72);
-  --ink-faint: rgba(20, 24, 32, 0.55);
-  --surface-soft: rgba(20, 24, 32, 0.04);
-  --surface-mid: rgba(20, 24, 32, 0.07);
-  --overlay-heavy: rgba(255, 255, 255, 0.72);
-  --overlay-mid: rgba(255, 255, 255, 0.55);
-  --overlay-light: rgba(255, 255, 255, 0.4);
+    radial-gradient(1000px 480px at 12% -12%, rgba(168, 132, 28, 0.1), transparent 58%),
+    radial-gradient(720px 380px at 100% 0%, rgba(28, 48, 72, 0.06), transparent 52%),
+    linear-gradient(180deg, #f7f8fa 0%, #eef1f4 42%, #f4f6f8 100%);
+  --admin-shell: #eef1f4;
+  --panel-border: rgba(28, 34, 43, 0.1);
+  --ink: #1c222b;
+  --ink-soft: rgba(28, 34, 43, 0.72);
+  --ink-faint: rgba(28, 34, 43, 0.52);
+  --surface-soft: rgba(28, 34, 43, 0.035);
+  --surface-mid: rgba(28, 34, 43, 0.06);
+  --overlay-heavy: rgba(255, 255, 255, 0.82);
+  --overlay-mid: rgba(255, 255, 255, 0.7);
+  --overlay-light: rgba(255, 255, 255, 0.55);
+  --portal-card-shadow: 0 1px 0 rgba(28, 34, 43, 0.04), 0 12px 32px rgba(28, 34, 43, 0.06);
   color-scheme: light;
 }
 
@@ -288,4 +290,67 @@ html[data-theme="day"] .text-gold-gradient {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Extra portal utilities used heavily on /members */
+html[data-theme="day"] .text-white\/65 {
+  color: color-mix(in srgb, var(--ink) 65%, transparent) !important;
+}
+html[data-theme="day"] .border-white\/12 {
+  border-color: rgba(28, 34, 43, 0.12) !important;
+}
+html[data-theme="day"] .bg-white\/\[0\.03\],
+html[data-theme="day"] .bg-white\/\[0\.04\],
+html[data-theme="day"] .bg-white\/\[0\.06\] {
+  background-color: var(--surface-soft) !important;
+}
+html[data-theme="day"] .bg-black\/20 {
+  background-color: rgba(255, 255, 255, 0.55) !important;
+}
+html[data-theme="day"] .placeholder\:text-white\/35::placeholder {
+  color: rgba(28, 34, 43, 0.4) !important;
+}
+html[data-theme="day"] .to-black\/40 {
+  --tw-gradient-to: rgba(255, 255, 255, 0.55) !important;
+}
+html[data-theme="day"] .from-white\/\[0\.06\] {
+  --tw-gradient-from: rgba(28, 34, 43, 0.04) !important;
+}
+
+/* Member portal shell — theme-aware (replaces hardcoded black page) */
+.member-portal-shell {
+  background:
+    radial-gradient(ellipse at top, rgba(201, 162, 39, 0.12), transparent 55%),
+    linear-gradient(180deg, #0a0a0a, #050505);
+  color: var(--text);
+}
+html[data-theme="day"] .member-portal-shell {
+  background: var(--page-gradient);
+}
+html[data-theme="day"] .member-portal-shell .rounded-3xl.border.border-white\/10,
+html[data-theme="day"] .member-portal-shell .rounded-2xl.border.border-white\/10 {
+  box-shadow: var(--portal-card-shadow, none);
+  background-color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(28, 34, 43, 0.08) !important;
+}
+html[data-theme="day"] .member-portal-shell .bg-charcoal\/60,
+html[data-theme="day"] .member-portal-shell .bg-charcoal\/50,
+html[data-theme="day"] .member-portal-shell .bg-charcoal\/40 {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+html[data-theme="day"] .portal-back-btn {
+  border-color: rgba(168, 132, 28, 0.55) !important;
+  background: #fffdf6 !important;
+  color: #8a7018 !important;
+  box-shadow: 0 1px 0 rgba(28, 34, 43, 0.04), 0 6px 18px rgba(168, 132, 28, 0.12) !important;
+}
+html[data-theme="day"] .portal-back-btn:hover {
+  border-color: #a8841c !important;
+  background: #fff8e6 !important;
+  color: #7a6414 !important;
+}
+
+html[data-theme="day"] ::selection {
+  background: rgba(168, 132, 28, 0.28);
+  color: #1c222b;
 }

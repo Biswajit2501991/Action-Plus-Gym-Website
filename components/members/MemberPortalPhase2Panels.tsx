@@ -23,6 +23,7 @@ import {
   writeAttendanceCache,
   writeTrainingCache,
 } from "@/lib/member-portal/panel-cache";
+import { detectWebPushSupport } from "@/lib/member-portal/web-push-support";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 
 type Payment = {
@@ -272,27 +273,56 @@ export function AttendancePanel({
 export function NotificationsPanel({ onBack }: { onBack: () => void }) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [support, setSupport] = useState<ReturnType<typeof detectWebPushSupport> | null>(null);
+
+  useEffect(() => {
+    setSupport(detectWebPushSupport());
+  }, []);
 
   async function enable() {
     setBusy(true);
     setError(null);
+    setHint(null);
+    setStatus(null);
     try {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        throw new Error("Web Push is not supported in this browser.");
+      const check = detectWebPushSupport();
+      setSupport(check);
+      if (!check.ok) {
+        setError(check.message);
+        if (check.hint) setHint(check.hint);
+        return;
       }
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") throw new Error("Notification permission denied.");
 
-      const reg = await navigator.serviceWorker.register("/sw-member-portal.js");
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        throw new Error("Notification permission denied. Allow notifications for this site in Settings, then try again.");
+      }
+
+      const reg = await navigator.serviceWorker.register("/sw-member-portal.js", {
+        scope: "/members",
+      });
       await navigator.serviceWorker.ready;
 
-      const vapid = await api<{ ok: true; publicKey: string }>("/api/member/push/vapid");
+      const vapid = await api<{ ok: true; publicKey: string; message?: string }>(
+        "/api/member/push/vapid",
+      );
+      if (!vapid?.publicKey) {
+        throw new Error(
+          (vapid as { message?: string })?.message ||
+            "Push is not configured on the server yet. Ask the gym to enable WEB_PUSH_VAPID keys.",
+        );
+      }
+
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapid.publicKey),
       });
       const json = sub.toJSON();
+      if (!json.endpoint || !json.keys) {
+        throw new Error("Could not create a push subscription. Try again from the Home Screen app.");
+      }
       await api("/api/member/push/subscribe", {
         method: "POST",
         body: JSON.stringify({
@@ -303,29 +333,55 @@ export function NotificationsPanel({ onBack }: { onBack: () => void }) {
       });
       setStatus("Billing-day reminders enabled.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not enable push");
+      const msg = e instanceof Error ? e.message : "Could not enable push";
+      setError(msg);
+      if (/not supported|PushManager|service worker/i.test(msg)) {
+        setHint(
+          "On iPhone: Safari → Share → Add to Home Screen, then open Action Plus from the icon and tap Enable again. On Android: use Chrome (not WhatsApp’s in-app browser).",
+        );
+      }
     } finally {
       setBusy(false);
     }
   }
+
+  const needsHomeScreen = support && !support.ok && support.reason === "ios_needs_home_screen";
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
       <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Billing reminders</h2>
       <p className="mt-1 text-sm text-muted">
-        Allow browser notifications once. On your billing day the gym app can remind you automatically.
+        Allow notifications once. On your billing day the gym can remind you automatically.
       </p>
+
+      {needsHomeScreen ? (
+        <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
+          <p className="font-semibold text-gold">Install on your Home Screen first</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-white/80">
+            <li>Tap Share in Safari (or Chrome menu → Share)</li>
+            <li>Choose Add to Home Screen</li>
+            <li>Open Action Plus from the new icon</li>
+            <li>Return here and tap Enable billing-day push</li>
+          </ol>
+        </div>
+      ) : null}
+
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+      {hint ? <p className="mt-2 text-xs leading-relaxed text-muted">{hint}</p> : null}
       {status ? <p className="mt-3 text-sm text-gold">{status}</p> : null}
       <button
         type="button"
         disabled={busy}
         onClick={() => void enable()}
-        className="mt-4 w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+        className="mt-4 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
       >
         {busy ? "Enabling…" : "Enable billing-day push"}
       </button>
+      <p className="mt-3 text-[11px] leading-relaxed text-muted">
+        Android Chrome can enable push in the browser. iPhone/iPad require the Home Screen app (iOS
+        16.4+).
+      </p>
     </section>
   );
 }
