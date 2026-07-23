@@ -4,6 +4,7 @@ import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
 import {
   normalizePortalSections,
+  portalSectionsFromSettings,
   visibleBasicWorkoutLabels,
   type PortalSections,
 } from "@/lib/member-portal/portal-ui-config";
@@ -101,9 +102,10 @@ export async function GET() {
     .eq("gym_id", gymId)
     .maybeSingle();
 
-  const portalSections: PortalSections = normalizePortalSections(
-    portalSettingsRow?.portal_sections,
-  );
+  const portalSections: PortalSections = portalSectionsFromSettings({
+    portal_sections: portalSettingsRow?.portal_sections,
+    basic_workout_options: portalSettingsRow?.basic_workout_options,
+  });
   const basicExerciseTypes = visibleBasicWorkoutLabels(
     portalSettingsRow?.basic_workout_options,
   );

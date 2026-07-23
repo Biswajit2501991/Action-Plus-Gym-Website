@@ -109,7 +109,44 @@ export function normalizePortalSections(input: unknown): PortalSections {
 export function visibleBasicWorkoutLabels(options: unknown): string[] {
   return normalizeBasicWorkoutOptions(options)
     .filter((o) => o.visible)
+    .filter((o) => !String(o.label).startsWith("__tile__:"))
     .map((o) => o.label);
+}
+
+const HOME_TILE_OPTION_PREFIX = "__tile__:";
+const HOME_TILE_KEYS: (keyof PortalSections)[] = [
+  "homeProfile",
+  "homeQrCard",
+  "homeDevices",
+  "homePayments",
+  "homeAttendance",
+  "homeAlerts",
+  "homeChat",
+  "homeTraining",
+  "homeWeightTracker",
+  "homeBook",
+  "homePerks",
+  "homeBiometric",
+];
+
+/** Merge portal_sections with optional __tile__: sentinels from workout options. */
+export function portalSectionsFromSettings(input: {
+  portal_sections?: unknown;
+  basic_workout_options?: unknown;
+}): PortalSections {
+  const homeFromOptions: Partial<PortalSections> = {};
+  for (const row of normalizeBasicWorkoutOptions(input.basic_workout_options)) {
+    if (!String(row.label).startsWith(HOME_TILE_OPTION_PREFIX)) continue;
+    const key = row.label.slice(HOME_TILE_OPTION_PREFIX.length) as keyof PortalSections;
+    if (HOME_TILE_KEYS.includes(key)) homeFromOptions[key] = row.visible;
+  }
+  const base = { ...DEFAULT_PORTAL_SECTIONS, ...homeFromOptions };
+  return normalizePortalSections({
+    ...base,
+    ...(input.portal_sections && typeof input.portal_sections === "object"
+      ? input.portal_sections
+      : {}),
+  });
 }
 
 /** Map portal step → home tile section flag. */

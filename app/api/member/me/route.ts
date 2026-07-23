@@ -11,7 +11,7 @@ import {
 import { portalGymId } from "@/lib/member-portal/config";
 import {
   DEFAULT_PORTAL_SECTIONS,
-  normalizePortalSections,
+  portalSectionsFromSettings,
 } from "@/lib/member-portal/portal-ui-config";
 
 export async function GET() {
@@ -44,10 +44,13 @@ export async function GET() {
       if (!gymId) return DEFAULT_PORTAL_SECTIONS;
       const { data } = await svc.client
         .from("member_portal_settings")
-        .select("portal_sections")
+        .select("portal_sections, basic_workout_options")
         .eq("gym_id", gymId)
         .maybeSingle();
-      return normalizePortalSections(data?.portal_sections);
+      return portalSectionsFromSettings({
+        portal_sections: data?.portal_sections,
+        basic_workout_options: data?.basic_workout_options,
+      });
     })(),
   ]);
 
