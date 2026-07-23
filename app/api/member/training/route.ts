@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
+import {
+  normalizePortalSections,
+  visibleBasicWorkoutLabels,
+  type PortalSections,
+} from "@/lib/member-portal/portal-ui-config";
 
 type PlanJson = {
   trainerId?: string;
@@ -43,6 +48,19 @@ function packageSessionTotal(sessions: PlanJson["sessions"]): number | null {
   return null;
 }
 
+function scheduledFocusMap(
+  focusByDate: Record<string, string>,
+  revealFocus: boolean,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(focusByDate)) {
+    const focus = String(v || "").trim();
+    if (!focus) continue;
+    out[k] = revealFocus ? focus : "scheduled";
+  }
+  return out;
+}
+
 export async function GET() {
   const session = await requireMemberSession();
   if (!session.ok) {
@@ -76,8 +94,27 @@ export async function GET() {
 
   const planNameLive = String(member?.plan_name || "").trim();
   const onPtPlan = isPtPlanName(planNameLive);
-  /** Basic (non-PT) members may log their own daily workouts; PT is trainer-managed read-only. */
-  const canEditWorkouts = !onPtPlan;
+
+  const { data: portalSettingsRow } = await svc.client
+    .from("member_portal_settings")
+    .select("basic_workout_options, portal_sections")
+    .eq("gym_id", gymId)
+    .maybeSingle();
+
+  const portalSections: PortalSections = normalizePortalSections(
+    portalSettingsRow?.portal_sections,
+  );
+  const basicExerciseTypes = visibleBasicWorkoutLabels(
+    portalSettingsRow?.basic_workout_options,
+  );
+
+  /** Basic members may log workouts when section enabled; PT may add notes only when enabled. */
+  const canEditWorkouts =
+    !onPtPlan && portalSections.basicDailyWorkouts;
+  const canEditNotes = onPtPlan
+    ? portalSections.ptMemberNotes
+    : portalSections.basicNotes;
+  const canEditPtNotes = onPtPlan && portalSections.ptMemberNotes;
 
   // Keep Phase 2 stub tables as optional extras (never overwrite GM PT source of truth).
   const [ptStub, workoutsStub, dietsStub, measurements] = await Promise.all([
@@ -147,7 +184,7 @@ export async function GET() {
         profileRow?.trainer_staff_code ||
         "",
     ).trim();
-    focusByDate =
+    const rawFocusByDate =
       planJson.focusByDate && typeof planJson.focusByDate === "object"
         ? Object.fromEntries(
             Object.entries(planJson.focusByDate).map(([k, v]) => [
@@ -156,17 +193,24 @@ export async function GET() {
             ]),
           )
         : {};
-    const todayFocus = String(focusByDate[today] || "").trim();
+    focusByDate = scheduledFocusMap(
+      rawFocusByDate,
+      onPtPlan && portalSections.ptWorkoutDetails,
+    );
+    const todayFocus = String(rawFocusByDate[today] || "").trim();
     const workoutPlanText = String(planJson.workoutPlan || "").trim();
     const focusArea = String(planJson.focusArea || "").trim();
     const dietPlanText = String(planJson.dietPlan || "").trim();
     ptWorkoutNotes = String(planJson.ptWorkoutNotes || "").trim();
-    const scheduledDays = Object.values(focusByDate).filter(Boolean).length;
+    const scheduledDays = Object.values(rawFocusByDate).filter(Boolean).length;
     const sessionsTotal = packageSessionTotal(planJson.sessions);
 
     // Only surface PT assignment while the member is on a PT plan (profile data stays in DB).
-    if (onPtPlan && (trainerName || scheduledDays || workoutPlanText || todayFocus)) {
-      // Prefer Gym Manager PT row over empty Phase 2 stubs (avoids fake 0/— sessions).
+    if (
+      onPtPlan &&
+      portalSections.ptAssignment &&
+      (trainerName || scheduledDays || workoutPlanText || todayFocus)
+    ) {
       pt = [
         {
           id: profileRow?.id || `gm-pt-${member.id}`,
@@ -179,15 +223,17 @@ export async function GET() {
         },
         ...pt.filter((row) => String(row?.source || "") !== "pt_client_profiles"),
       ];
+    } else if (!onPtPlan || !portalSections.ptAssignment) {
+      pt = [];
     }
 
-    // Trainer schedule / diet / notes: expose only while on PT (read-only for the member).
+    // Trainer schedule / diet / notes: expose only while on PT.
     if (!onPtPlan) {
       focusByDate = {};
       ptWorkoutNotes = "";
     }
 
-    if (onPtPlan && workouts.length === 0) {
+    if (onPtPlan && portalSections.ptWorkoutDetails && workouts.length === 0) {
       const rows: Array<Record<string, unknown>> = [];
       if (todayFocus) {
         rows.push({
@@ -218,9 +264,13 @@ export async function GET() {
         });
       }
       workouts = rows;
+    } else if (onPtPlan && !portalSections.ptWorkoutDetails) {
+      // Hide trainer focus / plan text from PT clients (days calendar only).
+      workouts = [];
+      ptWorkoutNotes = "";
     }
 
-    if (onPtPlan && diets.length === 0 && dietPlanText) {
+    if (onPtPlan && portalSections.ptDiet && diets.length === 0 && dietPlanText) {
       const macros = [
         planJson.calories ? `${planJson.calories} kcal` : "",
         planJson.protein ? `${planJson.protein} protein` : "",
@@ -235,6 +285,8 @@ export async function GET() {
           kind: "diet_plan",
         },
       ];
+    } else if (onPtPlan && !portalSections.ptDiet) {
+      diets = [];
     }
 
     if (!onPtPlan) {
@@ -243,23 +295,13 @@ export async function GET() {
     }
   }
 
-  const [dailyRes, exerciseRes] = await Promise.all([
-    svc.client
-      .from("member_daily_workouts")
-      .select("workout_date, exercises, notes, source, updated_at")
-      .eq("gym_id", gymId)
-      .eq("member_uuid", uuid)
-      .order("workout_date", { ascending: false })
-      .limit(400),
-    svc.client
-      .from("settings_lookup_values")
-      .select("value")
-      .eq("gym_id", gymId)
-      .eq("category", "exerciseTypes")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true })
-      .limit(100),
-  ]);
+  const dailyRes = await svc.client
+    .from("member_daily_workouts")
+    .select("workout_date, exercises, notes, source, updated_at")
+    .eq("gym_id", gymId)
+    .eq("member_uuid", uuid)
+    .order("workout_date", { ascending: false })
+    .limit(400);
 
   const dailyByDate: Record<
     string,
@@ -267,23 +309,18 @@ export async function GET() {
   > = {};
   for (const row of dailyRes.data || []) {
     const key = String(row.workout_date).slice(0, 10);
+    const exercises = Array.isArray(row.exercises)
+      ? row.exercises.map(String)
+      : [];
+    // PT clients: never surface trainer/logged exercise chips — notes only.
     dailyByDate[key] = {
-      exercises: Array.isArray(row.exercises) ? row.exercises.map(String) : [],
+      exercises: onPtPlan ? [] : exercises,
       notes: String(row.notes || ""),
       source: row.source ? String(row.source) : undefined,
     };
   }
 
-  const exerciseTypes = [
-    ...new Set(
-      (exerciseRes.data || [])
-        .map((r: { value?: string }) => String(r.value || "").trim())
-        .filter(Boolean),
-    ),
-  ];
-  if (!exerciseTypes.length) {
-    exerciseTypes.push(...DEFAULT_EXERCISE_TYPES);
-  }
+  const exerciseTypes = onPtPlan ? [] : basicExerciseTypes;
 
   return NextResponse.json({
     ok: true,
@@ -291,41 +328,42 @@ export async function GET() {
     planName: planNameLive || null,
     onPtPlan,
     canEditWorkouts,
+    canEditNotes,
+    canEditPtNotes,
     focusByDate,
-    ptWorkoutNotes,
-    pt,
-    workouts,
-    diets,
-    measurements: measurements.data || [],
+    ptWorkoutNotes: portalSections.ptWorkoutDetails ? ptWorkoutNotes : "",
+    pt: portalSections.ptAssignment ? pt : [],
+    workouts: onPtPlan && !portalSections.ptWorkoutDetails ? [] : workouts,
+    diets: onPtPlan && !portalSections.ptDiet ? [] : diets,
+    measurements: portalSections.measurements ? measurements.data || [] : [],
+    showMeasurements: portalSections.measurements,
+    showPtSchedule: portalSections.ptSchedule,
+    showPtWorkoutDetails: portalSections.ptWorkoutDetails,
+    portalSections,
     dailyByDate,
     exerciseTypes,
   });
 }
 
-const DEFAULT_EXERCISE_TYPES = [
-  "Back",
-  "Chest",
-  "Legs",
-  "Shoulder",
-  "Cardio",
-  "Freehand + Cardio",
-  "Yoga",
-  "Running",
-  "Rest day",
-  "Full Body",
-];
-
-function normalizeExercises(input: unknown): string[] {
+function normalizeExercises(input: unknown, allowed?: string[]): string[] {
   if (!Array.isArray(input)) return [];
+  const allow =
+    allowed && allowed.length
+      ? new Set(allowed.map((x) => x.toLowerCase()))
+      : null;
   const out: string[] = [];
   const seen = new Set<string>();
   for (const raw of input) {
     const label = String(raw || "").trim().slice(0, 80);
     if (!label) continue;
     const key = label.toLowerCase();
+    if (allow && !allow.has(key)) continue;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(label);
+    // Prefer canonical casing from allowed list when present.
+    const canonical =
+      allowed?.find((a) => a.toLowerCase() === key) || label;
+    out.push(canonical);
     if (out.length >= 20) break;
   }
   return out;
@@ -355,7 +393,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const exercises = normalizeExercises(body.exercises);
   const notes = String(body.notes || "").trim().slice(0, 1000);
 
   const svc = createServiceRoleClient();
@@ -369,7 +406,7 @@ export async function POST(req: Request) {
   // Fresh plan/status from DB so plan switches take effect immediately.
   const { data: memberLive, error: memberErr } = await svc.client
     .from("members")
-    .select("plan_name, status")
+    .select("id, plan_name, status")
     .eq("gym_id", gymId)
     .eq("member_uuid", uuid)
     .maybeSingle();
@@ -390,18 +427,157 @@ export async function POST(req: Request) {
     );
   }
 
-  if (isPtPlanName(memberLive?.plan_name)) {
+  const { data: portalSettingsRow } = await svc.client
+    .from("member_portal_settings")
+    .select("basic_workout_options, portal_sections")
+    .eq("gym_id", gymId)
+    .maybeSingle();
+  const portalSections = normalizePortalSections(
+    portalSettingsRow?.portal_sections,
+  );
+  const allowedBasic = visibleBasicWorkoutLabels(
+    portalSettingsRow?.basic_workout_options,
+  );
+
+  const onPtPlan = isPtPlanName(memberLive?.plan_name);
+
+  if (onPtPlan) {
+    if (!portalSections.ptMemberNotes) {
+      return NextResponse.json(
+        { ok: false, error: "Notes are not enabled for PT clients." },
+        { status: 403 },
+      );
+    }
+
+    // Optional: only allow notes on days the trainer scheduled.
+    let scheduled = false;
+    if (memberLive?.id) {
+      const { data: profileRow } = await svc.client
+        .from("pt_client_profiles")
+        .select("plan_json")
+        .eq("gym_id", gymId)
+        .eq("member_id", memberLive.id)
+        .maybeSingle();
+      const planJson =
+        profileRow?.plan_json && typeof profileRow.plan_json === "object"
+          ? (profileRow.plan_json as PlanJson)
+          : ({} as PlanJson);
+      const focus = String(planJson.focusByDate?.[workoutDate] || "").trim();
+      scheduled = Boolean(focus);
+    }
+    if (!scheduled) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Notes can only be added on days scheduled with your PT.",
+        },
+        { status: 403 },
+      );
+    }
+
+    // PT clients: notes only — preserve any staff-logged exercises; never set chips from portal.
+    const { data: existingRow } = await svc.client
+      .from("member_daily_workouts")
+      .select("id, exercises, notes, source")
+      .eq("gym_id", gymId)
+      .eq("member_uuid", uuid)
+      .eq("workout_date", workoutDate)
+      .maybeSingle();
+
+    const existingExercises = Array.isArray(existingRow?.exercises)
+      ? existingRow.exercises.map(String).filter(Boolean)
+      : [];
+
+    if (!notes) {
+      if (existingExercises.length) {
+        // Keep staff workout row; only clear member notes.
+        const { data, error } = await svc.client
+          .from("member_daily_workouts")
+          .upsert(
+            {
+              gym_id: gymId,
+              member_uuid: uuid,
+              workout_date: workoutDate,
+              exercises: existingExercises,
+              notes: "",
+              recorded_by: existingRow?.source === "gym_manager" ? "staff" : "member",
+              source: existingRow?.source || "portal",
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "gym_id,member_uuid,workout_date" },
+          )
+          .select("id, workout_date, exercises, notes, source, updated_at")
+          .maybeSingle();
+        if (error) {
+          return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        }
+        return NextResponse.json({ ok: true, item: data, clearedNotes: true });
+      }
+      const { error } = await svc.client
+        .from("member_daily_workouts")
+        .delete()
+        .eq("gym_id", gymId)
+        .eq("member_uuid", uuid)
+        .eq("workout_date", workoutDate);
+      if (error) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true, cleared: true, workoutDate });
+    }
+
+    const { data, error } = await svc.client
+      .from("member_daily_workouts")
+      .upsert(
+        {
+          gym_id: gymId,
+          member_uuid: uuid,
+          workout_date: workoutDate,
+          exercises: existingExercises,
+          notes,
+          recorded_by: "member",
+          source: existingRow?.source === "gym_manager" ? "gym_manager" : "portal",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "gym_id,member_uuid,workout_date" },
+      )
+      .select("id, workout_date, exercises, notes, source, updated_at")
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, item: data });
+  }
+
+  if (!portalSections.basicDailyWorkouts && !portalSections.basicNotes) {
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "Your plan is PT — training is set by your trainer and cannot be edited here.",
-      },
+      { ok: false, error: "Workout logging is not enabled." },
       { status: 403 },
     );
   }
 
-  if (!exercises.length && !notes) {
+  // Preserve labels already on this day even if gym later hid that option.
+  const { data: existingBasic } = await svc.client
+    .from("member_daily_workouts")
+    .select("exercises, notes")
+    .eq("gym_id", gymId)
+    .eq("member_uuid", uuid)
+    .eq("workout_date", workoutDate)
+    .maybeSingle();
+  const historical = Array.isArray(existingBasic?.exercises)
+    ? existingBasic.exercises.map(String).filter(Boolean)
+    : [];
+  const allowList = [...new Set([...allowedBasic, ...historical])];
+
+  const exercises = portalSections.basicDailyWorkouts
+    ? normalizeExercises(body.exercises, allowList)
+    : historical;
+  const notesToSave = portalSections.basicNotes
+    ? notes
+    : String(existingBasic?.notes || "");
+
+  if (!exercises.length && !notesToSave) {
     const { error } = await svc.client
       .from("member_daily_workouts")
       .delete()
@@ -422,7 +598,7 @@ export async function POST(req: Request) {
         member_uuid: uuid,
         workout_date: workoutDate,
         exercises,
-        notes,
+        notes: notesToSave,
         recorded_by: "member",
         source: "portal",
         updated_at: new Date().toISOString(),

@@ -536,6 +536,11 @@ type TrainingData = {
   exerciseTypes?: string[];
   onPtPlan?: boolean;
   canEditWorkouts?: boolean;
+  canEditNotes?: boolean;
+  canEditPtNotes?: boolean;
+  showMeasurements?: boolean;
+  showPtSchedule?: boolean;
+  showPtWorkoutDetails?: boolean;
   planName?: string | null;
 };
 
@@ -552,13 +557,16 @@ export function TrainingPanel({
     readTrainingCache<TrainingData>(memberUuid),
   );
   const [error, setError] = useState<string | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(true);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [logDate, setLogDate] = useState("");
   const [logExercises, setLogExercises] = useState<string[]>([]);
   const [logNotes, setLogNotes] = useState("");
   const [logBusy, setLogBusy] = useState(false);
   const [logMsg, setLogMsg] = useState<string | null>(null);
+  const [ptNotes, setPtNotes] = useState("");
+  const [ptNotesBusy, setPtNotesBusy] = useState(false);
+  const [ptNotesMsg, setPtNotesMsg] = useState<string | null>(null);
   const [exercisesExpanded, setExercisesExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -575,7 +583,12 @@ export function TrainingPanel({
   const [viewMonthIndex, setViewMonthIndex] = useState(todayParts.monthIndex);
 
   const canEditWorkouts = data?.canEditWorkouts === true;
+  const canEditNotes = data?.canEditNotes !== false;
   const onPtPlan = data?.onPtPlan === true;
+  const canEditPtNotes = data?.canEditPtNotes === true;
+  const showMeasurements = data?.showMeasurements !== false;
+  const showPtSchedule = data?.showPtSchedule !== false;
+  const showPtWorkoutDetails = data?.showPtWorkoutDetails === true;
 
   const applyTraining = useCallback(
     (res: TrainingData) => {
@@ -623,6 +636,15 @@ export function TrainingPanel({
     setLogNotes(row?.notes || "");
   }, [logDate, data?.dailyByDate]);
 
+  useEffect(() => {
+    if (!selectedDayKey || !data?.dailyByDate) {
+      setPtNotes("");
+      return;
+    }
+    setPtNotes(data.dailyByDate[selectedDayKey]?.notes || "");
+    setPtNotesMsg(null);
+  }, [selectedDayKey, data?.dailyByDate]);
+
   const focusByDate = useMemo(
     () => data?.focusByDate || {},
     [data?.focusByDate],
@@ -631,6 +653,7 @@ export function TrainingPanel({
     const map: Record<string, string> = {};
     for (const [k, v] of Object.entries(data?.dailyByDate || {})) {
       if (v.exercises?.length) map[k] = v.exercises.join(", ");
+      else if (v.notes?.trim()) map[k] = "notes";
     }
     return map;
   }, [data?.dailyByDate]);
@@ -646,8 +669,12 @@ export function TrainingPanel({
   const ptDaysThisMonth = monthCells.filter(
     (c) => c.kind === "day" && !c.isSunday && c.hasFocus,
   ).length;
-  const selectedFocus =
+  const selectedIsScheduled =
     selectedDayKey && focusByDate[selectedDayKey]
+      ? Boolean(String(focusByDate[selectedDayKey]).trim())
+      : false;
+  const selectedFocus =
+    showPtWorkoutDetails && selectedDayKey && focusByDate[selectedDayKey]
       ? String(focusByDate[selectedDayKey])
       : "";
 
@@ -656,13 +683,12 @@ export function TrainingPanel({
     : [
         "Back",
         "Chest",
-        "Legs",
+        "Leg",
         "Shoulder",
-        "Cardio",
-        "Freehand + Cardio",
-        "Yoga",
         "Full Body",
-        "Rest day",
+        "Cardio",
+        "Biceps",
+        "Triceps",
       ];
 
   const PREVIEW_EXERCISE_COUNT = 8;
@@ -683,7 +709,7 @@ export function TrainingPanel({
   }
 
   async function saveDailyLog() {
-    if (!logDate || !canEditWorkouts) return;
+    if (!logDate || (!canEditWorkouts && !canEditNotes)) return;
     setLogBusy(true);
     setLogMsg(null);
     try {
@@ -691,8 +717,8 @@ export function TrainingPanel({
         method: "POST",
         body: JSON.stringify({
           workoutDate: logDate,
-          exercises: logExercises,
-          notes: logNotes,
+          exercises: canEditWorkouts ? logExercises : [],
+          notes: canEditNotes ? logNotes : "",
         }),
       });
       setLogMsg(
@@ -708,6 +734,36 @@ export function TrainingPanel({
     }
   }
 
+  async function savePtDayNotes() {
+    if (!selectedDayKey || !canEditPtNotes || !selectedIsScheduled) return;
+    setPtNotesBusy(true);
+    setPtNotesMsg(null);
+    try {
+      await api("/api/member/training", {
+        method: "POST",
+        body: JSON.stringify({
+          workoutDate: selectedDayKey,
+          exercises: [],
+          notes: ptNotes,
+        }),
+      });
+      setPtNotesMsg(
+        ptNotes.trim() ? "Notes saved for this day." : "Notes cleared for this day.",
+      );
+      await reload();
+    } catch (e) {
+      setPtNotesMsg(e instanceof Error ? e.message : "Could not save notes");
+    } finally {
+      setPtNotesBusy(false);
+    }
+  }
+
+  const showBasicLogger = canEditWorkouts || (canEditNotes && !onPtPlan);
+  const showPtAssignment = onPtPlan && (data?.pt || []).length > 0;
+  const showPtWorkouts =
+    onPtPlan && showPtWorkoutDetails && (data?.workouts || []).length > 0;
+  const showPtDiet = onPtPlan && (data?.diets || []).length > 0;
+
   return (
     <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-4 space-y-5 sm:p-5">
       <PortalBackButton onClick={onBack} />
@@ -716,7 +772,7 @@ export function TrainingPanel({
         <p className="text-xs text-muted">
           Plan · <span className="text-white/85">{data.planName}</span>
           {onPtPlan
-            ? " · Trainer schedule (view only)"
+            ? " · Your PT schedule days"
             : " · Log your own workouts"}
         </p>
       ) : null}
@@ -725,12 +781,14 @@ export function TrainingPanel({
       ) : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-      {canEditWorkouts ? (
+      {showBasicLogger ? (
       <div className="w-full min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-3.5 space-y-5 sm:p-5">
         <div>
           <p className="font-display text-lg tracking-wide text-white">My daily workouts</p>
           <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            Choose a day, pick what you trained, add a note if you like. History stays until the gym
+            Choose a day
+            {canEditWorkouts ? ", pick what you trained" : ""}
+            {canEditNotes ? ", add a note if you like" : ""}. History stays until the gym
             removes it.
           </p>
         </div>
@@ -749,10 +807,6 @@ export function TrainingPanel({
                   })()
                 : "Pick a date"}
             </p>
-            {/*
-              Direct tap on <input type="date"> works on iOS Safari and Android Chrome.
-              ≥44px hit target; clip overflow so native date min-width cannot break the card.
-            */}
             <div className="relative h-11 w-[4.75rem] shrink-0 overflow-hidden rounded-full">
               <span
                 aria-hidden
@@ -779,6 +833,7 @@ export function TrainingPanel({
           <p className="text-[10px] text-muted">Or tap a day on the calendar below.</p>
         </div>
 
+        {canEditWorkouts ? (
         <div className="min-w-0 space-y-2.5">
           <div className="flex items-end justify-between gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
@@ -826,7 +881,9 @@ export function TrainingPanel({
             </button>
           ) : null}
         </div>
+        ) : null}
 
+        {canEditNotes ? (
         <div className="min-w-0 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
             + Notes
@@ -840,6 +897,7 @@ export function TrainingPanel({
             disabled={logBusy}
           />
         </div>
+        ) : null}
 
         <button
           type="button"
@@ -905,8 +963,7 @@ export function TrainingPanel({
       </div>
       ) : null}
 
-      {onPtPlan ? (
-        <>
+      {showPtAssignment ? (
       <Block title="PT" empty="No PT assignment yet.">
         {(data?.pt || []).map((p) => {
           const trainer = String(p.trainer_name || "Trainer");
@@ -941,6 +998,8 @@ export function TrainingPanel({
           );
         })}
       </Block>
+      ) : null}
+      {showPtWorkouts ? (
       <Block title="Workouts" empty="No workout plan assigned.">
         {(data?.workouts || []).map((w) => (
           <p key={String(w.id)} className="text-sm text-white/85 whitespace-pre-wrap">
@@ -948,6 +1007,8 @@ export function TrainingPanel({
           </p>
         ))}
       </Block>
+      ) : null}
+      {showPtDiet ? (
       <Block title="Diet" empty="No diet plan assigned.">
         {(data?.diets || []).map((d) => (
           <p key={String(d.id)} className="text-sm text-white/85 whitespace-pre-wrap">
@@ -955,9 +1016,9 @@ export function TrainingPanel({
           </p>
         ))}
       </Block>
-        </>
       ) : null}
 
+      {showMeasurements ? (
       <Block title="Measurements" empty="No measurements yet.">
         {(data?.measurements || []).map((m) => (
           <p key={String(m.id)} className="text-sm text-white/85">
@@ -967,8 +1028,9 @@ export function TrainingPanel({
           </p>
         ))}
       </Block>
+      ) : null}
 
-      {onPtPlan ? (
+      {onPtPlan && showPtSchedule ? (
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-3">
         <button
           type="button"
@@ -977,10 +1039,10 @@ export function TrainingPanel({
           aria-expanded={calendarOpen}
         >
           <div>
-            <p className="text-sm font-semibold text-white">Workout Scheduler & Calendar</p>
+            <p className="text-sm font-semibold text-white">Your PT days</p>
             {!calendarOpen ? (
               <p className="mt-0.5 text-xs text-emerald-200/80">
-                Expand for read-only view of your PT workout days
+                Expand to see days scheduled with your trainer
               </p>
             ) : null}
           </div>
@@ -1017,8 +1079,10 @@ export function TrainingPanel({
               </p>
             </div>
             <p className="text-[11px] text-muted">
-              View only — your trainer sets the schedule in Gym Manager. Green = scheduled · Rose =
-              open. Tap a day to see the focus.
+              Green = day with your PT · Rose = open.
+              {canEditPtNotes
+                ? " Tap a scheduled day to add + Notes."
+                : " Tap a day to select it."}
             </p>
             <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] text-muted sm:gap-2 sm:text-xs">
               {PT_WEEKDAYS.map((d) => (
@@ -1050,27 +1114,77 @@ export function TrainingPanel({
                       selectedDayKey === entry.key ? "ring-2 ring-sky-400" : "",
                     ].join(" ")}
                     title={
-                      entry.focus
-                        ? `${entry.key}: ${entry.focus}`
-                        : `${entry.key}: No focus assigned`
+                      entry.hasFocus
+                        ? showPtWorkoutDetails && entry.focus && entry.focus !== "scheduled"
+                          ? `${entry.key}: ${entry.focus}`
+                          : `${entry.key}: PT day`
+                        : `${entry.key}: Open`
                     }
                   >
                     <div className="font-semibold">{entry.day}</div>
-                    <div className="mt-0.5 truncate">
-                      {entry.focus || (entry.isSunday ? "Sun" : "—")}
-                    </div>
+                    {showPtWorkoutDetails ? (
+                      <div className="mt-0.5 truncate">
+                        {entry.focus && entry.focus !== "scheduled"
+                          ? entry.focus
+                          : entry.isSunday
+                            ? "Sun"
+                            : entry.hasFocus
+                              ? "PT"
+                              : "—"}
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 truncate">
+                        {entry.hasFocus ? "PT" : entry.isSunday ? "Sun" : "—"}
+                      </div>
+                    )}
                   </button>
                 ),
               )}
             </div>
             {selectedDayKey ? (
-              <p className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/85">
-                <span className="text-muted">{selectedDayKey}</span>
-                {" · "}
-                {selectedFocus || "No workout focus assigned"}
-              </p>
+              <div className="space-y-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+                <p className="text-sm text-white/85">
+                  <span className="text-muted">{selectedDayKey}</span>
+                  {" · "}
+                  {selectedIsScheduled
+                    ? showPtWorkoutDetails && selectedFocus && selectedFocus !== "scheduled"
+                      ? selectedFocus
+                      : "Scheduled with your PT"
+                    : "No PT session this day"}
+                </p>
+                {canEditPtNotes && selectedIsScheduled ? (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+                      + Notes
+                    </p>
+                    <textarea
+                      rows={2}
+                      className="box-border block w-full min-w-0 max-w-full resize-none rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-gold/40 sm:text-sm"
+                      value={ptNotes}
+                      onChange={(e) => setPtNotes(e.target.value)}
+                      placeholder="Your notes for this PT day…"
+                      disabled={ptNotesBusy}
+                    />
+                    <button
+                      type="button"
+                      disabled={ptNotesBusy}
+                      onClick={() => void savePtDayNotes()}
+                      className="min-h-11 w-full touch-manipulation rounded-full gold-gradient px-5 py-2.5 text-sm font-semibold tracking-wide text-black disabled:opacity-50"
+                    >
+                      {ptNotesBusy
+                        ? "Saving…"
+                        : ptNotes.trim()
+                          ? "Save notes"
+                          : "Clear notes"}
+                    </button>
+                    {ptNotesMsg ? (
+                      <p className="text-xs text-amber-200/90">{ptNotesMsg}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
-            {data?.ptWorkoutNotes ? (
+            {showPtWorkoutDetails && data?.ptWorkoutNotes ? (
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted">PT Workout Notes</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-white/85">
@@ -1085,6 +1199,7 @@ export function TrainingPanel({
     </section>
   );
 }
+
 
 function Block({
   title,
