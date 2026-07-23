@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import {
   MEMBER_ACCESS_COOKIE,
@@ -124,7 +125,7 @@ export async function issueSession(input: {
 
   const { data: devices, error: devicesErr } = await svc.client
     .from("member_portal_devices")
-    .select("id, device_id, revoked_at")
+    .select("id, device_id, revoked_at, last_seen_at, created_at")
     .eq("member_uuid", memberUuid);
 
   if (devicesErr) {
@@ -138,12 +139,31 @@ export async function issueSession(input: {
   // must reactivate rather than insert a duplicate.
   const existing = allDevices.find((d) => d.device_id === deviceId);
   const wouldAddActiveSlot = !existing || Boolean(existing.revoked_at);
+
+  // Soft-cap: when a new/reactivated device would exceed the limit, silently
+  // revoke the oldest other device(s) by last activity so login stays seamless.
   if (wouldAddActiveSlot && active.length >= MEMBER_MAX_DEVICES) {
-    return {
-      ok: false,
-      error: `Maximum ${MEMBER_MAX_DEVICES} devices allowed. Remove a device from Settings or ask the gym.`,
-      status: 403,
-    };
+    const keepSlots = MEMBER_MAX_DEVICES - 1;
+    const evicted = await revokeOldestActiveDevices({
+      client: svc.client,
+      memberUuid,
+      activeDevices: active.filter((d) => d.device_id !== deviceId),
+      keepCount: keepSlots,
+    });
+    if (evicted.length) {
+      await auditLog({
+        memberUuid,
+        eventType: "device_auto_evicted",
+        meta: {
+          reason: "max_devices",
+          maxDevices: MEMBER_MAX_DEVICES,
+          newDeviceId: deviceId,
+          evictedDeviceIds: evicted.map((d) => d.device_id),
+        },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
   }
 
   const refreshToken = randomToken(32);
@@ -258,6 +278,50 @@ export async function issueSession(input: {
   });
 
   return { ok: true };
+}
+
+type DeviceRowLite = {
+  id: string;
+  device_id: string;
+  last_seen_at?: string | null;
+  created_at?: string | null;
+};
+
+/** Soft-revoke oldest active devices until `keepCount` remain. Does not delete rows. */
+async function revokeOldestActiveDevices(input: {
+  client: SupabaseClient;
+  memberUuid: string;
+  activeDevices: DeviceRowLite[];
+  keepCount: number;
+}): Promise<DeviceRowLite[]> {
+  const overflow = input.activeDevices.length - input.keepCount;
+  if (overflow <= 0) return [];
+
+  const sorted = [...input.activeDevices].sort((a, b) => {
+    const aT = Date.parse(String(a.last_seen_at || a.created_at || "")) || 0;
+    const bT = Date.parse(String(b.last_seen_at || b.created_at || "")) || 0;
+    return aT - bT;
+  });
+  const toRevoke = sorted.slice(0, overflow);
+  const now = new Date().toISOString();
+
+  for (const device of toRevoke) {
+    await input.client
+      .from("member_portal_devices")
+      .update({ revoked_at: now })
+      .eq("id", device.id)
+      .eq("member_uuid", input.memberUuid)
+      .is("revoked_at", null);
+
+    await input.client
+      .from("member_portal_sessions")
+      .update({ revoked_at: now })
+      .eq("member_uuid", input.memberUuid)
+      .eq("device_id", device.device_id)
+      .is("revoked_at", null);
+  }
+
+  return toRevoke;
 }
 
 function guessDeviceLabel(ua?: string) {

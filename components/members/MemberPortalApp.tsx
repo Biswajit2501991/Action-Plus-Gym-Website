@@ -1237,7 +1237,9 @@ export function MemberPortalApp() {
           {step === "devices" ? (
             <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
               <PortalBackButton onClick={() => setStep("home")} />
-              <p className="mt-4 text-sm text-muted">Up to 3 trusted devices. Remove unused ones anytime.</p>
+              <p className="mt-4 text-sm text-muted">
+                Up to 3 trusted devices. Signing in on a new phone automatically signs out the oldest one.
+              </p>
               <ul className="mt-4 space-y-3">
                 {devices.map((d) => (
                   <li
