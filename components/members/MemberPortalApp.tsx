@@ -21,6 +21,11 @@ import {
   readKnownDeviceProfile,
   writeKnownDeviceProfile,
 } from "@/lib/member-portal/known-device";
+import {
+  DEFAULT_PORTAL_SECTIONS,
+  homeTileKeyForStep,
+  type PortalSections,
+} from "@/lib/member-portal/portal-ui-config";
 
 const IDLE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -165,8 +170,16 @@ export function MemberPortalApp() {
   const [email, setEmail] = useState("");
   const [chatUnread, setChatUnread] = useState(false);
   const [knownDevice, setKnownDevice] = useState(false);
+  const [portalSections, setPortalSections] = useState<PortalSections>(
+    () => ({ ...DEFAULT_PORTAL_SECTIONS }),
+  );
 
   const [liveTick, setLiveTick] = useState(0);
+
+  const tileEnabled = useCallback(
+    (key: keyof PortalSections) => portalSections[key] !== false,
+    [portalSections],
+  );
 
   const rememberThisDevice = useCallback(
     (mobileValue: string, id: string, hasPin = true) => {
@@ -255,12 +268,23 @@ export function MemberPortalApp() {
 
   /** Soft refresh — updates member data without forcing navigation to home. */
   const refreshMember = useCallback(async () => {
-    const data = await api<{ ok: true; member: MemberMe }>("/api/member/me");
+    const data = await api<{
+      ok: true;
+      member: MemberMe;
+      portalSections?: PortalSections;
+    }>("/api/member/me");
     setMember((prev) => {
       const next = data.member;
       if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
       return next;
     });
+    if (data.portalSections) {
+      setPortalSections((prev) => {
+        const next = { ...DEFAULT_PORTAL_SECTIONS, ...data.portalSections };
+        if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+        return next;
+      });
+    }
     setLiveTick((t) => t + 1);
     return data.member;
   }, []);
@@ -445,6 +469,16 @@ export function MemberPortalApp() {
       window.clearInterval(id);
     };
   }, [member, refreshMember, step]);
+
+  // If staff hides a home tile, leave that screen quietly (data stays intact).
+  useEffect(() => {
+    if (!member) return;
+    const key = homeTileKeyForStep(step);
+    if (key && !tileEnabled(key)) {
+      setStep("home");
+      if (step === "card") setCard(null);
+    }
+  }, [member, step, tileEnabled]);
 
   function openWhatsAppLinks(webUrl: string, appUrl?: string) {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -1134,27 +1168,58 @@ export function MemberPortalApp() {
               </section>
 
               <div className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-3">
-                <NavTile icon={<User size={18} />} label="Profile" onClick={() => setStep("profile")} />
-                <NavTile icon={<QrCode size={18} />} label="QR Card" onClick={openCard} />
-                <NavTile icon={<Smartphone size={18} />} label="Devices" onClick={openDevices} />
-                <NavTile label="Payments" onClick={() => setStep("payments")} />
-                <NavTile label="Attendance" onClick={() => setStep("attendance")} />
-                <NavTile label="Alerts" onClick={() => setStep("notifications")} />
-                <NavTile
-                  label="Chat"
-                  badge={chatUnread}
-                  onClick={() => {
-                    setChatUnread(false);
-                    setStep("chat");
-                  }}
-                />
-                <NavTile label="Training" onClick={() => setStep("training")} />
-                {!/\bpt\b/i.test(String(member.planName || "")) ? (
+                {tileEnabled("homeProfile") ? (
+                  <NavTile
+                    icon={<User size={18} />}
+                    label="Profile"
+                    onClick={() => setStep("profile")}
+                  />
+                ) : null}
+                {tileEnabled("homeQrCard") ? (
+                  <NavTile icon={<QrCode size={18} />} label="QR Card" onClick={openCard} />
+                ) : null}
+                {tileEnabled("homeDevices") ? (
+                  <NavTile
+                    icon={<Smartphone size={18} />}
+                    label="Devices"
+                    onClick={openDevices}
+                  />
+                ) : null}
+                {tileEnabled("homePayments") ? (
+                  <NavTile label="Payments" onClick={() => setStep("payments")} />
+                ) : null}
+                {tileEnabled("homeAttendance") ? (
+                  <NavTile label="Attendance" onClick={() => setStep("attendance")} />
+                ) : null}
+                {tileEnabled("homeAlerts") ? (
+                  <NavTile label="Alerts" onClick={() => setStep("notifications")} />
+                ) : null}
+                {tileEnabled("homeChat") ? (
+                  <NavTile
+                    label="Chat"
+                    badge={chatUnread}
+                    onClick={() => {
+                      setChatUnread(false);
+                      setStep("chat");
+                    }}
+                  />
+                ) : null}
+                {tileEnabled("homeTraining") ? (
+                  <NavTile label="Training" onClick={() => setStep("training")} />
+                ) : null}
+                {tileEnabled("homeWeightTracker") &&
+                !/\bpt\b/i.test(String(member.planName || "")) ? (
                   <NavTile label="Weight Tracker" onClick={() => setStep("weight")} />
                 ) : null}
-                <NavTile label="Book" onClick={() => setStep("bookings")} />
-                <NavTile label="Perks" onClick={() => setStep("perks")} />
-                <NavTile label="Biometric" onClick={() => setStep("biometric")} />
+                {tileEnabled("homeBook") ? (
+                  <NavTile label="Book" onClick={() => setStep("bookings")} />
+                ) : null}
+                {tileEnabled("homePerks") ? (
+                  <NavTile label="Perks" onClick={() => setStep("perks")} />
+                ) : null}
+                {tileEnabled("homeBiometric") ? (
+                  <NavTile label="Biometric" onClick={() => setStep("biometric")} />
+                ) : null}
               </div>
 
               <p className="text-center text-xs text-muted">

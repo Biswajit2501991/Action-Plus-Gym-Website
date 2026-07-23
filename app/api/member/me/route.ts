@@ -8,6 +8,11 @@ import {
   branchLabel,
   safeMemberPayload,
 } from "@/lib/member-portal/members";
+import { portalGymId } from "@/lib/member-portal/config";
+import {
+  DEFAULT_PORTAL_SECTIONS,
+  normalizePortalSections,
+} from "@/lib/member-portal/portal-ui-config";
 
 export async function GET() {
   const session = await requireMemberSession();
@@ -20,7 +25,7 @@ export async function GET() {
 
   const member = session.member;
 
-  const [branch, photoUrl] = await Promise.all([
+  const [branch, photoUrl, portalSections] = await Promise.all([
     branchLabel(member.assigned_gym_code_id),
     (async (): Promise<string | null> => {
       const url: string | null = member.photo_url || null;
@@ -31,6 +36,18 @@ export async function GET() {
         .from("apg-media")
         .createSignedUrl(member.photo_path, 60 * 30);
       return data?.signedUrl || url;
+    })(),
+    (async () => {
+      const svc = createServiceRoleClient();
+      if (!svc.ok) return DEFAULT_PORTAL_SECTIONS;
+      const gymId = portalGymId();
+      if (!gymId) return DEFAULT_PORTAL_SECTIONS;
+      const { data } = await svc.client
+        .from("member_portal_settings")
+        .select("portal_sections")
+        .eq("gym_id", gymId)
+        .maybeSingle();
+      return normalizePortalSections(data?.portal_sections);
     })(),
   ]);
 
@@ -43,5 +60,6 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     member: safeMemberPayload(member, branch, photoUrl),
+    portalSections,
   });
 }

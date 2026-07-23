@@ -3,6 +3,20 @@
 export type BasicWorkoutOption = { label: string; visible: boolean };
 
 export type PortalSections = {
+  // Home tiles
+  homeProfile: boolean;
+  homeQrCard: boolean;
+  homeDevices: boolean;
+  homePayments: boolean;
+  homeAttendance: boolean;
+  homeAlerts: boolean;
+  homeChat: boolean;
+  homeTraining: boolean;
+  homeWeightTracker: boolean;
+  homeBook: boolean;
+  homePerks: boolean;
+  homeBiometric: boolean;
+  // Training internals
   basicDailyWorkouts: boolean;
   basicNotes: boolean;
   measurements: boolean;
@@ -24,7 +38,20 @@ export const DEFAULT_BASIC_WORKOUT_OPTIONS: BasicWorkoutOption[] = [
   { label: "Triceps", visible: true },
 ];
 
+/** Missing keys default on — existing DB rows stay fully visible until staff toggles. */
 export const DEFAULT_PORTAL_SECTIONS: PortalSections = {
+  homeProfile: true,
+  homeQrCard: true,
+  homeDevices: true,
+  homePayments: true,
+  homeAttendance: true,
+  homeAlerts: true,
+  homeChat: true,
+  homeTraining: true,
+  homeWeightTracker: true,
+  homeBook: true,
+  homePerks: true,
+  homeBiometric: true,
   basicDailyWorkouts: true,
   basicNotes: true,
   measurements: true,
@@ -83,4 +110,38 @@ export function visibleBasicWorkoutLabels(options: unknown): string[] {
   return normalizeBasicWorkoutOptions(options)
     .filter((o) => o.visible)
     .map((o) => o.label);
+}
+
+/** Map portal step → home tile section flag. */
+export function homeTileKeyForStep(
+  step: string,
+): keyof PortalSections | null {
+  switch (step) {
+    case "profile":
+      return "homeProfile";
+    case "card":
+      return "homeQrCard";
+    case "devices":
+      return "homeDevices";
+    case "payments":
+      return "homePayments";
+    case "attendance":
+      return "homeAttendance";
+    case "notifications":
+      return "homeAlerts";
+    case "chat":
+      return "homeChat";
+    case "training":
+      return "homeTraining";
+    case "weight":
+      return "homeWeightTracker";
+    case "bookings":
+      return "homeBook";
+    case "perks":
+      return "homePerks";
+    case "biometric":
+      return "homeBiometric";
+    default:
+      return null;
+  }
 }
