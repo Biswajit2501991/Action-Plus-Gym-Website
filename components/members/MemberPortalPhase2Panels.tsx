@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   startRegistration,
   startAuthentication,
@@ -18,8 +18,10 @@ import {
   writeCachedMessages,
 } from "@/lib/member-portal/chat-client";
 import {
+  peekTrainingCache,
   readAttendanceCache,
   readTrainingCache,
+  TRAINING_SOFT_TTL_MS,
   writeAttendanceCache,
   writeTrainingCache,
 } from "@/lib/member-portal/panel-cache";
@@ -180,10 +182,8 @@ export function AttendancePanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setRefreshing(true);
     try {
       const data = await api<{ ok: true; items: Attendance[] }>(
         `/api/member/attendance?month=${encodeURIComponent(month)}`,
@@ -192,15 +192,15 @@ export function AttendancePanel({
       setItems(next);
       writeAttendanceCache(memberUuid, month, next);
       setError(null);
-    } finally {
-      setRefreshing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Load failed");
     }
   }, [month, memberUuid]);
 
   useEffect(() => {
     const cached = readAttendanceCache<Attendance[]>(memberUuid, month);
     if (cached) setItems(cached);
-    load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
+    void load();
   }, [load, liveTick, memberUuid, month]);
 
   async function checkIn() {
@@ -234,9 +234,6 @@ export function AttendancePanel({
         Scan the gym QR (or paste claim token) to check in. Staff can also scan your member QR.
       </p>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
-      {refreshing && items.length ? (
-        <p className="mt-2 text-[10px] text-muted">Updating…</p>
-      ) : null}
       <div className="mt-4 space-y-2">
         <input
           className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white"
@@ -261,9 +258,7 @@ export function AttendancePanel({
           </li>
         ))}
         {!items.length ? (
-          <li className="text-sm text-muted">
-            {refreshing ? "Loading…" : "No check-ins yet."}
-          </li>
+          <li className="text-sm text-muted">No check-ins yet.</li>
         ) : null}
       </ul>
     </section>
@@ -547,10 +542,11 @@ type TrainingData = {
 export function TrainingPanel({
   onBack,
   memberUuid = "",
-  liveTick = 0,
+  liveTick: _liveTick = 0,
 }: {
   onBack: () => void;
   memberUuid?: string;
+  /** Kept for call-site compat; Training uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
 }) {
   const [data, setData] = useState<TrainingData | null>(() =>
@@ -568,7 +564,9 @@ export function TrainingPanel({
   const [ptNotesBusy, setPtNotesBusy] = useState(false);
   const [ptNotesMsg, setPtNotesMsg] = useState<string | null>(null);
   const [exercisesExpanded, setExercisesExpanded] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(() => !readTrainingCache(memberUuid));
+  const formHydratedDateRef = useRef<string | null>(null);
+  const ptHydratedDayRef = useRef<string | null>(null);
 
   const todayParts = useMemo(() => {
     const key = data?.today || new Date().toISOString().slice(0, 10);
@@ -594,53 +592,80 @@ export function TrainingPanel({
     (res: TrainingData) => {
       setData(res);
       writeTrainingCache(memberUuid, res);
-      const parts = parsePtDateKey(res.today);
-      if (parts) {
-        setViewYear(parts.year);
-        setViewMonthIndex(parts.monthIndex);
-        setSelectedDayKey((prev) => prev || res.today || null);
-      }
+      setSelectedDayKey((prev) => prev || res.today || null);
       setLogDate((prev) => prev || res.today || "");
       setError(null);
+      setInitialLoad(false);
     },
     [memberUuid],
   );
 
-  const reload = useCallback(async () => {
-    setRefreshing(true);
-    try {
+  const reload = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekTrainingCache<TrainingData>(memberUuid);
+        if (peek && peek.ageMs < TRAINING_SOFT_TTL_MS) {
+          // Keep UI on cache; skip redundant network while soft TTL holds.
+          return peek.data;
+        }
+      }
       const res = await api<TrainingData & { ok: true }>("/api/member/training");
       applyTraining(res);
       return res;
-    } finally {
-      setRefreshing(false);
-    }
-  }, [applyTraining]);
+    },
+    [applyTraining, memberUuid],
+  );
 
   useEffect(() => {
     let cancelled = false;
     const cached = readTrainingCache<TrainingData>(memberUuid);
     if (cached) applyTraining(cached);
-    reload().catch((e) => {
-      if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
-    });
+
+    const pull = (force: boolean) => {
+      void reload({ force }).catch((e) => {
+        if (!cancelled && !readTrainingCache(memberUuid)) {
+          setError(e instanceof Error ? e.message : "Load failed");
+          setInitialLoad(false);
+        }
+      });
+    };
+
+    // Always revalidate once when opening Training (cache paints instantly first).
+    pull(true);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [liveTick, reload, memberUuid, applyTraining]);
+    // liveTick intentionally omitted — soft TTL + visibility covers freshness without UI flicker.
+  }, [reload, memberUuid, applyTraining]);
 
+  // Hydrate Basic form only when the selected date changes (not on silent background refresh).
   useEffect(() => {
     if (!logDate || !data?.dailyByDate) return;
+    if (formHydratedDateRef.current === logDate) return;
+    formHydratedDateRef.current = logDate;
     const row = data.dailyByDate[logDate];
     setLogExercises(row?.exercises ? [...row.exercises] : []);
     setLogNotes(row?.notes || "");
   }, [logDate, data?.dailyByDate]);
 
+  // Hydrate PT notes only when the selected day changes.
   useEffect(() => {
     if (!selectedDayKey || !data?.dailyByDate) {
-      setPtNotes("");
+      if (!selectedDayKey) {
+        setPtNotes("");
+        ptHydratedDayRef.current = null;
+      }
       return;
     }
+    if (ptHydratedDayRef.current === selectedDayKey) return;
+    ptHydratedDayRef.current = selectedDayKey;
     setPtNotes(data.dailyByDate[selectedDayKey]?.notes || "");
     setPtNotesMsg(null);
   }, [selectedDayKey, data?.dailyByDate]);
@@ -726,7 +751,8 @@ export function TrainingPanel({
           ? "Workout saved for this day."
           : "Workout cleared for this day.",
       );
-      await reload();
+      formHydratedDateRef.current = null;
+      await reload({ force: true });
     } catch (e) {
       setLogMsg(e instanceof Error ? e.message : "Could not save");
     } finally {
@@ -750,7 +776,8 @@ export function TrainingPanel({
       setPtNotesMsg(
         ptNotes.trim() ? "Notes saved for this day." : "Notes cleared for this day.",
       );
-      await reload();
+      ptHydratedDayRef.current = null;
+      await reload({ force: true });
     } catch (e) {
       setPtNotesMsg(e instanceof Error ? e.message : "Could not save notes");
     } finally {
@@ -776,8 +803,8 @@ export function TrainingPanel({
             : " · Log your own workouts"}
         </p>
       ) : null}
-      {refreshing && data ? (
-        <p className="text-[10px] text-muted">Updating…</p>
+      {initialLoad && !data ? (
+        <p className="text-sm text-muted">Loading…</p>
       ) : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 

@@ -46,19 +46,35 @@ function writeStore<T>(key: string, data: T) {
   }
 }
 
-/** Max age to paint from cache (still always revalidates from API). */
+/** Max age to paint from cache (still revalidates from API in the background). */
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Skip network revalidation when cache is newer than this (ms).
+ * Keeps Training snappy across liveTick / tab focus without stale-forever data.
+ */
+export const TRAINING_SOFT_TTL_MS = 45_000;
 
 function isFresh(savedAt: number) {
   return Number.isFinite(savedAt) && Date.now() - savedAt < MAX_AGE_MS;
 }
 
-export function readTrainingCache<T>(memberUuid: string): T | null {
+export function peekTrainingCache<T>(
+  memberUuid: string,
+): { data: T; savedAt: number; ageMs: number } | null {
   const id = String(memberUuid || "").trim();
   if (!id) return null;
   const env = readStore<T>(`${TRAINING_PREFIX}${id}`);
   if (!env || !isFresh(env.savedAt)) return null;
-  return env.data;
+  return {
+    data: env.data,
+    savedAt: env.savedAt,
+    ageMs: Math.max(0, Date.now() - env.savedAt),
+  };
+}
+
+export function readTrainingCache<T>(memberUuid: string): T | null {
+  return peekTrainingCache<T>(memberUuid)?.data ?? null;
 }
 
 export function writeTrainingCache<T>(memberUuid: string, data: T) {
