@@ -327,6 +327,54 @@ export async function GET() {
     };
   }
 
+  // Portal PT calendar previously only used trainer focusByDate. Staff often
+  // schedule days via Gym Manager Workout (member_daily_workouts). Union those
+  // logged days into the calendar/count so members see the same PT days.
+  if (onPtPlan && portalSections.ptSchedule) {
+    const revealFocus = portalSections.ptWorkoutDetails;
+    for (const row of dailyRes.data || []) {
+      const key = String(row.workout_date || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+      const exercises = Array.isArray(row.exercises)
+        ? row.exercises.map(String).filter(Boolean)
+        : [];
+      if (!exercises.length) continue;
+      if (String(focusByDate[key] || "").trim()) continue;
+      focusByDate[key] = revealFocus
+        ? String(exercises[0] || "Workout").trim() || "Workout"
+        : "scheduled";
+    }
+
+    const scheduledDays = Object.values(focusByDate).filter((v) =>
+      Boolean(String(v || "").trim()),
+    ).length;
+    if (portalSections.ptAssignment && scheduledDays > 0) {
+      const hasGmPt = pt.some(
+        (row) => String(row?.source || "") === "pt_client_profiles",
+      );
+      if (hasGmPt) {
+        pt = pt.map((row) =>
+          String(row?.source || "") === "pt_client_profiles"
+            ? { ...row, scheduled_days: scheduledDays }
+            : row,
+        );
+      } else if (member?.id) {
+        pt = [
+          {
+            id: `gm-pt-${member.id}`,
+            trainer_name: "Assigned trainer",
+            plan_name: planNameLive || null,
+            scheduled_days: scheduledDays,
+            sessions_used: null,
+            sessions_total: null,
+            source: "pt_client_profiles",
+          },
+          ...pt,
+        ];
+      }
+    }
+  }
+
   const exerciseTypes = onPtPlan ? [] : basicExerciseTypes;
 
   return NextResponse.json({
@@ -456,7 +504,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Optional: only allow notes on days the trainer scheduled.
+    // Allow notes on trainer-scheduled days OR staff-logged workout days.
     let scheduled = false;
     if (memberLive?.id) {
       const { data: profileRow } = await svc.client
@@ -471,6 +519,19 @@ export async function POST(req: Request) {
           : ({} as PlanJson);
       const focus = String(planJson.focusByDate?.[workoutDate] || "").trim();
       scheduled = Boolean(focus);
+    }
+    if (!scheduled) {
+      const { data: loggedDay } = await svc.client
+        .from("member_daily_workouts")
+        .select("exercises")
+        .eq("gym_id", gymId)
+        .eq("member_uuid", uuid)
+        .eq("workout_date", workoutDate)
+        .maybeSingle();
+      const exercises = Array.isArray(loggedDay?.exercises)
+        ? loggedDay.exercises.map(String).filter(Boolean)
+        : [];
+      scheduled = exercises.length > 0;
     }
     if (!scheduled) {
       return NextResponse.json(

@@ -42,7 +42,11 @@ export async function GET() {
       rpName: "Action Plus Gym",
       rpID: webauthnRpID(),
       userName: session.member.member_code || session.member.mobile,
-      userDisplayName: session.member.full_name,
+      userDisplayName:
+        session.member.full_name ||
+        session.member.member_code ||
+        session.member.mobile ||
+        "Member",
       userID: new TextEncoder().encode(session.member.member_uuid),
       attestationType: "none",
       excludeCredentials: (existing || []).map((c) => ({
@@ -51,9 +55,10 @@ export async function GET() {
       authenticatorSelection: {
         // platform = Face ID / fingerprint / Android biometrics
         authenticatorAttachment: "platform",
-        residentKey: "preferred",
-        requireResidentKey: false,
-        userVerification: "preferred",
+        // Android Credential Manager expects discoverable passkeys.
+        residentKey: "required",
+        requireResidentKey: true,
+        userVerification: "required",
       },
       // Android Chrome + iOS Safari both handle ES256 / RS256
       supportedAlgorithmIDs: [-7, -257],

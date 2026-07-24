@@ -69,6 +69,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 function webAuthnErrorMessage(err: unknown) {
   if (!(err instanceof Error)) return "Biometric failed";
   const name = "name" in err ? String((err as DOMException).name || "") : "";
+  const message = String(err.message || "");
   if (name === "NotAllowedError") {
     return "Biometric was cancelled or not available. Unlock with Face ID / fingerprint and try again.";
   }
@@ -81,7 +82,14 @@ function webAuthnErrorMessage(err: unknown) {
   if (name === "SecurityError") {
     return "Biometric blocked for this site. Open https://actionplusgym.com and try again.";
   }
-  return err.message || "Biometric failed";
+  if (
+    name === "NotReadableError" ||
+    name === "UnknownError" ||
+    /credential manager/i.test(message)
+  ) {
+    return "Android could not open fingerprint / passkey storage. Use Chrome (not WhatsApp or Instagram browser), turn on screen lock + fingerprint, set Google Password Manager as preferred for passkeys, then tap Register biometric again.";
+  }
+  return message || "Biometric failed";
 }
 
 function formatDate(value: string | null | undefined) {
@@ -1564,7 +1572,9 @@ export function BiometricPanel({
       <h2 className="font-display text-2xl text-white">Face ID / fingerprint</h2>
       <p className="text-sm text-muted">
         Works on iPhone (Safari) and Android (Chrome) with screen lock biometrics.
-        Register while signed in, then use Login with biometric next time.
+        On Android open this site in Chrome (not WhatsApp/Instagram), keep fingerprint
+        unlocked, and prefer Google Password Manager for passkeys. Register while signed
+        in, then use Login with biometric next time.
       </p>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {status ? <p className="text-sm text-gold">{status}</p> : null}
