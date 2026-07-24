@@ -17,7 +17,7 @@ import {
 } from "@/lib/member-portal/webauthn";
 
 /** Start WebAuthn registration (logged-in member). */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await requireMemberSession();
     if (!session.ok) {
@@ -38,6 +38,12 @@ export async function GET() {
       .eq("gym_id", portalGymId())
       .eq("member_uuid", session.member.member_uuid);
 
+    const url = new URL(req.url);
+    // local (default): platform fingerprint via GMS FIDO2 — avoids Android Credential Manager failures.
+    // passkey: discoverable credential via Credential Manager (optional).
+    const mode = String(url.searchParams.get("mode") || "local").trim().toLowerCase();
+    const preferPasskey = mode === "passkey";
+
     const options = await generateRegistrationOptions({
       rpName: "Action Plus Gym",
       rpID: webauthnRpID(),
@@ -52,14 +58,21 @@ export async function GET() {
       excludeCredentials: (existing || []).map((c) => ({
         id: c.credential_id,
       })),
-      authenticatorSelection: {
-        // platform = Face ID / fingerprint / Android biometrics
-        authenticatorAttachment: "platform",
-        // Android Credential Manager expects discoverable passkeys.
-        residentKey: "required",
-        requireResidentKey: true,
-        userVerification: "required",
-      },
+      authenticatorSelection: preferPasskey
+        ? {
+            authenticatorAttachment: "platform",
+            residentKey: "required",
+            requireResidentKey: true,
+            userVerification: "required",
+          }
+        : {
+            // Local-only platform biometric. On Android Chrome this uses GMS FIDO2
+            // instead of Credential Manager (which often throws NotReadableError).
+            authenticatorAttachment: "platform",
+            residentKey: "discouraged",
+            requireResidentKey: false,
+            userVerification: "required",
+          },
       // Android Chrome + iOS Safari both handle ES256 / RS256
       supportedAlgorithmIDs: [-7, -257],
     });

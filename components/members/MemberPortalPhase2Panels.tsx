@@ -66,6 +66,17 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+function isCredentialManagerError(err: unknown) {
+  if (!(err instanceof Error)) return false;
+  const name = "name" in err ? String((err as DOMException).name || "") : "";
+  const message = String(err.message || "");
+  return (
+    name === "NotReadableError" ||
+    name === "UnknownError" ||
+    /credential manager/i.test(message)
+  );
+}
+
 function webAuthnErrorMessage(err: unknown) {
   if (!(err instanceof Error)) return "Biometric failed";
   const name = "name" in err ? String((err as DOMException).name || "") : "";
@@ -82,12 +93,8 @@ function webAuthnErrorMessage(err: unknown) {
   if (name === "SecurityError") {
     return "Biometric blocked for this site. Open https://actionplusgym.com and try again.";
   }
-  if (
-    name === "NotReadableError" ||
-    name === "UnknownError" ||
-    /credential manager/i.test(message)
-  ) {
-    return "Android could not open fingerprint / passkey storage. Use Chrome (not WhatsApp or Instagram browser), turn on screen lock + fingerprint, set Google Password Manager as preferred for passkeys, then tap Register biometric again.";
+  if (isCredentialManagerError(err)) {
+    return "Fingerprint setup failed on this Android phone. Open actionplusgym.com in Chrome (not WhatsApp), unlock screen lock + fingerprint, then try Register biometric again.";
   }
   return message || "Biometric failed";
 }
@@ -1516,9 +1523,11 @@ export function BiometricPanel({
           );
         }
       }
-      const opt = await api<{ ok: true; options: Parameters<typeof startRegistration>[0]["optionsJSON"] }>(
-        "/api/member/auth/webauthn/register",
-      );
+      // mode=local uses device fingerprint via GMS FIDO2 (not Android Credential Manager).
+      const opt = await api<{
+        ok: true;
+        options: Parameters<typeof startRegistration>[0]["optionsJSON"];
+      }>("/api/member/auth/webauthn/register?mode=local");
       const att = await startRegistration({ optionsJSON: opt.options });
       await api("/api/member/auth/webauthn/register", {
         method: "POST",
@@ -1572,9 +1581,8 @@ export function BiometricPanel({
       <h2 className="font-display text-2xl text-white">Face ID / fingerprint</h2>
       <p className="text-sm text-muted">
         Works on iPhone (Safari) and Android (Chrome) with screen lock biometrics.
-        On Android open this site in Chrome (not WhatsApp/Instagram), keep fingerprint
-        unlocked, and prefer Google Password Manager for passkeys. Register while signed
-        in, then use Login with biometric next time.
+        On Android use Chrome (not WhatsApp/Instagram). Register while signed in, then
+        use Login with biometric next time.
       </p>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {status ? <p className="text-sm text-gold">{status}</p> : null}
