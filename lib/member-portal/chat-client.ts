@@ -113,25 +113,58 @@ export function hasUnreadStaffChat(
   return latestMs > seenMs;
 }
 
-export function readCachedMessages(memberUuid: string): CachedChatMessage[] | null {
-  if (typeof window === "undefined" || !memberUuid) return null;
+const CHAT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/** Soft TTL for background chat poll while the panel is open. */
+export const CHAT_SOFT_TTL_MS = 8_000;
+
+type ChatEnvelope = { messages: CachedChatMessage[]; savedAt: number };
+
+function parseChatEnvelope(raw: string | null): ChatEnvelope | null {
+  if (!raw) return null;
   try {
-    const raw = sessionStorage.getItem(cacheKey(memberUuid));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { messages?: CachedChatMessage[] };
-    return Array.isArray(parsed.messages) ? parsed.messages : null;
+    const parsed = JSON.parse(raw) as ChatEnvelope;
+    if (!parsed || !Array.isArray(parsed.messages)) return null;
+    const savedAt = Number(parsed.savedAt) || 0;
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt >= CHAT_MAX_AGE_MS) return null;
+    return { messages: parsed.messages, savedAt };
   } catch {
     return null;
   }
 }
 
+export function peekCachedMessages(
+  memberUuid: string,
+): { messages: CachedChatMessage[]; savedAt: number; ageMs: number } | null {
+  if (typeof window === "undefined" || !memberUuid) return null;
+  try {
+    const key = cacheKey(memberUuid);
+    const fromSession = parseChatEnvelope(sessionStorage.getItem(key));
+    const env = fromSession || parseChatEnvelope(localStorage.getItem(key));
+    if (!env) return null;
+    return {
+      messages: env.messages,
+      savedAt: env.savedAt,
+      ageMs: Math.max(0, Date.now() - env.savedAt),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function readCachedMessages(memberUuid: string): CachedChatMessage[] | null {
+  return peekCachedMessages(memberUuid)?.messages ?? null;
+}
+
 export function writeCachedMessages(memberUuid: string, messages: CachedChatMessage[]) {
   if (typeof window === "undefined" || !memberUuid) return;
+  const payload = JSON.stringify({ messages, savedAt: Date.now() } satisfies ChatEnvelope);
   try {
-    sessionStorage.setItem(
-      cacheKey(memberUuid),
-      JSON.stringify({ messages, savedAt: Date.now() }),
-    );
+    sessionStorage.setItem(cacheKey(memberUuid), payload);
+  } catch {
+    /* ignore quota */
+  }
+  try {
+    localStorage.setItem(cacheKey(memberUuid), payload);
   } catch {
     /* ignore quota */
   }

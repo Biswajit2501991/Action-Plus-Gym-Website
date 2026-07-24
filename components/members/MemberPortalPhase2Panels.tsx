@@ -13,16 +13,25 @@ import {
   PT_WEEKDAYS,
 } from "@/lib/member-portal/pt-calendar";
 import {
+  CHAT_SOFT_TTL_MS,
   markChatSeen,
+  peekCachedMessages,
   readCachedMessages,
   writeCachedMessages,
 } from "@/lib/member-portal/chat-client";
 import {
+  PANEL_SOFT_TTL_MS,
+  peekPaymentsCache,
+  peekPerksCache,
   peekTrainingCache,
   readAttendanceCache,
+  readPaymentsCache,
+  readPerksCache,
   readTrainingCache,
   TRAINING_SOFT_TTL_MS,
   writeAttendanceCache,
+  writePaymentsCache,
+  writePerksCache,
   writeTrainingCache,
 } from "@/lib/member-portal/panel-cache";
 import { detectWebPushSupport } from "@/lib/member-portal/web-push-support";
@@ -112,34 +121,72 @@ function formatDate(value: string | null | undefined) {
 
 export function PaymentsPanel({
   onBack,
-  liveTick = 0,
+  memberUuid = "",
+  liveTick: _liveTick = 0,
 }: {
   onBack: () => void;
+  memberUuid?: string;
+  /** Kept for call-site compat; Payments uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
 }) {
-  const [items, setItems] = useState<Payment[]>([]);
+  const [items, setItems] = useState<Payment[]>(() => {
+    const cached = readPaymentsCache<Payment[]>(memberUuid);
+    return Array.isArray(cached) ? cached : [];
+  });
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(
+    () => !readPaymentsCache<Payment[]>(memberUuid),
+  );
+
+  const applyPayments = useCallback(
+    (next: Payment[]) => {
+      setItems(next);
+      writePaymentsCache(memberUuid, next);
+      setError(null);
+      setInitialLoad(false);
+    },
+    [memberUuid],
+  );
+
+  const reload = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekPaymentsCache<Payment[]>(memberUuid);
+        if (peek && peek.ageMs < PANEL_SOFT_TTL_MS) return peek.data;
+      }
+      const data = await api<{ ok: true; items: Payment[] }>("/api/member/payments");
+      const next = data.items || [];
+      applyPayments(next);
+      return next;
+    },
+    [applyPayments, memberUuid],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await api<{ ok: true; items: Payment[] }>("/api/member/payments");
-        if (!cancelled) {
-          setItems(data.items || []);
-          setError(null);
+    const cached = readPaymentsCache<Payment[]>(memberUuid);
+    if (cached) applyPayments(cached);
+
+    const pull = (force: boolean) => {
+      void reload({ force }).catch((e) => {
+        if (!cancelled && !readPaymentsCache(memberUuid)) {
+          setError(e instanceof Error ? e.message : "Could not load payments");
+          setInitialLoad(false);
         }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load payments");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+      });
+    };
+
+    pull(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [liveTick]);
+  }, [reload, memberUuid, applyPayments]);
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
@@ -147,7 +194,9 @@ export function PaymentsPanel({
       <h2 className="mt-3 font-display text-2xl text-white">Recent payments</h2>
       <p className="mt-1 text-sm text-muted">Last 3 payments from the gym ledger.</p>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="mt-4 text-sm text-muted">Loading…</p> : null}
+      {initialLoad && !items.length ? (
+        <p className="mt-4 text-sm text-muted">Loading…</p>
+      ) : null}
       <ul className="mt-4 space-y-3">
         {items.map((p) => (
           <li
@@ -170,7 +219,7 @@ export function PaymentsPanel({
             </a>
           </li>
         ))}
-        {!loading && !items.length ? (
+        {!initialLoad && !items.length ? (
           <li className="text-sm text-muted">No payments yet.</li>
         ) : null}
       </ul>
@@ -421,54 +470,95 @@ export function ChatPanel({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(
+    () => !(memberUuid && readCachedMessages(memberUuid)?.length),
+  );
 
-  const load = useCallback(async () => {
-    const data = await api<{
-      ok: true;
-      messages: Array<{
-        id: string;
-        sender: string;
-        body: string;
-        staff_name?: string;
-        created_at: string;
-      }>;
-      retentionDays?: number;
-      memberUuid?: string;
-    }>("/api/member/chat");
-    const next = data.messages || [];
-    setMessages(next);
-    const uuid = data.memberUuid || memberUuid;
-    if (uuid) {
-      writeCachedMessages(uuid, next);
-      const latestStaff = [...next].reverse().find((m) => m.sender === "staff");
-      const latestAny = next.length ? next[next.length - 1] : null;
-      const watermarkMs = Math.max(
-        Date.now(),
-        latestAny ? Date.parse(String(latestAny.created_at).replace(" ", "T")) || 0 : 0,
-        latestStaff
-          ? Date.parse(String(latestStaff.created_at).replace(" ", "T")) || 0
-          : 0,
-      );
-      markChatSeen(uuid, watermarkMs, latestStaff?.id || null);
-      onSeen?.();
-    }
-    if (typeof data.retentionDays === "number" && data.retentionDays > 0) {
-      setRetentionDays(data.retentionDays);
-    }
-  }, [memberUuid, onSeen]);
+  const load = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      const uuid = String(memberUuid || "").trim();
+      if (!force && uuid) {
+        const peek = peekCachedMessages(uuid);
+        if (peek && peek.ageMs < CHAT_SOFT_TTL_MS) {
+          setMessages(peek.messages);
+          setInitialLoad(false);
+          return peek.messages;
+        }
+      }
+      const data = await api<{
+        ok: true;
+        messages: Array<{
+          id: string;
+          sender: string;
+          body: string;
+          staff_name?: string;
+          created_at: string;
+        }>;
+        retentionDays?: number;
+        memberUuid?: string;
+      }>("/api/member/chat");
+      const next = data.messages || [];
+      setMessages(next);
+      setInitialLoad(false);
+      setError(null);
+      const resolvedUuid = data.memberUuid || memberUuid;
+      if (resolvedUuid) {
+        writeCachedMessages(resolvedUuid, next);
+        const latestStaff = [...next].reverse().find((m) => m.sender === "staff");
+        const latestAny = next.length ? next[next.length - 1] : null;
+        const watermarkMs = Math.max(
+          Date.now(),
+          latestAny ? Date.parse(String(latestAny.created_at).replace(" ", "T")) || 0 : 0,
+          latestStaff
+            ? Date.parse(String(latestStaff.created_at).replace(" ", "T")) || 0
+            : 0,
+        );
+        markChatSeen(resolvedUuid, watermarkMs, latestStaff?.id || null);
+        onSeen?.();
+      }
+      if (typeof data.retentionDays === "number" && data.retentionDays > 0) {
+        setRetentionDays(data.retentionDays);
+      }
+      return next;
+    },
+    [memberUuid, onSeen],
+  );
 
   useEffect(() => {
+    let cancelled = false;
     if (memberUuid) {
       const cached = readCachedMessages(memberUuid);
-      if (cached?.length) setMessages(cached);
+      if (cached?.length) {
+        setMessages(cached);
+        setInitialLoad(false);
+      }
     }
-    load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
+
+    const pull = (force: boolean) => {
+      void load({ force }).catch((e) => {
+        if (!cancelled && !(memberUuid && readCachedMessages(memberUuid)?.length)) {
+          setError(e instanceof Error ? e.message : "Load failed");
+          setInitialLoad(false);
+        }
+      });
+    };
+
+    pull(true);
     const tick = () => {
       if (document.visibilityState === "hidden") return;
-      void load().catch(() => null);
+      pull(false);
     };
-    const id = window.setInterval(tick, 8000);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(tick, CHAT_SOFT_TTL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load, memberUuid]);
 
   async function send() {
@@ -481,7 +571,7 @@ export function ChatPanel({
         body: JSON.stringify({ body: text.trim() }),
       });
       setText("");
-      await load();
+      await load({ force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send failed");
     } finally {
@@ -512,7 +602,12 @@ export function ChatPanel({
             </p>
           </div>
         ))}
-        {!messages.length ? <p className="text-sm text-muted">Say hello to the gym team.</p> : null}
+        {initialLoad && !messages.length ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : null}
+        {!initialLoad && !messages.length ? (
+          <p className="text-sm text-muted">Say hello to the gym team.</p>
+        ) : null}
       </div>
       <div className="mt-3 flex gap-2">
         <input
@@ -1344,50 +1439,84 @@ export function BookingsPanel({
   );
 }
 
+type PerksData = {
+  locker: { locker_code: string; status: string } | null;
+  referral: {
+    code: string;
+    points: number;
+    lifetimePoints?: number;
+    pendingCreditInr?: number;
+  } | null;
+};
+
 export function PerksPanel({
   onBack,
-  liveTick = 0,
+  memberUuid = "",
+  liveTick: _liveTick = 0,
 }: {
   onBack: () => void;
+  memberUuid?: string;
+  /** Kept for call-site compat; Perks uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
 }) {
-  const [data, setData] = useState<{
-    locker: { locker_code: string; status: string } | null;
-    referral: {
-      code: string;
-      points: number;
-      lifetimePoints?: number;
-      pendingCreditInr?: number;
-    } | null;
-  } | null>(null);
+  const [data, setData] = useState<PerksData | null>(() =>
+    readPerksCache<PerksData>(memberUuid),
+  );
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [initialLoad, setInitialLoad] = useState(() => !readPerksCache(memberUuid));
+
+  const applyPerks = useCallback(
+    (res: PerksData) => {
+      setData(res);
+      writePerksCache(memberUuid, res);
+      setError(null);
+      setInitialLoad(false);
+    },
+    [memberUuid],
+  );
+
+  const reload = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekPerksCache<PerksData>(memberUuid);
+        if (peek && peek.ageMs < PANEL_SOFT_TTL_MS) return peek.data;
+      }
+      const res = await api<PerksData & { ok: true }>("/api/member/perks");
+      applyPerks({
+        locker: res.locker || null,
+        referral: res.referral || null,
+      });
+      return res;
+    },
+    [applyPerks, memberUuid],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    api<{
-      ok: true;
-      locker: { locker_code: string; status: string } | null;
-      referral: {
-        code: string;
-        points: number;
-        lifetimePoints?: number;
-        pendingCreditInr?: number;
-      } | null;
-    }>("/api/member/perks")
-      .then((res) => {
-        if (!cancelled) {
-          setData(res);
-          setError(null);
+    const cached = readPerksCache<PerksData>(memberUuid);
+    if (cached) applyPerks(cached);
+
+    const pull = (force: boolean) => {
+      void reload({ force }).catch((e) => {
+        if (!cancelled && !readPerksCache(memberUuid)) {
+          setError(e instanceof Error ? e.message : "Load failed");
+          setInitialLoad(false);
         }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Load failed");
       });
+    };
+
+    pull(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [liveTick]);
+  }, [reload, memberUuid, applyPerks]);
 
   async function requestLocker() {
     try {
@@ -1396,6 +1525,7 @@ export function PerksPanel({
         body: JSON.stringify({ note: "Please assign a locker" }),
       });
       setMsg(res.message || "Request sent.");
+      await reload({ force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     }
@@ -1439,13 +1569,14 @@ export function PerksPanel({
       <h2 className="font-display text-2xl text-white">Lockers & referrals</h2>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {msg ? <p className="text-sm text-gold">{msg}</p> : null}
+      {initialLoad && !data ? <p className="text-sm text-muted">Loading…</p> : null}
       <div>
         <p className="text-xs uppercase tracking-wide text-muted">Locker</p>
         {data?.locker ? (
           <p className="mt-1 text-white">
             {data.locker.locker_code} · {data.locker.status}
           </p>
-        ) : (
+        ) : !initialLoad ? (
           <button
             type="button"
             onClick={() => void requestLocker()}
@@ -1453,7 +1584,7 @@ export function PerksPanel({
           >
             Request locker
           </button>
-        )}
+        ) : null}
       </div>
       <div>
         <p className="text-xs uppercase tracking-wide text-muted">Your referral code</p>

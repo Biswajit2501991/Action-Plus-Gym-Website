@@ -1339,7 +1339,11 @@ export function MemberPortalApp() {
           ) : null}
 
           {step === "payments" ? (
-            <PaymentsPanel onBack={() => setStep("home")} liveTick={liveTick} />
+            <PaymentsPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+              liveTick={liveTick}
+            />
           ) : null}
           {step === "attendance" ? (
             <AttendancePanel
@@ -1373,7 +1377,11 @@ export function MemberPortalApp() {
             <BookingsPanel onBack={() => setStep("home")} liveTick={liveTick} />
           ) : null}
           {step === "perks" ? (
-            <PerksPanel onBack={() => setStep("home")} liveTick={liveTick} />
+            <PerksPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+              liveTick={liveTick}
+            />
           ) : null}
           {step === "biometric" ? (
             <BiometricPanel
