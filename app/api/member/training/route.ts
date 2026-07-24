@@ -504,44 +504,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Allow notes on trainer-scheduled days OR staff-logged workout days.
-    let scheduled = false;
-    if (memberLive?.id) {
-      const { data: profileRow } = await svc.client
-        .from("pt_client_profiles")
-        .select("plan_json")
-        .eq("gym_id", gymId)
-        .eq("member_id", memberLive.id)
-        .maybeSingle();
-      const planJson =
-        profileRow?.plan_json && typeof profileRow.plan_json === "object"
-          ? (profileRow.plan_json as PlanJson)
-          : ({} as PlanJson);
-      const focus = String(planJson.focusByDate?.[workoutDate] || "").trim();
-      scheduled = Boolean(focus);
-    }
-    if (!scheduled) {
-      const { data: loggedDay } = await svc.client
-        .from("member_daily_workouts")
-        .select("exercises")
-        .eq("gym_id", gymId)
-        .eq("member_uuid", uuid)
-        .eq("workout_date", workoutDate)
-        .maybeSingle();
-      const exercises = Array.isArray(loggedDay?.exercises)
-        ? loggedDay.exercises.map(String).filter(Boolean)
-        : [];
-      scheduled = exercises.length > 0;
-    }
-    if (!scheduled) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Notes can only be added on days scheduled with your PT.",
-        },
-        { status: 403 },
-      );
-    }
+    // PT clients may add notes on any calendar day (PT or open).
+    // Staff-logged exercises are preserved; portal never sets exercise chips.
 
     // PT clients: notes only — preserve any staff-logged exercises; never set chips from portal.
     const { data: existingRow } = await svc.client

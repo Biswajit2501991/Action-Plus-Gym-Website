@@ -793,13 +793,22 @@ export function TrainingPanel({
     return map;
   }, [data?.dailyByDate]);
 
+  const notesByDate = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [k, v] of Object.entries(data?.dailyByDate || {})) {
+      const note = String(v?.notes || "").trim();
+      if (note) map[k] = note;
+    }
+    return map;
+  }, [data?.dailyByDate]);
+
   const monthCells = useMemo(
-    () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, focusByDate),
-    [viewYear, viewMonthIndex, focusByDate],
+    () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, focusByDate, notesByDate),
+    [viewYear, viewMonthIndex, focusByDate, notesByDate],
   );
   const dailyMonthCells = useMemo(
-    () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, dailyFocusMap),
-    [viewYear, viewMonthIndex, dailyFocusMap],
+    () => buildPtMonthCalendarCells(viewYear, viewMonthIndex, dailyFocusMap, notesByDate),
+    [viewYear, viewMonthIndex, dailyFocusMap, notesByDate],
   );
   const ptDaysThisMonth = monthCells.filter(
     (c) => c.kind === "day" && !c.isSunday && c.hasFocus,
@@ -808,6 +817,10 @@ export function TrainingPanel({
     selectedDayKey && focusByDate[selectedDayKey]
       ? Boolean(String(focusByDate[selectedDayKey]).trim())
       : false;
+  const selectedHasNoteOnly =
+    Boolean(selectedDayKey) &&
+    !selectedIsScheduled &&
+    Boolean(String(notesByDate[selectedDayKey || ""] || "").trim());
   const selectedFocus =
     showPtWorkoutDetails && selectedDayKey && focusByDate[selectedDayKey]
       ? String(focusByDate[selectedDayKey])
@@ -871,7 +884,7 @@ export function TrainingPanel({
   }
 
   async function savePtDayNotes() {
-    if (!selectedDayKey || !canEditPtNotes || !selectedIsScheduled) return;
+    if (!selectedDayKey || !canEditPtNotes) return;
     setPtNotesBusy(true);
     setPtNotesMsg(null);
     try {
@@ -1216,9 +1229,9 @@ export function TrainingPanel({
               </p>
             </div>
             <p className="text-[11px] text-muted">
-              Green = day with your PT · Rose = open.
+              Green = PT · Amber = NT (notes, no PT) · Rose = open.
               {canEditPtNotes
-                ? " Tap a scheduled day to add + Notes."
+                ? " Tap any day to add + Notes."
                 : " Tap a day to select it."}
             </p>
             <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] text-muted sm:gap-2 sm:text-xs">
@@ -1243,35 +1256,47 @@ export function TrainingPanel({
                     onClick={() => setSelectedDayKey(entry.key)}
                     className={[
                       "min-h-11 touch-manipulation rounded-lg border px-1 py-1.5 text-[10px] sm:min-h-12 sm:text-xs",
-                      entry.isSunday
+                      entry.isSunday && entry.mark == null
                         ? "border-white/10 bg-white/5 text-muted"
-                        : entry.hasFocus
+                        : entry.mark === "pt"
                           ? "border-emerald-400/50 bg-emerald-950/40 text-emerald-200"
-                          : "border-rose-400/40 bg-rose-950/35 text-rose-200",
+                          : entry.mark === "nt"
+                            ? "border-amber-400/50 bg-amber-950/40 text-amber-100"
+                            : "border-rose-400/40 bg-rose-950/35 text-rose-200",
                       selectedDayKey === entry.key ? "ring-2 ring-sky-400" : "",
                     ].join(" ")}
                     title={
-                      entry.hasFocus
+                      entry.mark === "pt"
                         ? showPtWorkoutDetails && entry.focus && entry.focus !== "scheduled"
                           ? `${entry.key}: ${entry.focus}`
                           : `${entry.key}: PT day`
-                        : `${entry.key}: Open`
+                        : entry.mark === "nt"
+                          ? `${entry.key}: Notes (no PT)`
+                          : `${entry.key}: Open`
                     }
                   >
                     <div className="font-semibold">{entry.day}</div>
                     {showPtWorkoutDetails ? (
                       <div className="mt-0.5 truncate">
-                        {entry.focus && entry.focus !== "scheduled"
+                        {entry.mark === "pt" && entry.focus && entry.focus !== "scheduled"
                           ? entry.focus
-                          : entry.isSunday
-                            ? "Sun"
-                            : entry.hasFocus
-                              ? "PT"
-                              : "—"}
+                          : entry.mark === "pt"
+                            ? "PT"
+                            : entry.mark === "nt"
+                              ? "NT"
+                              : entry.isSunday
+                                ? "Sun"
+                                : "—"}
                       </div>
                     ) : (
                       <div className="mt-0.5 truncate">
-                        {entry.hasFocus ? "PT" : entry.isSunday ? "Sun" : "—"}
+                        {entry.mark === "pt"
+                          ? "PT"
+                          : entry.mark === "nt"
+                            ? "NT"
+                            : entry.isSunday
+                              ? "Sun"
+                              : "—"}
                       </div>
                     )}
                   </button>
@@ -1287,9 +1312,11 @@ export function TrainingPanel({
                     ? showPtWorkoutDetails && selectedFocus && selectedFocus !== "scheduled"
                       ? selectedFocus
                       : "Scheduled with your PT"
-                    : "No PT session this day"}
+                    : selectedHasNoteOnly
+                      ? "Notes day (no PT)"
+                      : "No PT session this day"}
                 </p>
-                {canEditPtNotes && selectedIsScheduled ? (
+                {canEditPtNotes ? (
                   <div className="space-y-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
                       + Notes
@@ -1299,7 +1326,11 @@ export function TrainingPanel({
                       className="box-border block w-full min-w-0 max-w-full resize-none rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-gold/40 sm:text-sm"
                       value={ptNotes}
                       onChange={(e) => setPtNotes(e.target.value)}
-                      placeholder="Your notes for this PT day…"
+                      placeholder={
+                        selectedIsScheduled
+                          ? "Your notes for this PT day…"
+                          : "Add a note for this day (shows as NT if no PT)…"
+                      }
                       disabled={ptNotesBusy}
                     />
                     <button
