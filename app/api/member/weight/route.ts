@@ -6,6 +6,7 @@ import {
   isPortalAllowedMembershipStatus,
   portalGymId,
 } from "@/lib/member-portal/config";
+import { loadPortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
 
 function isPtPlanName(planName: string | null | undefined) {
   return /\bpt\b/i.test(String(planName || "").trim());
@@ -162,7 +163,8 @@ export async function POST(req: Request) {
     }
 
     const status = String(member?.status || "").trim().toLowerCase();
-    if (!isPortalAllowedMembershipStatus(status)) {
+    const accessByStatus = await loadPortalAccessByStatus();
+    if (!isPortalAllowedMembershipStatus(status, accessByStatus)) {
       return NextResponse.json(
         {
           ok: false,

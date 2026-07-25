@@ -4,6 +4,10 @@ import {
   isPortalAllowedMembershipStatus,
   portalGymId,
 } from "@/lib/member-portal/config";
+import {
+  loadPortalAccessByStatus,
+  type PortalAccessByStatus,
+} from "@/lib/member-portal/portal-access-by-status";
 import { mobileMatchVariants, normalizeMobile } from "@/lib/member-portal/phone";
 import type { MemberRow } from "@/lib/member-portal/session";
 import { randomToken } from "@/lib/member-portal/crypto";
@@ -114,9 +118,10 @@ export async function findMembersByMobile(
   return listMembersByMobile(mobileInput);
 }
 
-export function assertPortalEligible(
+export async function assertPortalEligible(
   member: MemberRow,
-): { ok: true } | { ok: false; error: string; status: number } {
+  accessByStatus?: PortalAccessByStatus | null,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   if (member.portal_status === "disabled" || member.portal_enabled === false) {
     return {
       ok: false,
@@ -124,7 +129,8 @@ export function assertPortalEligible(
       status: 403,
     };
   }
-  if (!isPortalAllowedMembershipStatus(member.status)) {
+  const map = accessByStatus ?? (await loadPortalAccessByStatus());
+  if (!isPortalAllowedMembershipStatus(member.status, map)) {
     return {
       ok: false,
       error: PORTAL_MEMBERSHIP_STATUS_ERROR,

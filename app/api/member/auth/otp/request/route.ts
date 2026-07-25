@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const eligible = assertPortalEligible(found.member);
+    const eligible = await assertPortalEligible(found.member);
     if (!eligible.ok) {
       return NextResponse.json(
         { ok: false, error: eligible.error },

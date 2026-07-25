@@ -158,7 +158,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "member-not-found" }, { status: 404 });
     }
 
-    const eligible = assertPortalEligible(member);
+    const eligible = await assertPortalEligible(member);
     if (!eligible.ok) {
       return NextResponse.json(
         { ok: false, error: eligible.error },

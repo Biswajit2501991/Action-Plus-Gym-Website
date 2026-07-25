@@ -6,6 +6,7 @@ import {
   isPortalAllowedMembershipStatus,
   portalGymId,
 } from "@/lib/member-portal/config";
+import { loadPortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
 import { normalizeMobile } from "@/lib/member-portal/phone";
 
 const querySchema = z.object({
@@ -78,8 +79,9 @@ export async function GET(req: NextRequest) {
 
     const status = String(member.status || "").trim().toLowerCase();
     const portalStatus = String(member.portal_status || "").trim().toLowerCase();
+    const accessByStatus = await loadPortalAccessByStatus();
     if (
-      !isPortalAllowedMembershipStatus(status) ||
+      !isPortalAllowedMembershipStatus(status, accessByStatus) ||
       portalStatus === "disabled" ||
       portalStatus === "revoked" ||
       member.portal_enabled === false

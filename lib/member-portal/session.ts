@@ -16,6 +16,10 @@ import {
 } from "@/lib/member-portal/config";
 import { randomToken, sha256 } from "@/lib/member-portal/crypto";
 import { signMemberAccess, verifyMemberAccess } from "@/lib/member-portal/jwt";
+import {
+  loadPortalAccessByStatus,
+  type PortalAccessByStatus,
+} from "@/lib/member-portal/portal-access-by-status";
 
 export type MemberRow = {
   id: number;
@@ -113,11 +117,12 @@ export async function clearAuthCookies() {
 
 /**
  * Shared gate for issued sessions / API access.
- * Never clears PIN — only blocks while status is not Active/Hold.
+ * Never clears PIN — blocks when status is not allowed by gym portal_access_by_status.
  */
-function evaluatePortalMemberAccess(
+async function evaluatePortalMemberAccess(
   member: MemberRow | null | undefined,
-): { ok: true; member: MemberRow } | { ok: false; error: string; status: number } {
+  accessByStatus?: PortalAccessByStatus | null,
+): Promise<{ ok: true; member: MemberRow } | { ok: false; error: string; status: number }> {
   if (!member) {
     return { ok: false, error: "Unauthorized", status: 401 };
   }
@@ -131,7 +136,8 @@ function evaluatePortalMemberAccess(
       status: 401,
     };
   }
-  if (!isPortalAllowedMembershipStatus(member.status)) {
+  const map = accessByStatus ?? (await loadPortalAccessByStatus());
+  if (!isPortalAllowedMembershipStatus(member.status, map)) {
     return {
       ok: false,
       error: PORTAL_MEMBERSHIP_STATUS_ERROR,
@@ -462,14 +468,17 @@ export async function requireMemberSession(): Promise<
       status: 401,
     };
   }
-  if (!isPortalAllowedMembershipStatus(member.status)) {
-    // Kick out immediately when status leaves Active/Hold. PIN is left intact.
-    await revokeSessionAndClearCookies(svc.client, session.id);
-    return {
-      ok: false,
-      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
-      status: 403,
-    };
+  {
+    const map = await loadPortalAccessByStatus();
+    if (!isPortalAllowedMembershipStatus(member.status, map)) {
+      // Kick out when status is no longer allowed. PIN is left intact.
+      await revokeSessionAndClearCookies(svc.client, session.id);
+      return {
+        ok: false,
+        error: PORTAL_MEMBERSHIP_STATUS_ERROR,
+        status: 403,
+      };
+    }
   }
 
   return { ok: true, claims, member: member as MemberRow };
@@ -495,7 +504,7 @@ async function requireMemberSessionAfterRefresh() {
     .maybeSingle();
 
   if (!member) return { ok: false as const, error: "Unauthorized", status: 401 };
-  const eligibility = evaluatePortalMemberAccess(member as MemberRow);
+  const eligibility = await evaluatePortalMemberAccess(member as MemberRow);
   if (!eligibility.ok) {
     await revokeSessionAndClearCookies(svc.client, claims.sid);
     return { ok: false as const, error: eligibility.error, status: eligibility.status };
@@ -570,13 +579,16 @@ async function refreshFromCookies(): Promise<
       status: 401,
     };
   }
-  if (!isPortalAllowedMembershipStatus(member.status)) {
-    await revokeSessionAndClearCookies(svc.client, session.id);
-    return {
-      ok: false,
-      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
-      status: 403,
-    };
+  {
+    const map = await loadPortalAccessByStatus();
+    if (!isPortalAllowedMembershipStatus(member.status, map)) {
+      await revokeSessionAndClearCookies(svc.client, session.id);
+      return {
+        ok: false,
+        error: PORTAL_MEMBERSHIP_STATUS_ERROR,
+        status: 403,
+      };
+    }
   }
 
   const newRefresh = randomToken(32);

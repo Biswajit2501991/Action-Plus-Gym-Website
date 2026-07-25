@@ -134,7 +134,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Prefer eligible Active/Hold among identity matches
-    const eligibleMatches = matched.filter((m) => assertPortalEligible(m).ok);
+    const eligibilityFlags = await Promise.all(matched.map((m) => assertPortalEligible(m)));
+    const eligibleMatches = matched.filter((_, i) => eligibilityFlags[i]?.ok);
     const member =
       eligibleMatches.find(
         (m) => String(m.status || "").trim().toLowerCase() === "active",
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const eligible = assertPortalEligible(member);
+    const eligible = await assertPortalEligible(member);
     if (!eligible.ok) {
       return NextResponse.json(
         { ok: false, error: eligible.error },
