@@ -322,7 +322,7 @@ function ReceiptView({
             </dl>
 
             {gym && (gym.address || gym.phoneDisplay || gym.whatsappDisplay || gym.email) ? (
-              <div className="mx-5 mb-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-xs leading-relaxed text-muted">
+              <div className="mx-5 mb-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-xs leading-relaxed text-muted">
                 <p className="mb-1.5 text-sm font-semibold text-white">
                   {gym.siteName || "Action Plus Gym"}
                 </p>
@@ -332,6 +332,16 @@ function ReceiptView({
                 {gym.email ? <p>Email: {gym.email}</p> : null}
               </div>
             ) : null}
+
+            <p className="mx-5 mb-5 text-left text-[11px] leading-relaxed text-muted">
+              This receipt is an automated copy of a payment recorded in{" "}
+              {gym?.siteName || "Action Plus Gym"}’s system. It does not create any
+              extra rights beyond the payment shown. Any altered, incomplete, or
+              falsely claimed use of this receipt is unauthorised.{" "}
+              {gym?.siteName || "Action Plus Gym"} accepts no liability for disputes
+              arising from misuse of a shared or downloaded copy. Only the gym’s
+              official payment records shall be relied upon.
+            </p>
           </div>
 
           <div className="mt-4 space-y-2">

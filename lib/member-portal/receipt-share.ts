@@ -505,10 +505,10 @@ export function renderReceiptHtml(input: {
     .contact a { color: var(--gold); text-decoration: none; }
     .footer {
       padding: 0 24px 24px;
-      text-align: center;
-      font-size: 12px;
+      text-align: left;
+      font-size: 11px;
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.55;
     }
     @media print {
       body {
@@ -595,8 +595,7 @@ export function renderReceiptHtml(input: {
       ${contactBlock}
 
       <p class="footer">
-        Official payment receipt from ${esc(r.gym.siteName || "Action Plus Gym")}.<br />
-        Contact the gym for any corrections.
+        This receipt is an automated copy of a payment recorded in ${esc(r.gym.siteName || "Action Plus Gym")}’s system. It does not create any extra rights beyond the payment shown. Any altered, incomplete, or falsely claimed use of this receipt is unauthorised. ${esc(r.gym.siteName || "Action Plus Gym")} accepts no liability for disputes arising from misuse of a shared or downloaded copy. Only the gym’s official payment records shall be relied upon.
       </p>
     </article>
   </div>
