@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { branchLabel } from "@/lib/member-portal/members";
 import {
+  buildReceiptQrDataUrl,
   buildReceiptShareText,
   formatMembershipPeriod,
   formatReceiptAmount,
   formatReceiptPaidAt,
   loadGymContact,
+  receiptFingerprint,
   renderReceiptHtml,
   verifyReceiptShare,
   type ReceiptViewModel,
@@ -116,6 +118,13 @@ export async function GET(
   const branchName = String(branch || "").trim() || "—";
 
   const shareUrl = `${siteOrigin(req)}/r/${encodeURIComponent(token)}`;
+  const fingerprint = receiptFingerprint({
+    gymId: claims.gid,
+    memberId: claims.mid,
+    paymentId: receiptId,
+  });
+  const qrDataUrl = await buildReceiptQrDataUrl(shareUrl);
+
   const base: Omit<ReceiptViewModel, "shareText" | "shareUrl"> = {
     receiptId,
     memberName,
@@ -129,6 +138,8 @@ export async function GET(
     note,
     amount,
     amountDisplay,
+    fingerprint,
+    qrDataUrl,
     gym,
   };
   const receipt: ReceiptViewModel = {

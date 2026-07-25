@@ -4,11 +4,13 @@ import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
 import { branchLabel } from "@/lib/member-portal/members";
 import {
+  buildReceiptQrDataUrl,
   buildReceiptShareText,
   formatMembershipPeriod,
   formatReceiptAmount,
   formatReceiptPaidAt,
   loadGymContact,
+  receiptFingerprint,
   renderReceiptHtml,
   signReceiptShare,
   type ReceiptViewModel,
@@ -106,6 +108,12 @@ export async function GET(
     paymentId: receiptId,
   });
   const shareUrl = `${siteOrigin(req)}/r/${encodeURIComponent(token)}`;
+  const fingerprint = receiptFingerprint({
+    gymId: portalGymId(),
+    memberId: session.member.id,
+    paymentId: receiptId,
+  });
+  const qrDataUrl = await buildReceiptQrDataUrl(shareUrl);
 
   const base: Omit<ReceiptViewModel, "shareText" | "shareUrl"> = {
     receiptId,
@@ -120,6 +128,8 @@ export async function GET(
     note,
     amount,
     amountDisplay,
+    fingerprint,
+    qrDataUrl,
     gym,
   };
   const receipt: ReceiptViewModel = {

@@ -132,6 +132,10 @@ export type ReceiptViewModel = {
   note: string;
   amount: string;
   amountDisplay: string;
+  /** Stable staff/member verification code, e.g. APG-7F2C-991A. */
+  fingerprint: string;
+  /** PNG data URL for verification QR (points at shareUrl). */
+  qrDataUrl?: string;
   gym: ReceiptGymContact;
   shareText: string;
   shareUrl?: string;
@@ -238,15 +242,49 @@ export async function loadGymContact(
   }
 }
 
-export function buildReceiptShareText(r: Omit<ReceiptViewModel, "shareText" | "shareUrl">) {
+/**
+ * Deterministic receipt fingerprint from payment identity (no DB writes).
+ * Staff can ask for this code and match it to the payment in gym records.
+ */
+export function receiptFingerprint(input: {
+  gymId: string;
+  memberId: number;
+  paymentId: string;
+}): string {
+  const digest = createHmac("sha256", memberJwtSecret())
+    .update(
+      `receipt-fp:v1:${String(input.gymId)}:${Number(input.memberId)}:${String(input.paymentId)}`,
+    )
+    .digest("hex")
+    .toUpperCase();
+  return `APG-${digest.slice(0, 4)}-${digest.slice(4, 8)}`;
+}
+
+export async function buildReceiptQrDataUrl(shareUrl: string): Promise<string> {
+  try {
+    const QRCode = (await import("qrcode")).default;
+    return await QRCode.toDataURL(shareUrl, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 168,
+      color: { dark: "#111111", light: "#ffffff" },
+    });
+  } catch {
+    return "";
+  }
+}
+
+export function buildReceiptShareText(r: Omit<ReceiptViewModel, "shareText" | "shareUrl" | "qrDataUrl">) {
   const lines = [
     `${r.gym.siteName || "Action Plus Gym"} — Payment Receipt`,
+    `Verify code: ${r.fingerprint}`,
     `Receipt: ${r.receiptId}`,
     `Member: ${r.memberName} (${r.memberCode})`,
     r.periodLabel,
     `Amount: ₹${r.amountDisplay}`,
     `Paid: ${r.paidAt}`,
     `Method: ${r.method}`,
+    "Scan the receipt QR or open the verify link to confirm authenticity.",
   ];
   if (r.gym.phoneDisplay) lines.push(`Phone: ${r.gym.phoneDisplay}`);
   if (r.gym.whatsappDisplay) lines.push(`WhatsApp: ${r.gym.whatsappDisplay}`);
@@ -291,6 +329,24 @@ export function renderReceiptHtml(input: {
   const contactBlock = contactLines.length
     ? `<div class="contact"><strong>${esc(r.gym.siteName || "Action Plus Gym")}</strong>${contactLines.join("<br />")}</div>`
     : "";
+
+  const watermarkText = esc(
+    `${r.gym.siteName || "Action Plus Gym"} · verify via QR · not a tax invoice`,
+  );
+  const watermark = `<div class="watermark" aria-hidden="true">${Array.from({ length: 24 }, () => `<span>${watermarkText}</span>`).join("")}</div>`;
+
+  const qrImg = r.qrDataUrl
+    ? `<img src="${esc(r.qrDataUrl)}" alt="Verification QR code" width="96" height="96" />`
+    : `<div style="width:96px;height:96px;border-radius:10px;background:#fff;color:#111;display:grid;place-items:center;font-size:10px;text-align:center;padding:6px">Open verify link</div>`;
+
+  const verifyStrip = `<div class="verify-strip">
+      ${qrImg}
+      <div class="verify-copy">
+        <p class="label">Verify authenticity</p>
+        <p class="code">${esc(r.fingerprint)}</p>
+        <p class="hint-line">Scan QR for the live official receipt. Screenshots without this code/QR are incomplete.</p>
+      </div>
+    </div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -375,6 +431,27 @@ export function renderReceiptHtml(input: {
       overflow: hidden;
       box-shadow: 0 24px 60px rgba(0,0,0,0.45);
     }
+    .watermark {
+      position: absolute;
+      inset: -20%;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.075;
+      transform: rotate(-28deg);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 28px 36px;
+      align-content: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #fff;
+      text-transform: uppercase;
+      user-select: none;
+    }
+    .watermark span { white-space: nowrap; }
+    .card-body { position: relative; z-index: 1; }
     .card-top {
       padding: 28px 24px 20px;
       border-bottom: 1px solid var(--line);
@@ -465,6 +542,51 @@ export function renderReceiptHtml(input: {
       font-weight: 600;
       color: var(--ink);
     }
+    .verify-mini {
+      margin: 8px 0 0;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .verify-strip {
+      margin: 8px 20px 4px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    .verify-strip img {
+      width: 96px;
+      height: 96px;
+      border-radius: 10px;
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .verify-copy { min-width: 0; flex: 1; }
+    .verify-copy .label {
+      margin: 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .verify-copy .code {
+      margin: 4px 0 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--gold);
+      font-variant-numeric: tabular-nums;
+    }
+    .verify-copy .hint-line {
+      margin: 6px 0 0;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
     .rows {
       padding: 16px 24px 20px;
     }
@@ -535,7 +657,12 @@ export function renderReceiptHtml(input: {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .amount, .subtitle, .row.total .v, .period { color: #111; }
+      .amount, .subtitle, .row.total .v, .period, .verify-copy .code { color: #111; }
+      .watermark { opacity: 0.08; color: #000; }
+      .verify-strip {
+        background: #fafafa;
+        border-color: #eee;
+      }
       .paid {
         color: #166534;
         border-color: #86efac;
@@ -543,7 +670,7 @@ export function renderReceiptHtml(input: {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .row .k, .footer, .contact { color: #666; }
+      .row .k, .footer, .contact, .verify-mini, .verify-copy .hint-line, .verify-copy .label { color: #666; }
       .contact {
         background: #fafafa;
         border-color: #eee;
@@ -566,6 +693,8 @@ export function renderReceiptHtml(input: {
     <p class="hint" id="hint"></p>
 
     <article class="card" id="receipt">
+      ${watermark}
+      <div class="card-body">
       <header class="card-top">
         <div class="brand-mark" aria-hidden="true">AP</div>
         <h1 class="brand">${esc(r.gym.siteName || "Action Plus Gym")}</h1>
@@ -577,9 +706,13 @@ export function renderReceiptHtml(input: {
         <p class="amount-label">Amount paid</p>
         <p class="amount"><span class="currency">₹</span>${esc(r.amountDisplay)}</p>
         <p class="period">${esc(r.periodLabel)}</p>
+        <p class="verify-mini">Verify authenticity via QR. Gym records are final.</p>
       </div>
 
+      ${verifyStrip}
+
       <div class="rows">
+        <div class="row"><span class="k">Verify code</span><span class="v">${esc(r.fingerprint)}</span></div>
         <div class="row"><span class="k">Receipt</span><span class="v">${esc(r.receiptId)}</span></div>
         <div class="row"><span class="k">Member</span><span class="v">${esc(r.memberName)}</span></div>
         <div class="row"><span class="k">Member ID</span><span class="v">${esc(r.memberCode)}</span></div>
@@ -595,8 +728,9 @@ export function renderReceiptHtml(input: {
       ${contactBlock}
 
       <p class="footer">
-        This receipt is an automated copy of a payment recorded in ${esc(r.gym.siteName || "Action Plus Gym")}’s system. It does not create any extra rights beyond the payment shown. Any altered, incomplete, or falsely claimed use of this receipt is unauthorised. ${esc(r.gym.siteName || "Action Plus Gym")} accepts no liability for disputes arising from misuse of a shared or downloaded copy. Only the gym’s official payment records shall be relied upon.
+        This receipt is an automated copy of a payment recorded in ${esc(r.gym.siteName || "Action Plus Gym")}’s system. It does not create any extra rights beyond the payment shown. Any altered, incomplete, or falsely claimed use of this receipt is unauthorised. ${esc(r.gym.siteName || "Action Plus Gym")} accepts no liability for disputes arising from misuse of a shared or downloaded copy. Only the gym’s official payment records shall be relied upon. Accept only receipts that verify via QR or verify code ${esc(r.fingerprint)}.
       </p>
+      </div>
     </article>
   </div>
 

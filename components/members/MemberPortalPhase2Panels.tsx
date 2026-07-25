@@ -144,6 +144,8 @@ type ReceiptData = {
   note: string;
   amount: string;
   amountDisplay: string;
+  fingerprint?: string;
+  qrDataUrl?: string;
   shareText: string;
   shareUrl?: string;
   gym?: {
@@ -245,6 +247,9 @@ function ReceiptView({
 
   const rows: Array<[string, string]> = receipt
     ? [
+        ...(receipt.fingerprint
+          ? [["Verify code", receipt.fingerprint] as [string, string]]
+          : []),
         ["Receipt", receipt.receiptId],
         ["Member", receipt.memberName],
         ["Member ID", receipt.memberCode],
@@ -258,6 +263,7 @@ function ReceiptView({
     : [];
 
   const gym = receipt?.gym;
+  const watermarkLabel = `${gym?.siteName || "Action Plus Gym"} · verify via QR · not a tax invoice`;
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
@@ -271,7 +277,20 @@ function ReceiptView({
 
       {receipt ? (
         <>
-          <div className="mt-4 overflow-hidden rounded-3xl border border-gold/25 bg-black/35">
+          <div className="relative mt-4 overflow-hidden rounded-3xl border border-gold/25 bg-black/35">
+            <div
+              className="pointer-events-none absolute inset-[-20%] z-0 flex flex-wrap content-center justify-center gap-x-9 gap-y-7 text-[10px] font-bold uppercase tracking-wide text-white/[0.07]"
+              style={{ transform: "rotate(-28deg)" }}
+              aria-hidden
+            >
+              {Array.from({ length: 24 }, (_, i) => (
+                <span key={i} className="whitespace-nowrap">
+                  {watermarkLabel}
+                </span>
+              ))}
+            </div>
+
+            <div className="relative z-[1]">
             <div className="border-b border-white/10 px-5 py-5 text-center">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl gold-gradient text-sm font-extrabold text-black">
                 AP
@@ -301,7 +320,39 @@ function ReceiptView({
               <p className="mt-2 text-sm font-semibold text-white">
                 {receipt.periodLabel || "Membership payment"}
               </p>
+              <p className="mt-2 text-[11px] leading-snug text-muted">
+                Verify authenticity via QR. Gym records are final.
+              </p>
             </div>
+
+            {(receipt.qrDataUrl || receipt.fingerprint) ? (
+              <div className="mx-5 mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                {receipt.qrDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={receipt.qrDataUrl}
+                    alt="Verification QR"
+                    width={96}
+                    height={96}
+                    className="h-24 w-24 shrink-0 rounded-xl bg-white"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] uppercase tracking-widest text-muted">
+                    Verify authenticity
+                  </p>
+                  {receipt.fingerprint ? (
+                    <p className="mt-1 font-display text-lg tracking-wider text-gold">
+                      {receipt.fingerprint}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-[11px] leading-snug text-muted">
+                    Scan QR for the live official receipt. Screenshots without this
+                    code/QR are incomplete.
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             <dl className="px-5 pb-3 pt-3">
               {rows.map(([label, value]) => (
@@ -341,7 +392,11 @@ function ReceiptView({
               {gym?.siteName || "Action Plus Gym"} accepts no liability for disputes
               arising from misuse of a shared or downloaded copy. Only the gym’s
               official payment records shall be relied upon.
+              {receipt.fingerprint
+                ? ` Accept only receipts that verify via QR or verify code ${receipt.fingerprint}.`
+                : ""}
             </p>
+            </div>
           </div>
 
           <div className="mt-4 space-y-2">
