@@ -754,7 +754,7 @@ export function ChatPanel({
           >
             <p>{m.body}</p>
             <p className="mt-1 text-[10px] text-muted">
-              {m.sender === "staff" ? m.staff_name || "Staff" : "You"} ·{" "}
+              {m.sender === "staff" ? "Action Plus Gym" : "You"} ·{" "}
               {new Date(m.created_at).toLocaleString("en-IN")}
             </p>
           </div>
