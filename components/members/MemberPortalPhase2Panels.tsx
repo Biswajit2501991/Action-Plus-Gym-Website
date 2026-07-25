@@ -37,7 +37,6 @@ import {
 import { detectWebPushSupport } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
-  markAlertsSeen,
   type BillingAlert,
 } from "@/lib/member-portal/billing-alerts";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
@@ -346,7 +345,6 @@ type AlertsMember = {
 export function NotificationsPanel({
   onBack,
   member,
-  onSeen,
 }: {
   onBack: () => void;
   member?: AlertsMember | null;
@@ -379,13 +377,6 @@ export function NotificationsPanel({
   useEffect(() => {
     setSupport(detectWebPushSupport());
   }, []);
-
-  useEffect(() => {
-    const uuid = String(member?.memberUuid || "").trim();
-    if (!uuid || !billingAlert) return;
-    markAlertsSeen(uuid, billingAlert.cycleKey);
-    onSeen?.();
-  }, [member?.memberUuid, billingAlert, onSeen]);
 
   async function enable() {
     setBusy(true);
@@ -551,12 +542,6 @@ function BillingAlertCard({ alert }: { alert: BillingAlert }) {
           <dt>Payment by</dt>
           <dd className="text-white">{alert.paymentByLabel}</dd>
         </div>
-        {alert.amountLabel ? (
-          <div className="flex justify-between gap-3">
-            <dt>Plan amount</dt>
-            <dd className="text-white">{alert.amountLabel}</dd>
-          </div>
-        ) : null}
       </dl>
     </article>
   );

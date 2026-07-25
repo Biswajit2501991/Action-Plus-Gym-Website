@@ -4,16 +4,18 @@ export type BillingAlertKind = "billing" | "overdue";
 
 export type BillingAlert = {
   kind: BillingAlertKind;
-  /** Stable id for this billing cycle — used as “seen” watermark. */
+  /** Stable id for this billing cycle. */
   cycleKey: string;
+  /** When this alert stage started (local midnight ms) — New badge lasts 24h from here. */
+  startedAtMs: number;
   title: string;
   body: string;
   billingDateLabel: string;
   paymentByLabel: string;
-  amountLabel: string | null;
 };
 
 const FINE_AMOUNT_INR = 100;
+const NEW_BADGE_MS = 24 * 60 * 60 * 1000;
 
 function parseDateOnly(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -56,11 +58,6 @@ function formatIn(d: Date): string {
     month: "short",
     year: "numeric",
   });
-}
-
-function formatAmount(amount: number | null | undefined): string | null {
-  if (amount == null || !Number.isFinite(Number(amount))) return null;
-  return `₹${Number(amount).toLocaleString("en-IN")}`;
 }
 
 /**
@@ -110,7 +107,6 @@ export function deriveBillingAlert(input: {
 
   const billingLabel = formatIn(billing);
   const paymentByLabel = formatIn(paymentBy);
-  const amountLabel = formatAmount(input.amount);
   const cycleKey = `billing:${dateKey(billing)}`;
 
   if (today <= paymentBy) {
@@ -121,57 +117,33 @@ export function deriveBillingAlert(input: {
     return {
       kind: "billing",
       cycleKey,
+      startedAtMs: billing.getTime(),
       title: "Billing date reminder",
       body: `${intro} Please clear your payment by ${paymentByLabel} (within 1 week of billing date) to keep your account active.`,
       billingDateLabel: billingLabel,
       paymentByLabel,
-      amountLabel,
     };
   }
 
-  const planPart = amountLabel ? `${amountLabel}` : "your plan amount";
-  const totalPart = amountLabel
-    ? `${amountLabel} + ₹${FINE_AMOUNT_INR} = ₹${(Number(input.amount) + FINE_AMOUNT_INR).toLocaleString("en-IN")}`
-    : `plan amount + ₹${FINE_AMOUNT_INR}`;
-
+  const overdueStart = addDays(paymentBy, 1);
   return {
     kind: "overdue",
     cycleKey: `overdue:${dateKey(billing)}`,
+    startedAtMs: overdueStart.getTime(),
     title: "Late payment notice",
-    body: `Your payment was due on ${paymentByLabel}. A late payment amount of ₹${FINE_AMOUNT_INR} may have been added to your account. Outstanding balance is now about ${totalPart} (plan ${planPart}). Please clear your payment within the next 1 week to keep your account active, or reach out to the gym if there is any unwilling circumstance or issue.`,
+    body: `Your payment was due on ${paymentByLabel}. A late payment amount of ₹${FINE_AMOUNT_INR} may have been added to your account. Please clear your payment within the next 1 week to keep your account active, or reach out to the gym if there is any unwilling circumstance or issue.`,
     billingDateLabel: billingLabel,
     paymentByLabel,
-    amountLabel,
   };
 }
 
-function alertsSeenKey(memberUuid: string) {
-  return `apg_portal_alerts_seen_${memberUuid}`;
-}
-
-export function readAlertsSeenCycle(memberUuid: string): string | null {
-  if (typeof window === "undefined" || !memberUuid) return null;
-  try {
-    return localStorage.getItem(alertsSeenKey(memberUuid));
-  } catch {
-    return null;
-  }
-}
-
-export function markAlertsSeen(memberUuid: string, cycleKey: string) {
-  if (typeof window === "undefined" || !memberUuid || !cycleKey) return;
-  try {
-    localStorage.setItem(alertsSeenKey(memberUuid), cycleKey);
-  } catch {
-    /* ignore */
-  }
-}
-
+/** New badge stays for 24 hours from when this alert stage started (not cleared on open). */
 export function hasUnreadBillingAlert(
-  memberUuid: string,
+  _memberUuid: string,
   alert: BillingAlert | null,
+  nowMs: number = Date.now(),
 ): boolean {
-  if (!alert || !memberUuid) return false;
-  const seen = readAlertsSeenCycle(memberUuid);
-  return seen !== alert.cycleKey;
+  if (!alert) return false;
+  const elapsed = nowMs - alert.startedAtMs;
+  return elapsed >= 0 && elapsed < NEW_BADGE_MS;
 }

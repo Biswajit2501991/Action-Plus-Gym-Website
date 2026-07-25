@@ -276,10 +276,6 @@ export function MemberPortalApp() {
       setAlertsUnread(false);
       return;
     }
-    if (step === "notifications") {
-      setAlertsUnread(false);
-      return;
-    }
     const alert = deriveBillingAlert({
       status: member.status,
       billingDate: member.billingDate,
@@ -295,7 +291,6 @@ export function MemberPortalApp() {
     member?.paymentBy,
     member?.nextPaymentDate,
     member?.amount,
-    step,
     liveTick,
   ]);
 
@@ -1235,10 +1230,7 @@ export function MemberPortalApp() {
                   <NavTile
                     label="Alerts"
                     badge={alertsUnread}
-                    onClick={() => {
-                      setAlertsUnread(false);
-                      setStep("notifications");
-                    }}
+                    onClick={() => setStep("notifications")}
                   />
                 ) : null}
                 {tileEnabled("homeChat") ? (
@@ -1404,7 +1396,6 @@ export function MemberPortalApp() {
             <NotificationsPanel
               onBack={() => setStep("home")}
               member={member}
-              onSeen={() => setAlertsUnread(false)}
             />
           ) : null}
           {step === "chat" ? (
