@@ -140,11 +140,19 @@ type ReceiptData = {
   paidAt: string;
   method: string;
   billingMonth: string;
+  periodLabel: string;
   note: string;
   amount: string;
   amountDisplay: string;
   shareText: string;
   shareUrl?: string;
+  gym?: {
+    siteName: string;
+    phoneDisplay: string;
+    whatsappDisplay: string;
+    address: string;
+    email: string;
+  };
 };
 
 function receiptShareBody(receipt: ReceiptData, pageUrl: string) {
@@ -241,13 +249,15 @@ function ReceiptView({
         ["Member", receipt.memberName],
         ["Member ID", receipt.memberCode],
         ["Plan", receipt.planName],
+        ["Covered period", receipt.periodLabel || receipt.billingMonth],
         ["Branch", receipt.branchName],
         ["Paid at", receipt.paidAt],
         ["Method", receipt.method],
-        ["Billing month", receipt.billingMonth],
         ["Note", receipt.note],
       ]
     : [];
+
+  const gym = receipt?.gym;
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
@@ -266,7 +276,9 @@ function ReceiptView({
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl gold-gradient text-sm font-extrabold text-black">
                 AP
               </div>
-              <p className="mt-3 font-display text-xl text-gold">Action Plus Gym</p>
+              <p className="mt-3 font-display text-xl text-gold">
+                {gym?.siteName || "Action Plus Gym"}
+              </p>
               <p className="mt-1 text-[11px] uppercase tracking-widest text-muted">
                 Payment receipt
               </p>
@@ -286,9 +298,12 @@ function ReceiptView({
                 </span>
                 {receipt.amountDisplay}
               </p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {receipt.periodLabel || "Membership payment"}
+              </p>
             </div>
 
-            <dl className="px-5 pb-5 pt-3">
+            <dl className="px-5 pb-3 pt-3">
               {rows.map(([label, value]) => (
                 <div
                   key={label}
@@ -305,6 +320,18 @@ function ReceiptView({
                 </dd>
               </div>
             </dl>
+
+            {gym && (gym.address || gym.phoneDisplay || gym.whatsappDisplay || gym.email) ? (
+              <div className="mx-5 mb-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-xs leading-relaxed text-muted">
+                <p className="mb-1.5 text-sm font-semibold text-white">
+                  {gym.siteName || "Action Plus Gym"}
+                </p>
+                {gym.address ? <p>{gym.address}</p> : null}
+                {gym.phoneDisplay ? <p>Phone: {gym.phoneDisplay}</p> : null}
+                {gym.whatsappDisplay ? <p>WhatsApp: {gym.whatsappDisplay}</p> : null}
+                {gym.email ? <p>Email: {gym.email}</p> : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-4 space-y-2">

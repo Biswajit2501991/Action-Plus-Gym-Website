@@ -5,8 +5,10 @@ import { portalGymId } from "@/lib/member-portal/config";
 import { branchLabel } from "@/lib/member-portal/members";
 import {
   buildReceiptShareText,
+  formatMembershipPeriod,
   formatReceiptAmount,
   formatReceiptPaidAt,
+  loadGymContact,
   renderReceiptHtml,
   signReceiptShare,
   type ReceiptViewModel,
@@ -81,10 +83,16 @@ export async function GET(
   }
 
   const branch = await branchLabel(session.member.assigned_gym_code_id);
+  const gym = await loadGymContact(svc.client, portalGymId());
   const { amount, amountDisplay } = formatReceiptAmount(row.amount);
   const paidAt = formatReceiptPaidAt(row.paid_at);
   const receiptId = String(row.external_payment_id || row.id);
   const billingMonth = String(row.paid_month || row.billing_month || "").trim() || "—";
+  const periodLabel = formatMembershipPeriod({
+    paidMonth: row.paid_month,
+    billingMonth: row.billing_month,
+    billingDate: row.billing_date,
+  });
   const method = String(row.method || "").trim() || "—";
   const note = String(row.note || "").trim() || "—";
   const planName = String(session.member.plan_name || "").trim() || "—";
@@ -108,9 +116,11 @@ export async function GET(
     paidAt,
     method,
     billingMonth,
+    periodLabel,
     note,
     amount,
     amountDisplay,
+    gym,
   };
   const receipt: ReceiptViewModel = {
     ...base,

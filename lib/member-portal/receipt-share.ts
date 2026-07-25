@@ -108,6 +108,16 @@ export function escHtml(value: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
+export type ReceiptGymContact = {
+  siteName: string;
+  phone: string;
+  phoneDisplay: string;
+  whatsapp: string;
+  whatsappDisplay: string;
+  address: string;
+  email: string;
+};
+
 export type ReceiptViewModel = {
   receiptId: string;
   memberName: string;
@@ -117,23 +127,131 @@ export type ReceiptViewModel = {
   paidAt: string;
   method: string;
   billingMonth: string;
+  /** Human line e.g. "Membership for Jul 2026". */
+  periodLabel: string;
   note: string;
   amount: string;
   amountDisplay: string;
+  gym: ReceiptGymContact;
   shareText: string;
   shareUrl?: string;
 };
 
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** Digits only for wa.me links. */
+export function whatsappDigits(value: unknown): string {
+  return String(value || "").replace(/\D/g, "");
+}
+
+/** Display WhatsApp / phone nicely for India (+91 …). */
+export function formatPhoneDisplay(value: unknown): string {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const digits = whatsappDigits(raw);
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  return raw;
+}
+
+/**
+ * Build “Membership for Jul 2026” from paid_month / billing_month (YYYY-MM)
+ * or billing_date (YYYY-MM-DD).
+ */
+export function formatMembershipPeriod(input: {
+  paidMonth?: string | null;
+  billingMonth?: string | null;
+  billingDate?: string | null;
+}): string {
+  const monthKey =
+    String(input.paidMonth || input.billingMonth || "").trim() ||
+    String(input.billingDate || "")
+      .trim()
+      .slice(0, 7);
+  const m = monthKey.match(/^(\d{4})-(\d{2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const monthIndex = Number(m[2]) - 1;
+    if (year && monthIndex >= 0 && monthIndex < 12) {
+      return `Membership for ${MONTH_SHORT[monthIndex]} ${year}`;
+    }
+  }
+  const label = String(input.paidMonth || input.billingMonth || "").trim();
+  if (label && label !== "—") return `Membership for ${label}`;
+  return "Membership payment";
+}
+
+export function defaultGymContact(): ReceiptGymContact {
+  return {
+    siteName: "Action Plus Gym",
+    phone: "",
+    phoneDisplay: "",
+    whatsapp: "",
+    whatsappDisplay: "",
+    address: "",
+    email: "",
+  };
+}
+
+export async function loadGymContact(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: { from: (table: string) => any },
+  gymId: string,
+): Promise<ReceiptGymContact> {
+  try {
+    const { data } = await client
+      .from("website_settings")
+      .select("site_name, phone, whatsapp, address, email")
+      .eq("gym_id", gymId)
+      .maybeSingle();
+    if (!data) return defaultGymContact();
+    const phone = String(data.phone || "").trim();
+    const whatsapp = String(data.whatsapp || "").trim();
+    return {
+      siteName: String(data.site_name || "").trim() || "Action Plus Gym",
+      phone,
+      phoneDisplay: formatPhoneDisplay(phone),
+      whatsapp,
+      whatsappDisplay: formatPhoneDisplay(whatsapp || phone),
+      address: String(data.address || "").trim(),
+      email: String(data.email || "").trim(),
+    };
+  } catch {
+    return defaultGymContact();
+  }
+}
+
 export function buildReceiptShareText(r: Omit<ReceiptViewModel, "shareText" | "shareUrl">) {
-  return [
-    "Action Plus Gym — Payment Receipt",
+  const lines = [
+    `${r.gym.siteName || "Action Plus Gym"} — Payment Receipt`,
     `Receipt: ${r.receiptId}`,
     `Member: ${r.memberName} (${r.memberCode})`,
+    r.periodLabel,
     `Amount: ₹${r.amountDisplay}`,
     `Paid: ${r.paidAt}`,
     `Method: ${r.method}`,
-    `Billing month: ${r.billingMonth}`,
-  ].join("\n");
+  ];
+  if (r.gym.phoneDisplay) lines.push(`Phone: ${r.gym.phoneDisplay}`);
+  if (r.gym.whatsappDisplay) lines.push(`WhatsApp: ${r.gym.whatsappDisplay}`);
+  if (r.gym.address) lines.push(`Address: ${r.gym.address}`);
+  return lines.join("\n");
 }
 
 /** Branded HTML receipt used by both authenticated and public share links. */
@@ -149,6 +267,30 @@ export function renderReceiptHtml(input: {
     input.backHref != null
       ? `<a class="btn-ghost" href="${esc(input.backHref)}">← Back to Member Portal</a>`
       : "";
+
+  const waDigits = whatsappDigits(r.gym.whatsapp || r.gym.phone);
+  const contactLines: string[] = [];
+  if (r.gym.address) contactLines.push(esc(r.gym.address));
+  if (r.gym.phoneDisplay) {
+    contactLines.push(
+      `Phone: <a href="tel:${esc(whatsappDigits(r.gym.phone) || r.gym.phone)}">${esc(r.gym.phoneDisplay)}</a>`,
+    );
+  }
+  if (r.gym.whatsappDisplay && waDigits) {
+    contactLines.push(
+      `WhatsApp: <a href="https://wa.me/${esc(waDigits)}">${esc(r.gym.whatsappDisplay)}</a>`,
+    );
+  } else if (r.gym.whatsappDisplay) {
+    contactLines.push(`WhatsApp: ${esc(r.gym.whatsappDisplay)}`);
+  }
+  if (r.gym.email) {
+    contactLines.push(
+      `Email: <a href="mailto:${esc(r.gym.email)}">${esc(r.gym.email)}</a>`,
+    );
+  }
+  const contactBlock = contactLines.length
+    ? `<div class="contact"><strong>${esc(r.gym.siteName || "Action Plus Gym")}</strong>${contactLines.join("<br />")}</div>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -317,8 +459,14 @@ export function renderReceiptHtml(input: {
       opacity: 0.92;
       vertical-align: 0.12em;
     }
+    .period {
+      margin: 10px 0 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+    }
     .rows {
-      padding: 16px 24px 28px;
+      padding: 16px 24px 20px;
     }
     .row {
       display: flex;
@@ -337,6 +485,24 @@ export function renderReceiptHtml(input: {
       font-size: 16px;
       font-variant-numeric: tabular-nums;
     }
+    .contact {
+      margin: 0 20px 20px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      text-align: left;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .contact strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .contact a { color: var(--gold); text-decoration: none; }
     .footer {
       padding: 0 24px 24px;
       text-align: center;
@@ -369,7 +535,7 @@ export function renderReceiptHtml(input: {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .amount, .subtitle, .row.total .v { color: #111; }
+      .amount, .subtitle, .row.total .v, .period { color: #111; }
       .paid {
         color: #166534;
         border-color: #86efac;
@@ -377,7 +543,13 @@ export function renderReceiptHtml(input: {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .row .k, .footer { color: #666; }
+      .row .k, .footer, .contact { color: #666; }
+      .contact {
+        background: #fafafa;
+        border-color: #eee;
+      }
+      .contact strong { color: #111; }
+      .contact a { color: #111; }
       .row { border-bottom-color: #eee; }
       .card-top { border-bottom-color: #eee; }
     }
@@ -396,7 +568,7 @@ export function renderReceiptHtml(input: {
     <article class="card" id="receipt">
       <header class="card-top">
         <div class="brand-mark" aria-hidden="true">AP</div>
-        <h1 class="brand">Action Plus Gym</h1>
+        <h1 class="brand">${esc(r.gym.siteName || "Action Plus Gym")}</h1>
         <p class="subtitle">Payment receipt</p>
         <div class="paid">Paid</div>
       </header>
@@ -404,6 +576,7 @@ export function renderReceiptHtml(input: {
       <div class="amount-block">
         <p class="amount-label">Amount paid</p>
         <p class="amount"><span class="currency">₹</span>${esc(r.amountDisplay)}</p>
+        <p class="period">${esc(r.periodLabel)}</p>
       </div>
 
       <div class="rows">
@@ -411,16 +584,18 @@ export function renderReceiptHtml(input: {
         <div class="row"><span class="k">Member</span><span class="v">${esc(r.memberName)}</span></div>
         <div class="row"><span class="k">Member ID</span><span class="v">${esc(r.memberCode)}</span></div>
         <div class="row"><span class="k">Plan</span><span class="v">${esc(r.planName)}</span></div>
+        <div class="row"><span class="k">Covered period</span><span class="v">${esc(r.periodLabel)}</span></div>
         <div class="row"><span class="k">Branch</span><span class="v">${esc(r.branchName)}</span></div>
         <div class="row"><span class="k">Paid at</span><span class="v">${esc(r.paidAt)}</span></div>
         <div class="row"><span class="k">Method</span><span class="v">${esc(r.method)}</span></div>
-        <div class="row"><span class="k">Billing month</span><span class="v">${esc(r.billingMonth)}</span></div>
         <div class="row"><span class="k">Note</span><span class="v">${esc(r.note)}</span></div>
         <div class="row total"><span class="k">Amount</span><span class="v">₹${esc(r.amountDisplay)}</span></div>
       </div>
 
+      ${contactBlock}
+
       <p class="footer">
-        Official payment receipt from Action Plus Gym.<br />
+        Official payment receipt from ${esc(r.gym.siteName || "Action Plus Gym")}.<br />
         Contact the gym for any corrections.
       </p>
     </article>

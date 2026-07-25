@@ -3,8 +3,10 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 import { branchLabel } from "@/lib/member-portal/members";
 import {
   buildReceiptShareText,
+  formatMembershipPeriod,
   formatReceiptAmount,
   formatReceiptPaidAt,
+  loadGymContact,
   renderReceiptHtml,
   verifyReceiptShare,
   type ReceiptViewModel,
@@ -96,10 +98,16 @@ export async function GET(
     .maybeSingle();
 
   const branch = await branchLabel(member?.assigned_gym_code_id || null);
+  const gym = await loadGymContact(svc.client, claims.gid);
   const { amount, amountDisplay } = formatReceiptAmount(row.amount);
   const paidAt = formatReceiptPaidAt(row.paid_at);
   const receiptId = String(row.external_payment_id || row.id);
   const billingMonth = String(row.paid_month || row.billing_month || "").trim() || "—";
+  const periodLabel = formatMembershipPeriod({
+    paidMonth: row.paid_month,
+    billingMonth: row.billing_month,
+    billingDate: row.billing_date,
+  });
   const method = String(row.method || "").trim() || "—";
   const note = String(row.note || "").trim() || "—";
   const planName = String(member?.plan_name || "").trim() || "—";
@@ -117,9 +125,11 @@ export async function GET(
     paidAt,
     method,
     billingMonth,
+    periodLabel,
     note,
     amount,
     amountDisplay,
+    gym,
   };
   const receipt: ReceiptViewModel = {
     ...base,
