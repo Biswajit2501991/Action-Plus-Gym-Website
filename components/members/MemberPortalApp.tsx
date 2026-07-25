@@ -669,12 +669,19 @@ export function MemberPortalApp() {
       await loadMe();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "PIN login failed";
-      setError(msg);
-      if (/revoked|Verify via WhatsApp|PIN not set|Could not register device/i.test(msg)) {
+      const needsSetup =
+        /revoked|Verify via WhatsApp|PIN not set|Could not register device|pin-setup-required/i.test(
+          msg,
+        );
+      if (needsSetup) {
+        // Quietly send member to verify/setup — do not show the old PIN/revoked banner.
         clearKnownDeviceProfile(deviceId);
         setKnownDevice(false);
         setNeedsReauth(true);
+        setError(null);
         setStep("mobile");
+      } else {
+        setError(msg);
       }
     } finally {
       setBusy(false);

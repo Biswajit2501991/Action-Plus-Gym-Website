@@ -48,10 +48,7 @@ export async function POST(req: NextRequest) {
 
     if (!found.member.pin_hash) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "PIN not set or access was revoked. Use Verify via WhatsApp.",
-        },
+        { ok: false, error: "pin-setup-required" },
         { status: 400 },
       );
     }
