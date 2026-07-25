@@ -49,19 +49,38 @@ export async function GET(
     return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
   }
 
-  const { data: row, error } = await svc.client
-    .from("member_payment_history")
-    .select(
-      "id, external_payment_id, paid_at, amount, method, paid_month, billing_month, billing_date, note, recorded_by, source, created_at",
-    )
-    .eq("gym_id", portalGymId())
-    .eq("member_id", session.member.id)
-    .or(`external_payment_id.eq.${paymentId},id.eq.${paymentId}`)
-    .maybeSingle();
+  const columns =
+    "id, external_payment_id, paid_at, amount, method, paid_month, billing_month, billing_date, note, recorded_by, source, created_at";
+  const baseQuery = () =>
+    svc.client
+      .from("member_payment_history")
+      .select(columns)
+      .eq("gym_id", portalGymId())
+      .eq("member_id", session.member.id);
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  const byExternal = await baseQuery()
+    .eq("external_payment_id", paymentId)
+    .maybeSingle();
+  if (byExternal.error) {
+    return NextResponse.json(
+      { ok: false, error: byExternal.error.message },
+      { status: 500 },
+    );
   }
+
+  let row = byExternal.data;
+  // `id` is a bigint column — only match it when the param is numeric.
+  if (!row && /^\d+$/.test(paymentId)) {
+    const byId = await baseQuery().eq("id", paymentId).maybeSingle();
+    if (byId.error) {
+      return NextResponse.json(
+        { ok: false, error: byId.error.message },
+        { status: 500 },
+      );
+    }
+    row = byId.data;
+  }
+
   if (!row) {
     return NextResponse.json({ ok: false, error: "not-found" }, { status: 404 });
   }
