@@ -144,6 +144,7 @@ type ReceiptData = {
   amount: string;
   amountDisplay: string;
   shareText: string;
+  shareUrl?: string;
 };
 
 function receiptShareBody(receipt: ReceiptData, pageUrl: string) {
@@ -162,14 +163,14 @@ function ReceiptView({
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
 
-  const pageUrl = `/api/member/payments/${encodeURIComponent(paymentId)}/receipt`;
+  const jsonUrl = `/api/member/payments/${encodeURIComponent(paymentId)}/receipt?format=json`;
 
   useEffect(() => {
     let cancelled = false;
     setReceipt(null);
     setError(null);
     setHint(null);
-    void api<{ ok: true; receipt: ReceiptData }>(`${pageUrl}?format=json`)
+    void api<{ ok: true; receipt: ReceiptData }>(jsonUrl)
       .then((data) => {
         if (!cancelled) setReceipt(data.receipt);
       })
@@ -181,16 +182,28 @@ function ReceiptView({
     return () => {
       cancelled = true;
     };
-  }, [pageUrl]);
+  }, [jsonUrl]);
 
-  function absoluteUrl() {
-    if (typeof window === "undefined") return pageUrl;
-    return new URL(pageUrl, window.location.origin).toString();
+  function shareLink() {
+    if (!receipt) return "";
+    if (receipt.shareUrl) return receipt.shareUrl;
+    if (typeof window === "undefined") {
+      return `/api/member/payments/${encodeURIComponent(paymentId)}/receipt`;
+    }
+    return new URL(
+      `/api/member/payments/${encodeURIComponent(paymentId)}/receipt`,
+      window.location.origin,
+    ).toString();
+  }
+
+  function printUrl() {
+    // Prefer public share link so Print opens without session issues in a new tab.
+    return shareLink() || `/api/member/payments/${encodeURIComponent(paymentId)}/receipt`;
   }
 
   function shareOnWhatsApp() {
     if (!receipt) return;
-    const text = receiptShareBody(receipt, absoluteUrl());
+    const text = receiptShareBody(receipt, shareLink());
     window.open(
       `https://wa.me/?text=${encodeURIComponent(text)}`,
       "_blank",
@@ -201,12 +214,13 @@ function ReceiptView({
   async function shareNative() {
     if (!receipt) return;
     setHint(null);
+    const url = shareLink();
     try {
       if (navigator.share) {
         await navigator.share({
           title: "Action Plus Gym receipt",
           text: receipt.shareText,
-          url: absoluteUrl(),
+          url,
         });
         return;
       }
@@ -214,9 +228,7 @@ function ReceiptView({
       if (e instanceof Error && e.name === "AbortError") return;
     }
     try {
-      await navigator.clipboard?.writeText(
-        receiptShareBody(receipt, absoluteUrl()),
-      );
+      await navigator.clipboard?.writeText(receiptShareBody(receipt, url));
       setHint("Receipt details copied.");
     } catch {
       setHint("Use Share on WhatsApp to send this receipt.");
@@ -264,12 +276,15 @@ function ReceiptView({
               </span>
             </div>
 
-            <div className="px-5 pb-2 pt-5 text-center">
+            <div className="px-5 pb-2 pt-6 text-center">
               <p className="text-[11px] uppercase tracking-widest text-muted">
                 Amount paid
               </p>
-              <p className="mt-1 font-display text-4xl text-gold">
-                ₹{receipt.amountDisplay}
+              <p className="mt-2 font-display text-[2.75rem] leading-none tracking-tight text-gold tabular-nums">
+                <span className="mr-1 align-[0.18em] text-[0.55em] font-semibold opacity-90">
+                  ₹
+                </span>
+                {receipt.amountDisplay}
               </p>
             </div>
 
@@ -283,6 +298,12 @@ function ReceiptView({
                   <dd className="break-words text-right text-white/90">{value}</dd>
                 </div>
               ))}
+              <div className="flex justify-between gap-4 py-3 text-sm">
+                <dt className="shrink-0 text-muted">Amount</dt>
+                <dd className="text-right text-base font-semibold tabular-nums text-gold">
+                  ₹{receipt.amountDisplay}
+                </dd>
+              </div>
             </dl>
           </div>
 
@@ -302,7 +323,7 @@ function ReceiptView({
               Share
             </button>
             <a
-              href={pageUrl}
+              href={printUrl()}
               target="_blank"
               rel="noreferrer"
               className="block w-full rounded-full border border-white/15 px-5 py-3 text-center text-sm text-white"
