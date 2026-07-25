@@ -39,6 +39,7 @@ import {
   deriveBillingAlert,
   type BillingAlert,
 } from "@/lib/member-portal/billing-alerts";
+import { isWithinNewBadgeWindow, toBadgeStartMs } from "@/lib/member-portal/new-badge";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 
 type Payment = {
@@ -202,13 +203,23 @@ export function PaymentsPanel({
         <p className="mt-4 text-sm text-muted">Loading…</p>
       ) : null}
       <ul className="mt-4 space-y-3">
-        {items.map((p) => (
+        {items.map((p, idx) => {
+          const isLatestNew =
+            idx === 0 && isWithinNewBadgeWindow(toBadgeStartMs(p.paidAt));
+          return (
           <li
             key={p.id}
             className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3"
           >
             <div>
-              <p className="text-white">₹{Number(p.amount || 0).toFixed(0)}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-white">₹{Number(p.amount || 0).toFixed(0)}</p>
+                {isLatestNew ? (
+                  <span className="rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black">
+                    New
+                  </span>
+                ) : null}
+              </div>
               <p className="text-xs text-muted">
                 {formatDate(p.paidAt)} · {p.method || "—"} · {p.paidMonth || "—"}
               </p>
@@ -222,7 +233,8 @@ export function PaymentsPanel({
               Receipt
             </a>
           </li>
-        ))}
+          );
+        })}
         {!initialLoad && !items.length ? (
           <li className="text-sm text-muted">No payments yet.</li>
         ) : null}
@@ -1878,11 +1890,43 @@ type WeightLog = {
   recordedBy?: string;
 };
 
+type WeightTrend = "down" | "up" | "same" | "first";
+
 function formatWeightDate(iso: string) {
   const key = String(iso || "").slice(0, 10);
   const [y, m, d] = key.split("-").map(Number);
   if (!y || !m || !d) return key || "—";
   return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
+
+/** Latest weight per YYYY-MM-DD (logs are newest-first). */
+function weightByDateMap(logs: WeightLog[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const log of logs) {
+    const key = String(log.date || "").slice(0, 10);
+    if (!key || log.weightKg == null || !Number.isFinite(log.weightKg)) continue;
+    if (!(key in out)) out[key] = Number(log.weightKg);
+  }
+  return out;
+}
+
+/** Compare each date to the previous logged date (ascending). */
+function weightTrendByDate(byDate: Record<string, number>): Record<string, WeightTrend> {
+  const keys = Object.keys(byDate).sort();
+  const out: Record<string, WeightTrend> = {};
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    if (i === 0) {
+      out[key] = "first";
+      continue;
+    }
+    const prev = byDate[keys[i - 1]];
+    const cur = byDate[key];
+    if (cur < prev) out[key] = "down";
+    else if (cur > prev) out[key] = "up";
+    else out[key] = "same";
+  }
+  return out;
 }
 
 /** Basic-member Weight Tracker — logs to member_measurements (shared with Gym Manager). */
@@ -1899,6 +1943,19 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
   const [feedback, setFeedback] = useState<null | { kind: "loss" | "gain" | "same"; delta: number }>(
     null,
   );
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonthIndex, setViewMonthIndex] = useState(() => new Date().getMonth());
+
+  const byDate = useMemo(() => weightByDateMap(logs), [logs]);
+  const trendByDate = useMemo(() => weightTrendByDate(byDate), [byDate]);
+  const calendarCells = useMemo(() => {
+    const focus: Record<string, string> = {};
+    for (const [k, v] of Object.entries(byDate)) focus[k] = String(v);
+    return buildPtMonthCalendarCells(viewYear, viewMonthIndex, focus, {});
+  }, [viewYear, viewMonthIndex, byDate]);
+
+  const selectedWeight = date && byDate[date] != null ? byDate[date] : null;
+  const selectedTrend = date ? trendByDate[date] : null;
 
   const reload = useCallback(async () => {
     const data = await api<{
@@ -1913,7 +1970,13 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
     setLogs(Array.isArray(data.logs) ? data.logs : []);
     setCurrentKg(data.currentKg);
     setChangeKg(data.changeKg);
-    setDate((prev) => prev || data.today || "");
+    const today = data.today || "";
+    setDate((prev) => prev || today);
+    const parts = parsePtDateKey(today);
+    if (parts) {
+      setViewYear(parts.year);
+      setViewMonthIndex(parts.monthIndex);
+    }
   }, []);
 
   useEffect(() => {
@@ -1923,11 +1986,21 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
       .finally(() => setLoading(false));
   }, [reload]);
 
+  function shiftMonth(delta: number) {
+    const dt = new Date(viewYear, viewMonthIndex + delta, 1);
+    setViewYear(dt.getFullYear());
+    setViewMonthIndex(dt.getMonth());
+  }
+
   async function addWeight() {
     if (!canEdit || busy) return;
     const kg = Number(String(weight).trim());
     if (!Number.isFinite(kg) || kg <= 0) {
       setError("Enter a valid weight in kg.");
+      return;
+    }
+    if (!date) {
+      setError("Pick a date on the calendar.");
       return;
     }
     setBusy(true);
@@ -1973,7 +2046,7 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
       <div>
         <h2 className="font-display text-2xl text-white">Weight Tracker</h2>
         <p className="mt-1 text-sm text-muted">
-          Log your weight. Staff can see your progress in Gym Manager → Workout.
+          Tap a calendar day to log weight. Green = down from last log, red = up.
         </p>
       </div>
 
@@ -1986,77 +2059,132 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
           Manager.
         </p>
       ) : (
-        <div className="space-y-4 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-3.5 sm:p-5">
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
-              Date
-            </p>
-            <input
-              type="date"
-              className="box-border w-full min-w-0 rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base text-white outline-none focus:border-gold/40 sm:text-sm"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
-              Weight (kg)
-            </p>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              min="1"
-              max="400"
-              placeholder="e.g. 72.5"
-              className="box-border w-full min-w-0 rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base text-white outline-none focus:border-gold/40 sm:text-sm"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={busy || !weight.trim()}
-            onClick={() => void addWeight()}
-            className="min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
-          >
-            {busy ? "Saving…" : "Add Weight"}
-          </button>
-          <p className="text-sm text-white/85">
-            Current:{" "}
-            <span className="text-gold">{currentKg != null ? `${currentKg} kg` : "NA"}</span>
-            {" · "}
-            Change: <span className="text-gold">{changeLabel}</span>
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
-          History
-        </p>
-        {!logs.length ? (
-          <p className="rounded-xl border border-dashed border-white/15 px-4 py-6 text-center text-sm text-muted">
-            No weight logs yet.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {logs.map((log) => (
-              <li
-                key={log.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+        <>
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => shiftMonth(-1)}
+                className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/80"
               >
-                <span className="text-muted">{formatWeightDate(log.date)}</span>
-                <span className="font-medium text-white">
-                  {log.weightKg != null ? `${log.weightKg} kg` : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                Prev
+              </button>
+              <p className="text-sm font-semibold text-white">
+                {PT_MONTH_LABELS[viewMonthIndex]} {viewYear}
+              </p>
+              <button
+                type="button"
+                onClick={() => shiftMonth(1)}
+                className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/80"
+              >
+                Next
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-muted">
+              {PT_WEEKDAYS.map((d) => (
+                <span key={d}>{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarCells.map((cell) => {
+                if (cell.kind === "pad") {
+                  return <div key={cell.key} className="aspect-square" />;
+                }
+                const kg = byDate[cell.key];
+                const trend = trendByDate[cell.key];
+                const selected = date === cell.key;
+                const tone =
+                  trend === "down"
+                    ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-100"
+                    : trend === "up"
+                      ? "border-rose-400/50 bg-rose-500/25 text-rose-100"
+                      : kg != null
+                        ? "border-gold/35 bg-gold/15 text-white"
+                        : "border-white/10 bg-black/40 text-white/70";
+                return (
+                  <button
+                    key={cell.key}
+                    type="button"
+                    onClick={() => {
+                      setDate(cell.key);
+                      if (kg != null) setWeight(String(kg));
+                      else setWeight("");
+                    }}
+                    className={`aspect-square rounded-xl border text-[11px] font-medium leading-tight touch-manipulation ${tone} ${
+                      selected ? "ring-2 ring-gold" : ""
+                    }`}
+                    title={kg != null ? `${kg} kg` : "Add weight"}
+                  >
+                    <span className="block">{cell.day}</span>
+                    {kg != null ? (
+                      <span className="mt-0.5 block text-[9px] opacity-90">{kg}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] leading-relaxed text-muted">
+              <span className="text-emerald-300">Green</span> = weight down ·{" "}
+              <span className="text-rose-300">Red</span> = weight up · Gold = first / same
+            </p>
+          </div>
+
+          <div className="space-y-4 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/40 p-3.5 sm:p-5">
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+                Selected day
+              </p>
+              <p className="text-sm text-white">
+                {date ? formatWeightDate(date) : "—"}
+                {selectedWeight != null ? (
+                  <span className="text-muted">
+                    {" "}
+                    · logged {selectedWeight} kg
+                    {selectedTrend === "down"
+                      ? " (↓)"
+                      : selectedTrend === "up"
+                        ? " (↑)"
+                        : ""}
+                  </span>
+                ) : (
+                  <span className="text-muted"> · no log yet</span>
+                )}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/90">
+                Weight (kg)
+              </p>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min="1"
+                max="400"
+                placeholder="e.g. 72.5"
+                className="box-border w-full min-w-0 rounded-xl border border-white/12 bg-black/50 px-3 py-3 text-base text-white outline-none focus:border-gold/40 sm:text-sm"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                disabled={busy || !date}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={busy || !weight.trim() || !date}
+              onClick={() => void addWeight()}
+              className="min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Add Weight"}
+            </button>
+            <p className="text-sm text-white/85">
+              Current:{" "}
+              <span className="text-gold">{currentKg != null ? `${currentKg} kg` : "NA"}</span>
+              {" · "}
+              Change: <span className="text-gold">{changeLabel}</span>
+            </p>
+          </div>
+        </>
+      )}
 
       {feedback ? (
         <div

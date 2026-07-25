@@ -15,11 +15,14 @@ import {
   WeightTrackerPanel,
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
-import { hasUnreadStaffChat } from "@/lib/member-portal/chat-client";
 import {
   deriveBillingAlert,
   hasUnreadBillingAlert,
 } from "@/lib/member-portal/billing-alerts";
+import {
+  isWithinNewBadgeWindow,
+  toBadgeStartMs,
+} from "@/lib/member-portal/new-badge";
 import {
   clearKnownDeviceProfile,
   readKnownDeviceProfile,
@@ -174,6 +177,7 @@ export function MemberPortalApp() {
   const [email, setEmail] = useState("");
   const [chatUnread, setChatUnread] = useState(false);
   const [alertsUnread, setAlertsUnread] = useState(false);
+  const [paymentsUnread, setPaymentsUnread] = useState(false);
   const [knownDevice, setKnownDevice] = useState(false);
   const [portalSections, setPortalSections] = useState<PortalSections>(
     () => ({ ...DEFAULT_PORTAL_SECTIONS }),
@@ -245,23 +249,20 @@ export function MemberPortalApp() {
         latestStaffAtMs?: number | null;
         memberUuid: string;
       }>("/api/member/chat/unread");
-      const uuid = data.memberUuid || member.memberUuid;
-      const unread = hasUnreadStaffChat(
-        uuid,
-        data.latestStaffAtMs != null
-          ? String(data.latestStaffAtMs)
-          : data.latestStaffAt,
-        data.latestStaffId,
-      );
-      setChatUnread(unread);
+      const startedMs =
+        data.latestStaffAtMs != null && Number.isFinite(data.latestStaffAtMs)
+          ? Number(data.latestStaffAtMs)
+          : toBadgeStartMs(data.latestStaffAt);
+      // Keep New for 24h from the latest staff message (not cleared on open).
+      setChatUnread(isWithinNewBadgeWindow(startedMs));
     } catch {
       /* ignore badge errors */
     }
   }, [member?.memberUuid]);
 
   useEffect(() => {
-    if (!member?.memberUuid || step === "chat") {
-      if (step === "chat") setChatUnread(false);
+    if (!member?.memberUuid) {
+      setChatUnread(false);
       return;
     }
     void refreshChatUnread();
@@ -269,7 +270,47 @@ export function MemberPortalApp() {
       if (document.visibilityState === "visible") void refreshChatUnread();
     }, 8_000);
     return () => window.clearInterval(id);
-  }, [member?.memberUuid, step, refreshChatUnread, liveTick]);
+  }, [member?.memberUuid, refreshChatUnread, liveTick]);
+
+  const refreshPaymentsUnread = useCallback(async () => {
+    if (!member?.memberUuid) {
+      setPaymentsUnread(false);
+      return;
+    }
+    try {
+      const { peekPaymentsCache, writePaymentsCache } = await import(
+        "@/lib/member-portal/panel-cache"
+      );
+      const cached = peekPaymentsCache<Array<{ paidAt?: string | null }>>(member.memberUuid);
+      let latestPaidAt: string | null = null;
+      if (cached?.data?.length) {
+        latestPaidAt = cached.data[0]?.paidAt || null;
+      }
+      if (!latestPaidAt || (cached && cached.ageMs > 45_000)) {
+        const data = await api<{ ok: true; items: Array<{ paidAt?: string | null }> }>(
+          "/api/member/payments",
+        );
+        const items = data.items || [];
+        writePaymentsCache(member.memberUuid, items);
+        latestPaidAt = items[0]?.paidAt || null;
+      }
+      setPaymentsUnread(isWithinNewBadgeWindow(toBadgeStartMs(latestPaidAt)));
+    } catch {
+      /* ignore */
+    }
+  }, [member?.memberUuid]);
+
+  useEffect(() => {
+    if (!member?.memberUuid) {
+      setPaymentsUnread(false);
+      return;
+    }
+    void refreshPaymentsUnread();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshPaymentsUnread();
+    }, 45_000);
+    return () => window.clearInterval(id);
+  }, [member?.memberUuid, refreshPaymentsUnread, liveTick]);
 
   useEffect(() => {
     if (!member?.memberUuid) {
@@ -1221,7 +1262,7 @@ export function MemberPortalApp() {
                   />
                 ) : null}
                 {tileEnabled("homePayments") ? (
-                  <NavTile label="Payments" onClick={() => setStep("payments")} />
+                  <NavTile label="Payments" badge={paymentsUnread} onClick={() => setStep("payments")} />
                 ) : null}
                 {tileEnabled("homeAttendance") ? (
                   <NavTile label="Attendance" onClick={() => setStep("attendance")} />
@@ -1237,10 +1278,7 @@ export function MemberPortalApp() {
                   <NavTile
                     label="Chat"
                     badge={chatUnread}
-                    onClick={() => {
-                      setChatUnread(false);
-                      setStep("chat");
-                    }}
+                    onClick={() => setStep("chat")}
                   />
                 ) : null}
                 {tileEnabled("homeTraining") ? (
@@ -1402,7 +1440,6 @@ export function MemberPortalApp() {
             <ChatPanel
               onBack={() => setStep("home")}
               memberUuid={member.memberUuid}
-              onSeen={() => setChatUnread(false)}
             />
           ) : null}
           {step === "training" ? (

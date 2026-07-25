@@ -1,5 +1,7 @@
 /** In-app billing Alerts for Member Portal (client-derived; no DB writes). */
 
+import { isWithinNewBadgeWindow } from "@/lib/member-portal/new-badge";
+
 export type BillingAlertKind = "billing" | "overdue";
 
 export type BillingAlert = {
@@ -15,7 +17,6 @@ export type BillingAlert = {
 };
 
 const FINE_AMOUNT_INR = 100;
-const NEW_BADGE_MS = 24 * 60 * 60 * 1000;
 
 function parseDateOnly(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -144,6 +145,5 @@ export function hasUnreadBillingAlert(
   nowMs: number = Date.now(),
 ): boolean {
   if (!alert) return false;
-  const elapsed = nowMs - alert.startedAtMs;
-  return elapsed >= 0 && elapsed < NEW_BADGE_MS;
+  return isWithinNewBadgeWindow(alert.startedAtMs, nowMs);
 }
