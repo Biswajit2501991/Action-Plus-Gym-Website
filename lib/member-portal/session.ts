@@ -168,7 +168,7 @@ export async function issueSession(input: {
   ip?: string;
   userAgent?: string;
 }): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const access = evaluatePortalMemberAccess(input.member);
+  const access = await evaluatePortalMemberAccess(input.member);
   if (!access.ok) {
     return { ok: false, error: access.error, status: access.status };
   }

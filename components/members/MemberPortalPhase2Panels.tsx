@@ -385,7 +385,7 @@ export function NotificationsPanel({
     if (!uuid || !billingAlert) return;
     markAlertsSeen(uuid, billingAlert.cycleKey);
     onSeen?.();
-  }, [member?.memberUuid, billingAlert?.cycleKey, onSeen]);
+  }, [member?.memberUuid, billingAlert, onSeen]);
 
   async function enable() {
     setBusy(true);
