@@ -998,6 +998,23 @@ type TrainingData = {
   planName?: string | null;
 };
 
+/** Training shows only first + latest weights; full history lives in Weight Tracker. */
+function firstAndLatestMeasurements(
+  list: Array<Record<string, unknown>>,
+): Array<{ label: string; m: Record<string, unknown> }> {
+  const timeOf = (m: Record<string, unknown>) => {
+    const ms = Date.parse(String(m.measured_at || ""));
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const sorted = [...list].sort((a, b) => timeOf(a) - timeOf(b));
+  if (!sorted.length) return [];
+  if (sorted.length === 1) return [{ label: "Latest", m: sorted[0] }];
+  return [
+    { label: "Latest", m: sorted[sorted.length - 1] },
+    { label: "First", m: sorted[0] },
+  ];
+}
+
 export function TrainingPanel({
   onBack,
   memberUuid = "",
@@ -1519,13 +1536,19 @@ export function TrainingPanel({
 
       {showMeasurements ? (
       <Block title="Measurements" empty="No measurements yet.">
-        {(data?.measurements || []).map((m) => (
+        {firstAndLatestMeasurements(data?.measurements || []).map(({ label, m }) => (
           <p key={String(m.id)} className="text-sm text-white/85">
+            <span className="text-muted">{label}: </span>
             {formatDate(String(m.measured_at))} ·{" "}
             {m.weight_kg != null ? `${m.weight_kg} kg` : "—"}
             {m.body_fat_pct != null ? ` · ${m.body_fat_pct}% bf` : ""}
           </p>
         ))}
+        {(data?.measurements || []).length > 2 ? (
+          <p className="text-xs text-muted">
+            Full history is in the Weight Tracker.
+          </p>
+        ) : null}
       </Block>
       ) : null}
 
