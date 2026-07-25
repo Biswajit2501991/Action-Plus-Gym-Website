@@ -32,24 +32,42 @@ export function isPortalAllowedMembershipStatus(
   status: unknown,
   accessByStatus?: Record<string, boolean> | null,
 ): boolean {
-  if (accessByStatus && typeof accessByStatus === "object") {
-    const raw = String(status || "").trim().toLowerCase();
-    const key =
-      raw === "active"
-        ? "Active"
-        : raw === "hold"
-          ? "Hold"
-          : raw === "deactivated"
-            ? "Deactivated"
-            : raw === "cancelled" || raw === "canceled"
-              ? "Cancelled"
-              : null;
-    if (!key) return false;
-    if (key in accessByStatus) return Boolean(accessByStatus[key]);
-    const lower = key.toLowerCase();
-    if (lower in accessByStatus) return Boolean(accessByStatus[lower]);
+  const statusLc = String(status || "").trim().toLowerCase();
+  // Historical fail-safe when settings are missing/corrupt.
+  if (!accessByStatus || typeof accessByStatus !== "object") {
+    return ALLOWED_MEMBER_STATUSES.has(statusLc);
   }
-  return ALLOWED_MEMBER_STATUSES.has(String(status || "").trim().toLowerCase());
+
+  const map = { ...accessByStatus };
+  const allOff =
+    !map.Active &&
+    !map.Hold &&
+    !map.Deactivated &&
+    !map.Cancelled &&
+    !map.active &&
+    !map.hold &&
+    !map.deactivated &&
+    !map.cancelled;
+  if (allOff) {
+    return ALLOWED_MEMBER_STATUSES.has(statusLc);
+  }
+
+  const key =
+    statusLc === "active"
+      ? "Active"
+      : statusLc === "hold"
+        ? "Hold"
+        : statusLc === "deactivated"
+          ? "Deactivated"
+          : statusLc === "cancelled" || statusLc === "canceled"
+            ? "Cancelled"
+            : null;
+  if (!key) return false;
+  if (key in map) return Boolean(map[key]);
+  const lower = key.toLowerCase();
+  if (lower in map) return Boolean(map[lower]);
+  // Unknown key shape → historical Active/Hold gate
+  return ALLOWED_MEMBER_STATUSES.has(statusLc);
 }
 
 export const PORTAL_MEMBERSHIP_STATUS_ERROR =
