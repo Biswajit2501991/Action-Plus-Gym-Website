@@ -131,6 +131,194 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
+type ReceiptData = {
+  receiptId: string;
+  memberName: string;
+  memberCode: string;
+  planName: string;
+  branchName: string;
+  paidAt: string;
+  method: string;
+  billingMonth: string;
+  note: string;
+  amount: string;
+  amountDisplay: string;
+  shareText: string;
+};
+
+function receiptShareBody(receipt: ReceiptData, pageUrl: string) {
+  return `${receipt.shareText}\n\n${pageUrl}`;
+}
+
+/** In-app receipt so home-screen members never leave the portal. */
+function ReceiptView({
+  paymentId,
+  onBack,
+}: {
+  paymentId: string;
+  onBack: () => void;
+}) {
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+
+  const pageUrl = `/api/member/payments/${encodeURIComponent(paymentId)}/receipt`;
+
+  useEffect(() => {
+    let cancelled = false;
+    setReceipt(null);
+    setError(null);
+    setHint(null);
+    void api<{ ok: true; receipt: ReceiptData }>(`${pageUrl}?format=json`)
+      .then((data) => {
+        if (!cancelled) setReceipt(data.receipt);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Could not load receipt");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageUrl]);
+
+  function absoluteUrl() {
+    if (typeof window === "undefined") return pageUrl;
+    return new URL(pageUrl, window.location.origin).toString();
+  }
+
+  function shareOnWhatsApp() {
+    if (!receipt) return;
+    const text = receiptShareBody(receipt, absoluteUrl());
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
+
+  async function shareNative() {
+    if (!receipt) return;
+    setHint(null);
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Action Plus Gym receipt",
+          text: receipt.shareText,
+          url: absoluteUrl(),
+        });
+        return;
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
+    }
+    try {
+      await navigator.clipboard?.writeText(
+        receiptShareBody(receipt, absoluteUrl()),
+      );
+      setHint("Receipt details copied.");
+    } catch {
+      setHint("Use Share on WhatsApp to send this receipt.");
+    }
+  }
+
+  const rows: Array<[string, string]> = receipt
+    ? [
+        ["Receipt", receipt.receiptId],
+        ["Member", receipt.memberName],
+        ["Member ID", receipt.memberCode],
+        ["Plan", receipt.planName],
+        ["Branch", receipt.branchName],
+        ["Paid at", receipt.paidAt],
+        ["Method", receipt.method],
+        ["Billing month", receipt.billingMonth],
+        ["Note", receipt.note],
+      ]
+    : [];
+
+  return (
+    <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
+      <PortalBackButton onClick={onBack} />
+      <h2 className="mt-3 font-display text-2xl text-white">Payment receipt</h2>
+
+      {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+      {!receipt && !error ? (
+        <p className="mt-4 text-sm text-muted">Loading…</p>
+      ) : null}
+
+      {receipt ? (
+        <>
+          <div className="mt-4 overflow-hidden rounded-3xl border border-gold/25 bg-black/35">
+            <div className="border-b border-white/10 px-5 py-5 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl gold-gradient text-sm font-extrabold text-black">
+                AP
+              </div>
+              <p className="mt-3 font-display text-xl text-gold">Action Plus Gym</p>
+              <p className="mt-1 text-[11px] uppercase tracking-widest text-muted">
+                Payment receipt
+              </p>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Paid
+              </span>
+            </div>
+
+            <div className="px-5 pb-2 pt-5 text-center">
+              <p className="text-[11px] uppercase tracking-widest text-muted">
+                Amount paid
+              </p>
+              <p className="mt-1 font-display text-4xl text-gold">
+                ₹{receipt.amountDisplay}
+              </p>
+            </div>
+
+            <dl className="px-5 pb-5 pt-3">
+              {rows.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex justify-between gap-4 border-b border-white/10 py-2.5 text-sm last:border-b-0"
+                >
+                  <dt className="shrink-0 text-muted">{label}</dt>
+                  <dd className="break-words text-right text-white/90">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <button
+              type="button"
+              onClick={shareOnWhatsApp}
+              className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
+            >
+              Share on WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={() => void shareNative()}
+              className="w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white"
+            >
+              Share
+            </button>
+            <a
+              href={pageUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full rounded-full border border-white/15 px-5 py-3 text-center text-sm text-white"
+            >
+              Print / Save PDF
+            </a>
+            {hint ? (
+              <p className="pt-1 text-center text-xs text-muted">{hint}</p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 export function PaymentsPanel({
   onBack,
   memberUuid = "",
@@ -141,6 +329,7 @@ export function PaymentsPanel({
   /** Kept for call-site compat; Payments uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
 }) {
+  const [receiptId, setReceiptId] = useState<string | null>(null);
   const [items, setItems] = useState<Payment[]>(() => {
     const cached = readPaymentsCache<Payment[]>(memberUuid);
     return Array.isArray(cached) ? cached : [];
@@ -200,6 +389,10 @@ export function PaymentsPanel({
     };
   }, [reload, memberUuid, applyPayments]);
 
+  if (receiptId) {
+    return <ReceiptView paymentId={receiptId} onBack={() => setReceiptId(null)} />;
+  }
+
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
       <PortalBackButton onClick={onBack} />
@@ -231,14 +424,13 @@ export function PaymentsPanel({
                 {formatDate(p.paidAt)} · {p.method || "—"} · {p.paidMonth || "—"}
               </p>
             </div>
-            <a
-              href={`/api/member/payments/${encodeURIComponent(p.id)}/receipt`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-gold hover:underline"
+            <button
+              type="button"
+              onClick={() => setReceiptId(p.id)}
+              className="shrink-0 rounded-full border border-gold/40 px-3 py-1.5 text-xs font-semibold text-gold"
             >
               Receipt
-            </a>
+            </button>
           </li>
           );
         })}

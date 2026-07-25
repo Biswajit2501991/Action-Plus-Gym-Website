@@ -27,7 +27,7 @@ function formatPaidAt(value: string | null | undefined): string {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const session = await requireMemberSession();
@@ -110,6 +110,31 @@ export async function GET(
     `Method: ${method}`,
     `Billing month: ${billingMonth}`,
   ].join("\n");
+
+  const wantsJson =
+    new URL(req.url).searchParams.get("format")?.toLowerCase() === "json";
+  if (wantsJson) {
+    return NextResponse.json(
+      {
+        ok: true,
+        receipt: {
+          receiptId,
+          memberName,
+          memberCode,
+          planName,
+          branchName,
+          paidAt,
+          method,
+          billingMonth,
+          note,
+          amount,
+          amountDisplay,
+          shareText,
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -332,7 +357,8 @@ export async function GET(
 <body>
   <div class="wrap">
     <div class="toolbar no-print">
-      <button type="button" class="btn-gold" id="shareBtn">Share</button>
+      <button type="button" class="btn-gold" id="whatsappBtn">Share on WhatsApp</button>
+      <button type="button" class="btn-outline" id="shareBtn">Share</button>
       <button type="button" class="btn-outline" id="printBtn">Print / Save PDF</button>
       <a class="btn-ghost" href="/members">← Back to Member Portal</a>
     </div>
@@ -376,6 +402,7 @@ export async function GET(
       var shareText = ${JSON.stringify(shareText)};
       var hint = document.getElementById("hint");
       var shareBtn = document.getElementById("shareBtn");
+      var whatsappBtn = document.getElementById("whatsappBtn");
       var printBtn = document.getElementById("printBtn");
 
       function setHint(msg) {
@@ -392,6 +419,12 @@ export async function GET(
       if (printBtn) {
         printBtn.addEventListener("click", function () {
           window.print();
+        });
+      }
+
+      if (whatsappBtn) {
+        whatsappBtn.addEventListener("click", function () {
+          openWhatsApp();
         });
       }
 
