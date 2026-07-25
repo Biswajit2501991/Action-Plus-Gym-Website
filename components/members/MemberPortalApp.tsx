@@ -17,6 +17,10 @@ import {
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { hasUnreadStaffChat } from "@/lib/member-portal/chat-client";
 import {
+  deriveBillingAlert,
+  hasUnreadBillingAlert,
+} from "@/lib/member-portal/billing-alerts";
+import {
   clearKnownDeviceProfile,
   readKnownDeviceProfile,
   writeKnownDeviceProfile,
@@ -169,6 +173,7 @@ export function MemberPortalApp() {
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [chatUnread, setChatUnread] = useState(false);
+  const [alertsUnread, setAlertsUnread] = useState(false);
   const [knownDevice, setKnownDevice] = useState(false);
   const [portalSections, setPortalSections] = useState<PortalSections>(
     () => ({ ...DEFAULT_PORTAL_SECTIONS }),
@@ -265,6 +270,34 @@ export function MemberPortalApp() {
     }, 8_000);
     return () => window.clearInterval(id);
   }, [member?.memberUuid, step, refreshChatUnread, liveTick]);
+
+  useEffect(() => {
+    if (!member?.memberUuid) {
+      setAlertsUnread(false);
+      return;
+    }
+    if (step === "notifications") {
+      setAlertsUnread(false);
+      return;
+    }
+    const alert = deriveBillingAlert({
+      status: member.status,
+      billingDate: member.billingDate,
+      paymentBy: member.paymentBy,
+      nextPaymentDate: member.nextPaymentDate,
+      amount: member.amount,
+    });
+    setAlertsUnread(hasUnreadBillingAlert(member.memberUuid, alert));
+  }, [
+    member?.memberUuid,
+    member?.status,
+    member?.billingDate,
+    member?.paymentBy,
+    member?.nextPaymentDate,
+    member?.amount,
+    step,
+    liveTick,
+  ]);
 
   /** Soft refresh — updates member data without forcing navigation to home. */
   const refreshMember = useCallback(async () => {
@@ -1199,7 +1232,14 @@ export function MemberPortalApp() {
                   <NavTile label="Attendance" onClick={() => setStep("attendance")} />
                 ) : null}
                 {tileEnabled("homeAlerts") ? (
-                  <NavTile label="Alerts" onClick={() => setStep("notifications")} />
+                  <NavTile
+                    label="Alerts"
+                    badge={alertsUnread}
+                    onClick={() => {
+                      setAlertsUnread(false);
+                      setStep("notifications");
+                    }}
+                  />
                 ) : null}
                 {tileEnabled("homeChat") ? (
                   <NavTile
@@ -1361,7 +1401,11 @@ export function MemberPortalApp() {
             />
           ) : null}
           {step === "notifications" ? (
-            <NotificationsPanel onBack={() => setStep("home")} />
+            <NotificationsPanel
+              onBack={() => setStep("home")}
+              member={member}
+              onSeen={() => setAlertsUnread(false)}
+            />
           ) : null}
           {step === "chat" ? (
             <ChatPanel
@@ -1424,7 +1468,7 @@ function NavTile({
       {badge ? (
         <span
           className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black shadow-[0_0_10px_rgba(212,175,55,0.85)]"
-          aria-label="New chat message from gym"
+          aria-label="New notification"
         >
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-black/70" />
           New

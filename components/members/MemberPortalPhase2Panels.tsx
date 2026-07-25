@@ -35,6 +35,11 @@ import {
   writeTrainingCache,
 } from "@/lib/member-portal/panel-cache";
 import { detectWebPushSupport } from "@/lib/member-portal/web-push-support";
+import {
+  deriveBillingAlert,
+  markAlertsSeen,
+  type BillingAlert,
+} from "@/lib/member-portal/billing-alerts";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 
 type Payment = {
@@ -329,16 +334,58 @@ export function AttendancePanel({
   );
 }
 
-export function NotificationsPanel({ onBack }: { onBack: () => void }) {
+type AlertsMember = {
+  memberUuid?: string;
+  status?: string | null;
+  billingDate?: string | null;
+  paymentBy?: string | null;
+  nextPaymentDate?: string | null;
+  amount?: number | null;
+};
+
+export function NotificationsPanel({
+  onBack,
+  member,
+  onSeen,
+}: {
+  onBack: () => void;
+  member?: AlertsMember | null;
+  onSeen?: () => void;
+}) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [support, setSupport] = useState<ReturnType<typeof detectWebPushSupport> | null>(null);
 
+  const billingAlert = useMemo(
+    () =>
+      deriveBillingAlert({
+        status: member?.status,
+        billingDate: member?.billingDate,
+        paymentBy: member?.paymentBy,
+        nextPaymentDate: member?.nextPaymentDate,
+        amount: member?.amount,
+      }),
+    [
+      member?.status,
+      member?.billingDate,
+      member?.paymentBy,
+      member?.nextPaymentDate,
+      member?.amount,
+    ],
+  );
+
   useEffect(() => {
     setSupport(detectWebPushSupport());
   }, []);
+
+  useEffect(() => {
+    const uuid = String(member?.memberUuid || "").trim();
+    if (!uuid || !billingAlert) return;
+    markAlertsSeen(uuid, billingAlert.cycleKey);
+    onSeen?.();
+  }, [member?.memberUuid, billingAlert?.cycleKey, onSeen]);
 
   async function enable() {
     setBusy(true);
@@ -409,39 +456,109 @@ export function NotificationsPanel({ onBack }: { onBack: () => void }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
       <PortalBackButton onClick={onBack} />
-      <h2 className="mt-3 font-display text-2xl text-white">Billing reminders</h2>
+      <h2 className="mt-3 font-display text-2xl text-white">Alerts</h2>
       <p className="mt-1 text-sm text-muted">
-        Allow notifications once. On your billing day the gym can remind you automatically.
+        Billing and payment notices for your membership. Optional phone push is below.
       </p>
 
-      {needsHomeScreen ? (
-        <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
-          <p className="font-semibold text-gold">Install on your Home Screen first</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-white/80">
-            <li>Tap Share in Safari (or Chrome menu → Share)</li>
-            <li>Choose Add to Home Screen</li>
-            <li>Open Action Plus from the new icon</li>
-            <li>Return here and tap Enable billing-day push</li>
-          </ol>
-        </div>
-      ) : null}
+      <div className="mt-5 space-y-3">
+        {billingAlert ? (
+          <BillingAlertCard alert={billingAlert} />
+        ) : (
+          <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-4 text-sm text-muted">
+            No billing alerts right now. You&apos;ll see a notice here from your billing date through
+            the payment-due window.
+          </div>
+        )}
+      </div>
 
-      {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
-      {hint ? <p className="mt-2 text-xs leading-relaxed text-muted">{hint}</p> : null}
-      {status ? <p className="mt-3 text-sm text-gold">{status}</p> : null}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void enable()}
-        className="mt-4 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
-      >
-        {busy ? "Enabling…" : "Enable billing-day push"}
-      </button>
-      <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        Android Chrome can enable push in the browser. iPhone/iPad require the Home Screen app (iOS
-        16.4+).
-      </p>
+      <div className="mt-8 border-t border-white/10 pt-6">
+        <h3 className="text-sm font-semibold text-white">Optional phone reminders</h3>
+        <p className="mt-1 text-sm text-muted">
+          Allow browser notifications once. On your billing day the gym can also remind you on this
+          device (Android Chrome works best; iPhone needs Home Screen).
+        </p>
+
+        {needsHomeScreen ? (
+          <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
+            <p className="font-semibold text-gold">Install on your Home Screen first</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-white/80">
+              <li>Tap Share in Safari (or Chrome menu → Share)</li>
+              <li>Choose Add to Home Screen</li>
+              <li>Open Action Plus from the new icon</li>
+              <li>Return here and tap Enable billing-day push</li>
+            </ol>
+          </div>
+        ) : null}
+
+        {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+        {hint ? <p className="mt-2 text-xs leading-relaxed text-muted">{hint}</p> : null}
+        {status ? <p className="mt-3 text-sm text-gold">{status}</p> : null}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void enable()}
+          className="mt-4 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+        >
+          {busy ? "Enabling…" : "Enable billing-day push"}
+        </button>
+        <p className="mt-3 text-[11px] leading-relaxed text-muted">
+          Android Chrome can enable push in the browser. iPhone/iPad require the Home Screen app (iOS
+          16.4+). In-app Alerts above work even if push is off.
+        </p>
+      </div>
     </section>
+  );
+}
+
+function BillingAlertCard({ alert }: { alert: BillingAlert }) {
+  const overdue = alert.kind === "overdue";
+  return (
+    <article
+      className={
+        overdue
+          ? "rounded-2xl border border-rose-400/40 bg-rose-950/35 px-4 py-4"
+          : "rounded-2xl border border-gold/35 bg-gold/10 px-4 py-4"
+      }
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p
+          className={
+            overdue
+              ? "text-sm font-semibold text-rose-200"
+              : "text-sm font-semibold text-gold"
+          }
+        >
+          {alert.title}
+        </p>
+        <span
+          className={
+            overdue
+              ? "shrink-0 rounded-full bg-rose-400/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-200"
+              : "shrink-0 rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold"
+          }
+        >
+          {overdue ? "Overdue" : "Billing"}
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-white/90">{alert.body}</p>
+      <dl className="mt-3 grid gap-1.5 text-xs text-white/70">
+        <div className="flex justify-between gap-3">
+          <dt>Billing date</dt>
+          <dd className="text-white">{alert.billingDateLabel}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Payment by</dt>
+          <dd className="text-white">{alert.paymentByLabel}</dd>
+        </div>
+        {alert.amountLabel ? (
+          <div className="flex justify-between gap-3">
+            <dt>Plan amount</dt>
+            <dd className="text-white">{alert.amountLabel}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </article>
   );
 }
 
