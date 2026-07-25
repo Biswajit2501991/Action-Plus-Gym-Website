@@ -21,18 +21,25 @@ import {
 } from "@/lib/member-portal/chat-client";
 import {
   PANEL_SOFT_TTL_MS,
+  peekAttendanceCache,
+  peekBookingsCache,
   peekPaymentsCache,
   peekPerksCache,
   peekTrainingCache,
+  peekWeightCache,
   readAttendanceCache,
+  readBookingsCache,
   readPaymentsCache,
   readPerksCache,
   readTrainingCache,
+  readWeightCache,
   TRAINING_SOFT_TTL_MS,
   writeAttendanceCache,
+  writeBookingsCache,
   writePaymentsCache,
   writePerksCache,
   writeTrainingCache,
+  writeWeightCache,
 } from "@/lib/member-portal/panel-cache";
 import { detectWebPushSupport } from "@/lib/member-portal/web-push-support";
 import {
@@ -247,11 +254,12 @@ export function AttendancePanel({
   onBack,
   deviceId,
   memberUuid = "",
-  liveTick = 0,
+  liveTick: _liveTick = 0,
 }: {
   onBack: () => void;
   deviceId: string;
   memberUuid?: string;
+  /** Kept for call-site compat; uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
 }) {
   const month = useMemo(() => new Date().toISOString().slice(0, 7), []);
@@ -262,9 +270,17 @@ export function AttendancePanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState("");
+  const [initialLoad, setInitialLoad] = useState(
+    () => !readAttendanceCache(memberUuid, month),
+  );
 
-  const load = useCallback(async () => {
-    try {
+  const load = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekAttendanceCache<Attendance[]>(memberUuid, month);
+        if (peek && peek.ageMs < PANEL_SOFT_TTL_MS) return peek.data;
+      }
       const data = await api<{ ok: true; items: Attendance[] }>(
         `/api/member/attendance?month=${encodeURIComponent(month)}`,
       );
@@ -272,16 +288,39 @@ export function AttendancePanel({
       setItems(next);
       writeAttendanceCache(memberUuid, month, next);
       setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
-    }
-  }, [month, memberUuid]);
+      setInitialLoad(false);
+      return next;
+    },
+    [month, memberUuid],
+  );
 
   useEffect(() => {
+    let cancelled = false;
     const cached = readAttendanceCache<Attendance[]>(memberUuid, month);
-    if (cached) setItems(cached);
-    void load();
-  }, [load, liveTick, memberUuid, month]);
+    if (cached) {
+      setItems(cached);
+      setInitialLoad(false);
+    }
+
+    const pull = (force: boolean) => {
+      void load({ force }).catch((e) => {
+        if (!cancelled && !readAttendanceCache(memberUuid, month)) {
+          setError(e instanceof Error ? e.message : "Load failed");
+          setInitialLoad(false);
+        }
+      });
+    };
+
+    pull(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load, memberUuid, month]);
 
   async function checkIn() {
     setBusy(true);
@@ -294,7 +333,7 @@ export function AttendancePanel({
         body: JSON.stringify({ presenceTicket, deviceId }),
       });
       setToken("");
-      await load();
+      await load({ force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check-in failed");
     } finally {
@@ -331,16 +370,20 @@ export function AttendancePanel({
         </button>
       </div>
       <p className="mt-5 text-xs uppercase tracking-wide text-muted">This month · {days.size} days</p>
-      <ul className="mt-2 max-h-64 space-y-2 overflow-auto">
-        {items.map((i) => (
-          <li key={i.id} className="text-sm text-white/85">
-            {new Date(i.checked_in_at).toLocaleString("en-IN")} · {i.source}
-          </li>
-        ))}
-        {!items.length ? (
-          <li className="text-sm text-muted">No check-ins yet.</li>
-        ) : null}
-      </ul>
+      {initialLoad && !items.length ? (
+        <p className="mt-2 text-sm text-muted">Loading…</p>
+      ) : (
+        <ul className="mt-2 max-h-64 space-y-2 overflow-auto">
+          {items.map((i) => (
+            <li key={i.id} className="text-sm text-white/85">
+              {new Date(i.checked_in_at).toLocaleString("en-IN")} · {i.source}
+            </li>
+          ))}
+          {!items.length ? (
+            <li className="text-sm text-muted">No check-ins yet.</li>
+          ) : null}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1505,31 +1548,89 @@ function Block({
 
 export function BookingsPanel({
   onBack,
-  liveTick = 0,
+  memberUuid = "",
+  liveTick: _liveTick = 0,
 }: {
   onBack: () => void;
+  memberUuid?: string;
   liveTick?: number;
 }) {
-  const [slots, setSlots] = useState<
-    Array<{ id: string; title: string; starts_at: string; capacity: number }>
-  >([]);
-  const [mine, setMine] = useState<Array<{ slot_id: string; status: string }>>([]);
+  type BookingsData = {
+    slots: Array<{ id: string; title: string; starts_at: string; capacity: number }>;
+    mine: Array<{ slot_id: string; status: string }>;
+  };
+
+  const [slots, setSlots] = useState<BookingsData["slots"]>(() => {
+    const cached = readBookingsCache<BookingsData>(memberUuid);
+    return cached?.slots || [];
+  });
+  const [mine, setMine] = useState<BookingsData["mine"]>(() => {
+    const cached = readBookingsCache<BookingsData>(memberUuid);
+    return cached?.mine || [];
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [initialLoad, setInitialLoad] = useState(
+    () => !readBookingsCache(memberUuid),
+  );
 
-  const load = useCallback(async () => {
-    const data = await api<{
-      ok: true;
-      slots: Array<{ id: string; title: string; starts_at: string; capacity: number }>;
-      myBookings: Array<{ slot_id: string; status: string }>;
-    }>("/api/member/bookings");
-    setSlots(data.slots || []);
-    setMine(data.myBookings || []);
-  }, []);
+  const applyBookings = useCallback(
+    (next: BookingsData) => {
+      setSlots(next.slots || []);
+      setMine(next.mine || []);
+      writeBookingsCache(memberUuid, next);
+      setError(null);
+      setInitialLoad(false);
+    },
+    [memberUuid],
+  );
+
+  const load = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekBookingsCache<BookingsData>(memberUuid);
+        if (peek && peek.ageMs < PANEL_SOFT_TTL_MS) return peek.data;
+      }
+      const data = await api<{
+        ok: true;
+        slots: BookingsData["slots"];
+        myBookings: BookingsData["mine"];
+      }>("/api/member/bookings");
+      const next = {
+        slots: data.slots || [],
+        mine: data.myBookings || [],
+      };
+      applyBookings(next);
+      return next;
+    },
+    [applyBookings, memberUuid],
+  );
 
   useEffect(() => {
-    load().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
-  }, [load, liveTick]);
+    let cancelled = false;
+    const cached = readBookingsCache<BookingsData>(memberUuid);
+    if (cached) applyBookings(cached);
+
+    const pull = (force: boolean) => {
+      void load({ force }).catch((e) => {
+        if (!cancelled && !readBookingsCache(memberUuid)) {
+          setError(e instanceof Error ? e.message : "Load failed");
+          setInitialLoad(false);
+        }
+      });
+    };
+
+    pull(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load, memberUuid, applyBookings]);
 
   async function book(slotId: string) {
     setBusy(slotId);
@@ -1539,7 +1640,7 @@ export function BookingsPanel({
         method: "POST",
         body: JSON.stringify({ slotId }),
       });
-      await load();
+      await load({ force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Booking failed");
     } finally {
@@ -1554,32 +1655,38 @@ export function BookingsPanel({
       <PortalBackButton onClick={onBack} />
       <h2 className="mt-3 font-display text-2xl text-white">Bookings</h2>
       {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
-      <ul className="mt-4 space-y-3">
-        {slots.map((s) => (
-          <li
-            key={s.id}
-            className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3"
-          >
-            <div>
-              <p className="text-white">{s.title}</p>
-              <p className="text-xs text-muted">
-                {new Date(s.starts_at).toLocaleString("en-IN")} · cap {s.capacity}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={busy === s.id || booked.has(s.id)}
-              onClick={() => void book(s.id)}
-              className="rounded-full border border-gold/40 px-3 py-1.5 text-xs text-gold disabled:opacity-40"
+      {initialLoad && !slots.length ? (
+        <p className="mt-4 text-sm text-muted">Loading…</p>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {slots.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3"
             >
-              {booked.has(s.id) ? "Booked" : busy === s.id ? "…" : "Book"}
-            </button>
-          </li>
-        ))}
-        {!slots.length ? (
-          <li className="text-sm text-muted">No upcoming classes yet. Ask the gym to publish slots.</li>
-        ) : null}
-      </ul>
+              <div>
+                <p className="text-white">{s.title}</p>
+                <p className="text-xs text-muted">
+                  {new Date(s.starts_at).toLocaleString("en-IN")} · cap {s.capacity}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy === s.id || booked.has(s.id)}
+                onClick={() => void book(s.id)}
+                className="rounded-full border border-gold/40 px-3 py-1.5 text-xs text-gold disabled:opacity-40"
+              >
+                {booked.has(s.id) ? "Booked" : busy === s.id ? "…" : "Book"}
+              </button>
+            </li>
+          ))}
+          {!slots.length ? (
+            <li className="text-sm text-muted">
+              No upcoming classes yet. Ask the gym to publish slots.
+            </li>
+          ) : null}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1929,22 +2036,42 @@ function weightTrendByDate(byDate: Record<string, number>): Record<string, Weigh
   return out;
 }
 
+type WeightCachePayload = {
+  canEdit: boolean;
+  logs: WeightLog[];
+  currentKg: number | null;
+  changeKg: number | null;
+  today: string;
+};
+
 /** Basic-member Weight Tracker — logs to member_measurements (shared with Gym Manager). */
-export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
-  const [logs, setLogs] = useState<WeightLog[]>([]);
-  const [canEdit, setCanEdit] = useState(true);
-  const [date, setDate] = useState("");
+export function WeightTrackerPanel({
+  onBack,
+  memberUuid = "",
+}: {
+  onBack: () => void;
+  memberUuid?: string;
+}) {
+  const cached0 = readWeightCache<WeightCachePayload>(memberUuid);
+  const [logs, setLogs] = useState<WeightLog[]>(() => cached0?.logs || []);
+  const [canEdit, setCanEdit] = useState(() => cached0?.canEdit !== false);
+  const [date, setDate] = useState(() => cached0?.today || "");
   const [weight, setWeight] = useState("");
-  const [currentKg, setCurrentKg] = useState<number | null>(null);
-  const [changeKg, setChangeKg] = useState<number | null>(null);
+  const [currentKg, setCurrentKg] = useState<number | null>(() => cached0?.currentKg ?? null);
+  const [changeKg, setChangeKg] = useState<number | null>(() => cached0?.changeKg ?? null);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(() => !cached0);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<null | { kind: "loss" | "gain" | "same"; delta: number }>(
     null,
   );
-  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
-  const [viewMonthIndex, setViewMonthIndex] = useState(() => new Date().getMonth());
+  const initialParts = parsePtDateKey(cached0?.today) || {
+    year: new Date().getFullYear(),
+    monthIndex: new Date().getMonth(),
+    day: new Date().getDate(),
+  };
+  const [viewYear, setViewYear] = useState(initialParts.year);
+  const [viewMonthIndex, setViewMonthIndex] = useState(initialParts.monthIndex);
 
   const byDate = useMemo(() => weightByDateMap(logs), [logs]);
   const trendByDate = useMemo(() => weightTrendByDate(byDate), [byDate]);
@@ -1957,34 +2084,80 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
   const selectedWeight = date && byDate[date] != null ? byDate[date] : null;
   const selectedTrend = date ? trendByDate[date] : null;
 
-  const reload = useCallback(async () => {
-    const data = await api<{
-      ok: true;
-      canEdit: boolean;
-      logs: WeightLog[];
-      currentKg: number | null;
-      changeKg: number | null;
-      today: string;
-    }>("/api/member/weight");
-    setCanEdit(Boolean(data.canEdit));
-    setLogs(Array.isArray(data.logs) ? data.logs : []);
-    setCurrentKg(data.currentKg);
-    setChangeKg(data.changeKg);
-    const today = data.today || "";
-    setDate((prev) => prev || today);
-    const parts = parsePtDateKey(today);
-    if (parts) {
-      setViewYear(parts.year);
-      setViewMonthIndex(parts.monthIndex);
-    }
-  }, []);
+  const applyWeight = useCallback(
+    (data: WeightCachePayload, opts?: { keepSelectedDate?: boolean }) => {
+      setCanEdit(Boolean(data.canEdit));
+      setLogs(Array.isArray(data.logs) ? data.logs : []);
+      setCurrentKg(data.currentKg);
+      setChangeKg(data.changeKg);
+      const today = data.today || "";
+      if (!opts?.keepSelectedDate) {
+        setDate((prev) => prev || today);
+      }
+      const parts = parsePtDateKey(today);
+      if (parts) {
+        setViewYear((y) => y || parts.year);
+        setViewMonthIndex((m) => (Number.isFinite(m) ? m : parts.monthIndex));
+      }
+      writeWeightCache(memberUuid, data);
+      setError(null);
+      setInitialLoad(false);
+    },
+    [memberUuid],
+  );
+
+  const reload = useCallback(
+    async (opts?: { force?: boolean; keepSelectedDate?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekWeightCache<WeightCachePayload>(memberUuid);
+        if (peek && peek.ageMs < PANEL_SOFT_TTL_MS) return peek.data;
+      }
+      const data = await api<{
+        ok: true;
+        canEdit: boolean;
+        logs: WeightLog[];
+        currentKg: number | null;
+        changeKg: number | null;
+        today: string;
+      }>("/api/member/weight");
+      const payload: WeightCachePayload = {
+        canEdit: Boolean(data.canEdit),
+        logs: Array.isArray(data.logs) ? data.logs : [],
+        currentKg: data.currentKg,
+        changeKg: data.changeKg,
+        today: data.today || "",
+      };
+      applyWeight(payload, { keepSelectedDate: opts?.keepSelectedDate });
+      return payload;
+    },
+    [applyWeight, memberUuid],
+  );
 
   useEffect(() => {
-    setLoading(true);
-    reload()
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load weight"))
-      .finally(() => setLoading(false));
-  }, [reload]);
+    let cancelled = false;
+    const cached = readWeightCache<WeightCachePayload>(memberUuid);
+    if (cached) applyWeight(cached);
+
+    const pull = (force: boolean) => {
+      void reload({ force, keepSelectedDate: true }).catch((e) => {
+        if (!cancelled && !readWeightCache(memberUuid)) {
+          setError(e instanceof Error ? e.message : "Could not load weight");
+          setInitialLoad(false);
+        }
+      });
+    };
+
+    pull(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [reload, memberUuid, applyWeight]);
 
   function shiftMonth(delta: number) {
     const dt = new Date(viewYear, viewMonthIndex + delta, 1);
@@ -2016,7 +2189,7 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ date, weightKg: kg }),
       });
       setWeight("");
-      await reload();
+      await reload({ force: true, keepSelectedDate: true });
       const delta = res.changeKg;
       if (delta != null && delta !== 0) {
         setFeedback({
@@ -2050,7 +2223,7 @@ export function WeightTrackerPanel({ onBack }: { onBack: () => void }) {
         </p>
       </div>
 
-      {loading ? <p className="text-sm text-muted">Loading…</p> : null}
+      {initialLoad && !logs.length ? <p className="text-sm text-muted">Loading…</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
       {!canEdit ? (

@@ -335,6 +335,109 @@ export function MemberPortalApp() {
     liveTick,
   ]);
 
+  /** Warm panel caches on home so cards open instantly (fresh fetch still runs in background). */
+  useEffect(() => {
+    if (step !== "home" || !member?.memberUuid) return;
+    const uuid = member.memberUuid;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const {
+          PANEL_SOFT_TTL_MS,
+          peekBookingsCache,
+          peekPerksCache,
+          peekTrainingCache,
+          peekWeightCache,
+          writeBookingsCache,
+          writePerksCache,
+          writeTrainingCache,
+          writeWeightCache,
+        } = await import("@/lib/member-portal/panel-cache");
+
+        const warm = async <T,>(
+          peek: () => { ageMs: number } | null,
+          fetchAndWrite: () => Promise<void>,
+        ) => {
+          if (cancelled) return;
+          const hit = peek();
+          if (hit && hit.ageMs < PANEL_SOFT_TTL_MS) return;
+          await fetchAndWrite();
+        };
+
+        await warm(
+          () => peekTrainingCache(uuid),
+          async () => {
+            const data = await api<{ ok: true } & Record<string, unknown>>(
+              "/api/member/training",
+            );
+            if (!cancelled) writeTrainingCache(uuid, data);
+          },
+        );
+        await warm(
+          () => peekWeightCache(uuid),
+          async () => {
+            const data = await api<{
+              ok: true;
+              canEdit: boolean;
+              logs: unknown[];
+              currentKg: number | null;
+              changeKg: number | null;
+              today: string;
+            }>("/api/member/weight");
+            if (!cancelled) {
+              writeWeightCache(uuid, {
+                canEdit: Boolean(data.canEdit),
+                logs: Array.isArray(data.logs) ? data.logs : [],
+                currentKg: data.currentKg,
+                changeKg: data.changeKg,
+                today: data.today || "",
+              });
+            }
+          },
+        );
+        await warm(
+          () => peekBookingsCache(uuid),
+          async () => {
+            const data = await api<{
+              ok: true;
+              slots: unknown[];
+              myBookings: unknown[];
+            }>("/api/member/bookings");
+            if (!cancelled) {
+              writeBookingsCache(uuid, {
+                slots: data.slots || [],
+                mine: data.myBookings || [],
+              });
+            }
+          },
+        );
+        await warm(
+          () => peekPerksCache(uuid),
+          async () => {
+            const data = await api<{
+              ok: true;
+              locker: unknown;
+              referral: unknown;
+            }>("/api/member/perks");
+            if (!cancelled) {
+              writePerksCache(uuid, {
+                locker: data.locker ?? null,
+                referral: data.referral ?? null,
+              });
+            }
+          },
+        );
+      } catch {
+        /* best-effort warm */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, member?.memberUuid]);
+
   /** Soft refresh — updates member data without forcing navigation to home. */
   const refreshMember = useCallback(async () => {
     const data = await api<{
@@ -1450,10 +1553,17 @@ export function MemberPortalApp() {
             />
           ) : null}
           {step === "weight" ? (
-            <WeightTrackerPanel onBack={() => setStep("home")} />
+            <WeightTrackerPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+            />
           ) : null}
           {step === "bookings" ? (
-            <BookingsPanel onBack={() => setStep("home")} liveTick={liveTick} />
+            <BookingsPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+              liveTick={liveTick}
+            />
           ) : null}
           {step === "perks" ? (
             <PerksPanel

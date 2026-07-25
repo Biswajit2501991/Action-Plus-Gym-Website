@@ -8,6 +8,8 @@ const TRAINING_PREFIX = "apg_portal_training_v1_";
 const ATTENDANCE_PREFIX = "apg_portal_attendance_v1_";
 const PAYMENTS_PREFIX = "apg_portal_payments_v1_";
 const PERKS_PREFIX = "apg_portal_perks_v1_";
+const WEIGHT_PREFIX = "apg_portal_weight_v1_";
+const BOOKINGS_PREFIX = "apg_portal_bookings_v1_";
 
 type Envelope<T> = { savedAt: number; data: T };
 
@@ -97,13 +99,24 @@ export function writeTrainingCache<T>(memberUuid: string, data: T) {
   writeKeyedCache(TRAINING_PREFIX, memberUuid, data);
 }
 
-export function readAttendanceCache<T>(memberUuid: string, month: string): T | null {
+export function peekAttendanceCache<T>(
+  memberUuid: string,
+  month: string,
+): { data: T; savedAt: number; ageMs: number } | null {
   const id = String(memberUuid || "").trim();
   const m = String(month || "").trim();
   if (!id || !m) return null;
   const env = readStore<T>(`${ATTENDANCE_PREFIX}${id}_${m}`);
   if (!env || !isFresh(env.savedAt)) return null;
-  return env.data;
+  return {
+    data: env.data,
+    savedAt: env.savedAt,
+    ageMs: Math.max(0, Date.now() - env.savedAt),
+  };
+}
+
+export function readAttendanceCache<T>(memberUuid: string, month: string): T | null {
+  return peekAttendanceCache<T>(memberUuid, month)?.data ?? null;
 }
 
 export function writeAttendanceCache<T>(memberUuid: string, month: string, data: T) {
@@ -139,4 +152,32 @@ export function readPerksCache<T>(memberUuid: string): T | null {
 
 export function writePerksCache<T>(memberUuid: string, data: T) {
   writeKeyedCache(PERKS_PREFIX, memberUuid, data);
+}
+
+export function peekWeightCache<T>(
+  memberUuid: string,
+): { data: T; savedAt: number; ageMs: number } | null {
+  return peekKeyedCache<T>(WEIGHT_PREFIX, memberUuid);
+}
+
+export function readWeightCache<T>(memberUuid: string): T | null {
+  return peekWeightCache<T>(memberUuid)?.data ?? null;
+}
+
+export function writeWeightCache<T>(memberUuid: string, data: T) {
+  writeKeyedCache(WEIGHT_PREFIX, memberUuid, data);
+}
+
+export function peekBookingsCache<T>(
+  memberUuid: string,
+): { data: T; savedAt: number; ageMs: number } | null {
+  return peekKeyedCache<T>(BOOKINGS_PREFIX, memberUuid);
+}
+
+export function readBookingsCache<T>(memberUuid: string): T | null {
+  return peekBookingsCache<T>(memberUuid)?.data ?? null;
+}
+
+export function writeBookingsCache<T>(memberUuid: string, data: T) {
+  writeKeyedCache(BOOKINGS_PREFIX, memberUuid, data);
 }
