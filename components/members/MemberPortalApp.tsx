@@ -1235,7 +1235,7 @@ export function MemberPortalApp() {
               </button>
               <button
                 type="button"
-                className="gold-glow-pulse w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                className="w-full text-sm text-muted hover:text-gold"
                 onClick={() => {
                   if (knownDevice) switchToFullRegistration();
                   else setStep("mobile");
