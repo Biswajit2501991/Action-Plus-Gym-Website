@@ -17,8 +17,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "Action Plus Gym", {
       body: data.body || "",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      icon: "/apg-icon-v3-192.png",
+      badge: "/apg-icon-v3-192.png",
       data: { url: data.url || "/members" },
     }),
   );

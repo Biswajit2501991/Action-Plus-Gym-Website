@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 
+/** Bump when home-screen icons change — iOS caches apple-touch-icon by URL path. */
+const ICON_V = "v3";
+
 export const metadata: Metadata = {
   title: "Member Portal | Action Plus Gym",
   description: "Secure member portal — membership card, billing reminders, and training.",
@@ -10,13 +13,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    apple: [{ url: `/apg-touch-${ICON_V}-180.png`, sizes: "180x180", type: "image/png" }],
     icon: [
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: `/apg-icon-${ICON_V}-192.png`, sizes: "192x192", type: "image/png" },
+      { url: `/apg-icon-${ICON_V}-512.png`, sizes: "512x512", type: "image/png" },
     ],
   },
-  manifest: "/manifest-member-portal.webmanifest",
+  manifest: `/manifest-member-portal.webmanifest?${ICON_V}`,
   other: {
     "mobile-web-app-capable": "yes",
   },
