@@ -27,6 +27,13 @@ export const metadata: Metadata = {
   },
   description:
     "Premium gym training, personal coaching, and world-class facilities at Action Plus Gym.",
+  icons: {
+    apple: [{ url: "/apg-touch-v3-180.png", sizes: "180x180", type: "image/png" }],
+    icon: [
+      { url: "/apg-icon-v3-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/apg-icon-v3-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 /** Mobile-first viewport for iOS + Android (incl. notch / gesture bars). */
