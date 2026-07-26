@@ -1,13 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/service";
-import {
-  PORTAL_MEMBERSHIP_STATUS_ERROR,
-  isPortalAllowedMembershipStatus,
-  portalGymId,
-} from "@/lib/member-portal/config";
-import {
-  loadPortalAccessByStatus,
-  type PortalAccessByStatus,
-} from "@/lib/member-portal/portal-access-by-status";
+import { portalGymId } from "@/lib/member-portal/config";
+import type { PortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
 import { mobileMatchVariants, normalizeMobile } from "@/lib/member-portal/phone";
 import type { MemberRow } from "@/lib/member-portal/session";
 import { randomToken } from "@/lib/member-portal/crypto";
@@ -120,20 +113,14 @@ export async function findMembersByMobile(
 
 export async function assertPortalEligible(
   member: MemberRow,
-  accessByStatus?: PortalAccessByStatus | null,
+  _accessByStatus?: PortalAccessByStatus | null,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  // Per-member portal_enabled is the login gate. Status-group settings only
+  // bulk-apply these flags; they must not block an individually enabled member.
   if (member.portal_status === "disabled" || member.portal_enabled === false) {
     return {
       ok: false,
       error: "Portal access is disabled for this membership. Contact the gym.",
-      status: 403,
-    };
-  }
-  const map = accessByStatus ?? (await loadPortalAccessByStatus());
-  if (!isPortalAllowedMembershipStatus(member.status, map)) {
-    return {
-      ok: false,
-      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
       status: 403,
     };
   }

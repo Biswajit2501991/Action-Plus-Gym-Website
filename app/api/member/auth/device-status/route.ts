@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceRoleClient } from "@/lib/supabase/service";
-import {
-  PORTAL_MEMBERSHIP_STATUS_ERROR,
-  isPortalAllowedMembershipStatus,
-  portalGymId,
-} from "@/lib/member-portal/config";
-import { loadPortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
+import { portalGymId } from "@/lib/member-portal/config";
 import { normalizeMobile } from "@/lib/member-portal/phone";
 
 const querySchema = z.object({
@@ -77,11 +72,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const status = String(member.status || "").trim().toLowerCase();
     const portalStatus = String(member.portal_status || "").trim().toLowerCase();
-    const accessByStatus = await loadPortalAccessByStatus();
     if (
-      !isPortalAllowedMembershipStatus(status, accessByStatus) ||
       portalStatus === "disabled" ||
       portalStatus === "revoked" ||
       member.portal_enabled === false
@@ -94,9 +86,7 @@ export async function GET(req: NextRequest) {
         reason:
           portalStatus === "revoked"
             ? "Access was revoked. Verify again to continue."
-            : portalStatus === "disabled" || member.portal_enabled === false
-              ? "Portal access is disabled for this membership. Contact the gym."
-              : PORTAL_MEMBERSHIP_STATUS_ERROR,
+            : "Portal access is disabled for this membership. Contact the gym.",
       });
     }
 

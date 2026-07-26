@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
-import {
-  PORTAL_MEMBERSHIP_STATUS_ERROR,
-  isPortalAllowedMembershipStatus,
-  portalGymId,
-} from "@/lib/member-portal/config";
-import { loadPortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
+import { portalGymId } from "@/lib/member-portal/config";
 
 function isPtPlanName(planName: string | null | undefined) {
   return /\bpt\b/i.test(String(planName || "").trim());
@@ -157,19 +152,6 @@ export async function POST(req: Request) {
           ok: false,
           error: "pt-plan-readonly",
           message: "Weight Tracker is for Basic members. PT clients use the trainer Weight Progress tab.",
-        },
-        { status: 403 },
-      );
-    }
-
-    const status = String(member?.status || "").trim().toLowerCase();
-    const accessByStatus = await loadPortalAccessByStatus();
-    if (!isPortalAllowedMembershipStatus(status, accessByStatus)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "member-inactive",
-          message: PORTAL_MEMBERSHIP_STATUS_ERROR,
         },
         { status: 403 },
       );

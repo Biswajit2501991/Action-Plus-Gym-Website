@@ -39,19 +39,6 @@ export function isPortalAllowedMembershipStatus(
   }
 
   const map = { ...accessByStatus };
-  const allOff =
-    !map.Active &&
-    !map.Hold &&
-    !map.Deactivated &&
-    !map.Cancelled &&
-    !map.active &&
-    !map.hold &&
-    !map.deactivated &&
-    !map.cancelled;
-  if (allOff) {
-    return ALLOWED_MEMBER_STATUSES.has(statusLc);
-  }
-
   const key =
     statusLc === "active"
       ? "Active"

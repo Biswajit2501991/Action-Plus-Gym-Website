@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
-import { portalGymId, PORTAL_MEMBERSHIP_STATUS_ERROR, isPortalAllowedMembershipStatus } from "@/lib/member-portal/config";
-import { loadPortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
+import { portalGymId } from "@/lib/member-portal/config";
 import {
   normalizePortalSections,
   portalSectionsFromSettings,
@@ -470,17 +469,6 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: false, error: memberErr.message || "member-lookup-failed" },
       { status: 500 },
-    );
-  }
-
-  const status = String(memberLive?.status || session.member.status || "")
-    .trim()
-    .toLowerCase();
-  const accessByStatus = await loadPortalAccessByStatus();
-  if (!isPortalAllowedMembershipStatus(status, accessByStatus)) {
-    return NextResponse.json(
-      { ok: false, error: PORTAL_MEMBERSHIP_STATUS_ERROR },
-      { status: 403 },
     );
   }
 

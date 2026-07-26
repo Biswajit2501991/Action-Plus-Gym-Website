@@ -10,16 +10,11 @@ import {
   MEMBER_REFRESH_TTL_SEC,
   MEMBER_IDLE_TTL_SEC,
   MEMBER_MAX_DEVICES,
-  PORTAL_MEMBERSHIP_STATUS_ERROR,
-  isPortalAllowedMembershipStatus,
   portalGymId,
 } from "@/lib/member-portal/config";
 import { randomToken, sha256 } from "@/lib/member-portal/crypto";
 import { signMemberAccess, verifyMemberAccess } from "@/lib/member-portal/jwt";
-import {
-  loadPortalAccessByStatus,
-  type PortalAccessByStatus,
-} from "@/lib/member-portal/portal-access-by-status";
+import type { PortalAccessByStatus } from "@/lib/member-portal/portal-access-by-status";
 
 export type MemberRow = {
   id: number;
@@ -117,11 +112,12 @@ export async function clearAuthCookies() {
 
 /**
  * Shared gate for issued sessions / API access.
- * Never clears PIN — blocks when status is not allowed by gym portal_access_by_status.
+ * Never clears PIN — blocks when portal_enabled is off / disabled / revoked.
+ * Status-group settings only bulk-apply those flags; per-member Portal ON is enough to allow login.
  */
 async function evaluatePortalMemberAccess(
   member: MemberRow | null | undefined,
-  accessByStatus?: PortalAccessByStatus | null,
+  _accessByStatus?: PortalAccessByStatus | null,
 ): Promise<{ ok: true; member: MemberRow } | { ok: false; error: string; status: number }> {
   if (!member) {
     return { ok: false, error: "Unauthorized", status: 401 };
@@ -134,14 +130,6 @@ async function evaluatePortalMemberAccess(
       ok: false,
       error: "Access revoked. Please verify via WhatsApp again.",
       status: 401,
-    };
-  }
-  const map = accessByStatus ?? (await loadPortalAccessByStatus());
-  if (!isPortalAllowedMembershipStatus(member.status, map)) {
-    return {
-      ok: false,
-      error: PORTAL_MEMBERSHIP_STATUS_ERROR,
-      status: 403,
     };
   }
   return { ok: true, member };
@@ -468,18 +456,6 @@ export async function requireMemberSession(): Promise<
       status: 401,
     };
   }
-  {
-    const map = await loadPortalAccessByStatus();
-    if (!isPortalAllowedMembershipStatus(member.status, map)) {
-      // Kick out when status is no longer allowed. PIN is left intact.
-      await revokeSessionAndClearCookies(svc.client, session.id);
-      return {
-        ok: false,
-        error: PORTAL_MEMBERSHIP_STATUS_ERROR,
-        status: 403,
-      };
-    }
-  }
 
   return { ok: true, claims, member: member as MemberRow };
 }
@@ -578,17 +554,6 @@ async function refreshFromCookies(): Promise<
       error: "Access revoked. Please verify via WhatsApp again.",
       status: 401,
     };
-  }
-  {
-    const map = await loadPortalAccessByStatus();
-    if (!isPortalAllowedMembershipStatus(member.status, map)) {
-      await revokeSessionAndClearCookies(svc.client, session.id);
-      return {
-        ok: false,
-        error: PORTAL_MEMBERSHIP_STATUS_ERROR,
-        status: 403,
-      };
-    }
   }
 
   const newRefresh = randomToken(32);
