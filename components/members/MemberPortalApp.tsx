@@ -499,74 +499,105 @@ export function MemberPortalApp() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const id = getOrCreateDeviceId();
-      if (!cancelled) setDeviceId(id);
+    const BOOT_TIMEOUT_MS = 10_000;
 
+    const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        await loadMe();
-        return;
-      } catch (e) {
-        if (cancelled) return;
-        const msg = e instanceof Error ? e.message : "";
-        if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
-          setNeedsReauth(/revoked/i.test(msg));
-          setError(
-            /revoked/i.test(msg)
-              ? "Access was revoked by the gym. Verify again to continue."
-              : /inactivity/i.test(msg)
-                ? msg
-                : null,
-          );
-        }
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(`${label} timed out`)),
+              BOOT_TIMEOUT_MS,
+            );
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
 
-        let status: {
-          registered?: boolean;
-          hasPin?: boolean;
-          mobile?: string | null;
-          blocked?: boolean;
-          reason?: string;
-        } | null = null;
+    (async () => {
+      try {
+        let id = "";
         try {
-          status = await api<{
-            ok: true;
-            registered: boolean;
-            hasPin: boolean;
+          id = getOrCreateDeviceId();
+        } catch {
+          id = `tmp_${Date.now().toString(36)}`;
+        }
+        if (!cancelled) setDeviceId(id);
+
+        try {
+          await withTimeout(loadMe(), "Session restore");
+          return;
+        } catch (e) {
+          if (cancelled) return;
+          const msg = e instanceof Error ? e.message : "";
+          if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
+            setNeedsReauth(/revoked/i.test(msg));
+            setError(
+              /revoked/i.test(msg)
+                ? "Access was revoked by the gym. Verify again to continue."
+                : /inactivity/i.test(msg)
+                  ? msg
+                  : null,
+            );
+          }
+
+          let status: {
+            registered?: boolean;
+            hasPin?: boolean;
             mobile?: string | null;
             blocked?: boolean;
             reason?: string;
-          }>(`/api/member/auth/device-status?deviceId=${encodeURIComponent(id)}`);
-        } catch {
-          status = null;
-        }
+          } | null = null;
+          try {
+            status = await withTimeout(
+              api<{
+                ok: true;
+                registered: boolean;
+                hasPin: boolean;
+                mobile?: string | null;
+                blocked?: boolean;
+                reason?: string;
+              }>(`/api/member/auth/device-status?deviceId=${encodeURIComponent(id)}`),
+              "Device status",
+            );
+          } catch {
+            status = null;
+          }
 
-        if (cancelled) return;
+          if (cancelled) return;
 
-        if (status?.blocked) {
-          clearKnownDeviceProfile(id);
-          setKnownDevice(false);
-          setNeedsReauth(true);
-          setError(status.reason || "Portal access is not available.");
+          if (status?.blocked) {
+            clearKnownDeviceProfile(id);
+            setKnownDevice(false);
+            setNeedsReauth(true);
+            setError(status.reason || "Portal access is not available.");
+            setStep("mobile");
+            return;
+          }
+
+          const local = readKnownDeviceProfile(id);
+          if (status?.hasPin && status.mobile) {
+            rememberThisDevice(status.mobile, id, true);
+            setMobile(status.mobile);
+            setStep("pinLogin");
+            return;
+          }
+
+          if (local?.hasPin && local.mobile) {
+            setKnownDevice(true);
+            setMobile(String(local.mobile).slice(-10));
+            setStep("pinLogin");
+            return;
+          }
+
           setStep("mobile");
-          return;
         }
-
-        const local = readKnownDeviceProfile(id);
-        if (status?.hasPin && status.mobile) {
-          rememberThisDevice(status.mobile, id, true);
-          setMobile(status.mobile);
-          setStep("pinLogin");
-          return;
-        }
-
-        if (local?.hasPin && local.mobile) {
-          setKnownDevice(true);
-          setMobile(String(local.mobile).slice(-10));
-          setStep("pinLogin");
-          return;
-        }
-
-        setStep("mobile");
+      } catch {
+        if (!cancelled) setStep("mobile");
       } finally {
         if (!cancelled) setBooting(false);
       }
