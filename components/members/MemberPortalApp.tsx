@@ -2,7 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { LogOut, QrCode, Smartphone, User } from "lucide-react";
+import {
+  Bell,
+  Building2,
+  CalendarDays,
+  ClipboardList,
+  CreditCard,
+  Dumbbell,
+  Fingerprint,
+  Gift,
+  Hourglass,
+  LogOut,
+  MessageCircle,
+  QrCode,
+  Scale,
+  Smartphone,
+  User,
+} from "lucide-react";
 import {
   AttendancePanel,
   BiometricPanel,
@@ -1306,17 +1322,17 @@ export function MemberPortalApp() {
 
           {step === "home" ? (
             <>
-              <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
+              <section className="portal-shine-card rounded-3xl p-5">
                 <div className="flex items-start gap-4">
                   {member.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={member.photoUrl}
                       alt=""
-                      className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-gold/40"
+                      className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-[0_0_0_1px_rgba(201,162,39,0.55),0_0_18px_rgba(201,162,39,0.35)]"
                     />
                   ) : (
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-gold ring-1 ring-white/10">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-gold shadow-[0_0_0_1px_rgba(201,162,39,0.45),0_0_16px_rgba(201,162,39,0.28)]">
                       <User size={24} />
                     </div>
                   )}
@@ -1328,64 +1344,104 @@ export function MemberPortalApp() {
                     <p className="mt-0.5 truncate text-sm text-white/70">{member.fullName}</p>
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-muted">Plan</p>
-                    <p className="text-white">{member.planName || "—"}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2.5 text-sm">
+                  <div className="portal-shine-stat flex items-center gap-2.5">
+                    <span className="portal-shine-stat__icon" aria-hidden>
+                      <ClipboardList size={14} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-muted">Plan</p>
+                      <p className="truncate text-white">{member.planName || "—"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted">Remaining</p>
-                    <p className="text-white">
-                      {member.remainingDays == null
-                        ? "—"
-                        : member.remainingDays >= 0
-                          ? `${member.remainingDays} days`
-                          : `${Math.abs(member.remainingDays)} days overdue`}
-                    </p>
+                  <div className="portal-shine-stat flex items-center gap-2.5">
+                    <span className="portal-shine-stat__icon" aria-hidden>
+                      <Hourglass size={14} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-muted">Remaining</p>
+                      <p className="text-white">
+                        {member.remainingDays == null
+                          ? "—"
+                          : member.remainingDays >= 0
+                            ? `${member.remainingDays} days`
+                            : `${Math.abs(member.remainingDays)} days overdue`}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted">Next Payment Date</p>
-                    <p className="text-white">
-                      {displayNextPaymentDate(
-                        member.billingDate,
-                        member.nextPaymentDate,
-                        member.paymentBy,
-                      )}
-                    </p>
+                  <div className="portal-shine-stat flex items-center gap-2.5">
+                    <span className="portal-shine-stat__icon" aria-hidden>
+                      <CalendarDays size={14} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-muted">Next Payment Date</p>
+                      <p className="text-white">
+                        {displayNextPaymentDate(
+                          member.billingDate,
+                          member.nextPaymentDate,
+                          member.paymentBy,
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted">Branch</p>
-                    <p className="text-white">{member.branch || "—"}</p>
+                  <div className="portal-shine-stat flex items-center gap-2.5">
+                    <span className="portal-shine-stat__icon" aria-hidden>
+                      <Building2 size={14} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-muted">Branch</p>
+                      <p className="truncate text-white">{member.branch || "—"}</p>
+                    </div>
                   </div>
                 </div>
               </section>
 
-              <div className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2.5 min-[380px]:grid-cols-3">
                 {tileEnabled("homeProfile") ? (
                   <NavTile
+                    accent="profile"
                     icon={<User size={18} />}
                     label="Profile"
                     onClick={() => setStep("profile")}
                   />
                 ) : null}
                 {tileEnabled("homeQrCard") ? (
-                  <NavTile icon={<QrCode size={18} />} label="QR Card" onClick={openCard} />
+                  <NavTile
+                    accent="qr"
+                    icon={<QrCode size={18} />}
+                    label="QR Card"
+                    onClick={openCard}
+                  />
                 ) : null}
                 {tileEnabled("homeDevices") ? (
                   <NavTile
+                    accent="devices"
                     icon={<Smartphone size={18} />}
                     label="Devices"
                     onClick={openDevices}
                   />
                 ) : null}
                 {tileEnabled("homePayments") ? (
-                  <NavTile label="Payments" badge={paymentsUnread} onClick={() => setStep("payments")} />
+                  <NavTile
+                    accent="payments"
+                    icon={<CreditCard size={18} />}
+                    label="Payments"
+                    badge={paymentsUnread}
+                    onClick={() => setStep("payments")}
+                  />
                 ) : null}
                 {tileEnabled("homeAttendance") ? (
-                  <NavTile label="Attendance" onClick={() => setStep("attendance")} />
+                  <NavTile
+                    accent="attendance"
+                    icon={<ClipboardList size={18} />}
+                    label="Attendance"
+                    onClick={() => setStep("attendance")}
+                  />
                 ) : null}
                 {tileEnabled("homeAlerts") ? (
                   <NavTile
+                    accent="alerts"
+                    icon={<Bell size={18} />}
                     label="Alerts"
                     badge={alertsUnread}
                     onClick={() => setStep("notifications")}
@@ -1393,26 +1449,53 @@ export function MemberPortalApp() {
                 ) : null}
                 {tileEnabled("homeChat") ? (
                   <NavTile
+                    accent="chat"
+                    icon={<MessageCircle size={18} />}
                     label="Chat"
                     badge={chatUnread}
                     onClick={() => setStep("chat")}
                   />
                 ) : null}
                 {tileEnabled("homeTraining") ? (
-                  <NavTile label="Training" onClick={() => setStep("training")} />
+                  <NavTile
+                    accent="training"
+                    icon={<Dumbbell size={18} />}
+                    label="Training"
+                    onClick={() => setStep("training")}
+                  />
                 ) : null}
                 {tileEnabled("homeWeightTracker") &&
                 !/\bpt\b/i.test(String(member.planName || "")) ? (
-                  <NavTile label="Weight Tracker" onClick={() => setStep("weight")} />
+                  <NavTile
+                    accent="weight"
+                    icon={<Scale size={18} />}
+                    label="Weight Tracker"
+                    onClick={() => setStep("weight")}
+                  />
                 ) : null}
                 {tileEnabled("homeBook") ? (
-                  <NavTile label="Book" onClick={() => setStep("bookings")} />
+                  <NavTile
+                    accent="book"
+                    icon={<CalendarDays size={18} />}
+                    label="Book"
+                    onClick={() => setStep("bookings")}
+                  />
                 ) : null}
                 {tileEnabled("homePerks") ? (
-                  <NavTile label="Perks" onClick={() => setStep("perks")} />
+                  <NavTile
+                    accent="perks"
+                    icon={<Gift size={18} />}
+                    label="Perks"
+                    onClick={() => setStep("perks")}
+                  />
                 ) : null}
                 {tileEnabled("homeBiometric") ? (
-                  <NavTile label="Biometric" onClick={() => setStep("biometric")} />
+                  <NavTile
+                    accent="biometric"
+                    icon={<Fingerprint size={18} />}
+                    label="Biometric"
+                    onClick={() => setStep("biometric")}
+                  />
                 ) : null}
               </div>
 
@@ -1619,28 +1702,47 @@ function NavTile({
   label,
   onClick,
   badge,
+  accent = "qr",
 }: {
   icon?: React.ReactNode;
   label: string;
   onClick: () => void;
   badge?: boolean;
+  accent?:
+    | "profile"
+    | "devices"
+    | "payments"
+    | "alerts"
+    | "chat"
+    | "training"
+    | "perks"
+    | "qr"
+    | "attendance"
+    | "weight"
+    | "book"
+    | "biometric";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative flex min-h-[4.5rem] touch-manipulation flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-charcoal/40 px-2 py-4 text-[11px] leading-tight text-white/85 hover:border-gold/40 hover:text-gold sm:px-3 sm:text-xs"
+      data-accent={accent}
+      className="portal-shine-tile relative flex min-h-[5.25rem] touch-manipulation flex-col items-center justify-center gap-2.5 rounded-2xl px-2 py-4 text-[11px] font-medium leading-tight text-white/90 sm:px-3 sm:text-xs"
     >
       {badge ? (
         <span
-          className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black shadow-[0_0_10px_rgba(212,175,55,0.85)]"
+          className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black shadow-[0_0_10px_rgba(212,175,55,0.85)]"
           aria-label="New notification"
         >
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-black/70" />
           New
         </span>
       ) : null}
-      {icon}
+      {icon ? (
+        <span className="portal-shine-tile__icon" aria-hidden>
+          {icon}
+        </span>
+      ) : null}
       {label}
     </button>
   );
