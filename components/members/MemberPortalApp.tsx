@@ -205,6 +205,8 @@ export function MemberPortalApp() {
   const [alertsUnread, setAlertsUnread] = useState(false);
   const [paymentsUnread, setPaymentsUnread] = useState(false);
   const [knownDevice, setKnownDevice] = useState(false);
+  /** Home tile with coloured liquid-glass edges (others stay neutral). */
+  const [activeHomeAccent, setActiveHomeAccent] = useState<string | null>(null);
   const [portalSections, setPortalSections] = useState<PortalSections>(
     () => ({ ...DEFAULT_PORTAL_SECTIONS }),
   );
@@ -1400,101 +1402,149 @@ export function MemberPortalApp() {
                 {tileEnabled("homeProfile") ? (
                   <NavTile
                     accent="profile"
+                    active={activeHomeAccent === "profile"}
                     icon={<User size={18} />}
                     label="Profile"
-                    onClick={() => setStep("profile")}
+                    onClick={() => {
+                      setActiveHomeAccent("profile");
+                      setStep("profile");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeQrCard") ? (
                   <NavTile
                     accent="qr"
+                    active={activeHomeAccent === "qr"}
                     icon={<QrCode size={18} />}
                     label="QR Card"
-                    onClick={openCard}
+                    onClick={() => {
+                      setActiveHomeAccent("qr");
+                      openCard();
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeDevices") ? (
                   <NavTile
                     accent="devices"
+                    active={activeHomeAccent === "devices"}
                     icon={<Smartphone size={18} />}
                     label="Devices"
-                    onClick={openDevices}
+                    onClick={() => {
+                      setActiveHomeAccent("devices");
+                      openDevices();
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homePayments") ? (
                   <NavTile
                     accent="payments"
+                    active={activeHomeAccent === "payments"}
                     icon={<CreditCard size={18} />}
                     label="Payments"
                     badge={paymentsUnread}
-                    onClick={() => setStep("payments")}
+                    onClick={() => {
+                      setActiveHomeAccent("payments");
+                      setStep("payments");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeAttendance") ? (
                   <NavTile
                     accent="attendance"
+                    active={activeHomeAccent === "attendance"}
                     icon={<ClipboardList size={18} />}
                     label="Attendance"
-                    onClick={() => setStep("attendance")}
+                    onClick={() => {
+                      setActiveHomeAccent("attendance");
+                      setStep("attendance");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeAlerts") ? (
                   <NavTile
                     accent="alerts"
+                    active={activeHomeAccent === "alerts"}
                     icon={<Bell size={18} />}
                     label="Alerts"
                     badge={alertsUnread}
-                    onClick={() => setStep("notifications")}
+                    onClick={() => {
+                      setActiveHomeAccent("alerts");
+                      setStep("notifications");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeChat") ? (
                   <NavTile
                     accent="chat"
+                    active={activeHomeAccent === "chat"}
                     icon={<MessageCircle size={18} />}
                     label="Chat"
                     badge={chatUnread}
-                    onClick={() => setStep("chat")}
+                    onClick={() => {
+                      setActiveHomeAccent("chat");
+                      setStep("chat");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeTraining") ? (
                   <NavTile
                     accent="training"
+                    active={activeHomeAccent === "training"}
                     icon={<Dumbbell size={18} />}
                     label="Training"
-                    onClick={() => setStep("training")}
+                    onClick={() => {
+                      setActiveHomeAccent("training");
+                      setStep("training");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeWeightTracker") &&
                 !/\bpt\b/i.test(String(member.planName || "")) ? (
                   <NavTile
                     accent="weight"
+                    active={activeHomeAccent === "weight"}
                     icon={<Scale size={18} />}
                     label="Weight Tracker"
-                    onClick={() => setStep("weight")}
+                    onClick={() => {
+                      setActiveHomeAccent("weight");
+                      setStep("weight");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeBook") ? (
                   <NavTile
                     accent="book"
+                    active={activeHomeAccent === "book"}
                     icon={<CalendarDays size={18} />}
                     label="Book"
-                    onClick={() => setStep("bookings")}
+                    onClick={() => {
+                      setActiveHomeAccent("book");
+                      setStep("bookings");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homePerks") ? (
                   <NavTile
                     accent="perks"
+                    active={activeHomeAccent === "perks"}
                     icon={<Gift size={18} />}
                     label="Perks"
-                    onClick={() => setStep("perks")}
+                    onClick={() => {
+                      setActiveHomeAccent("perks");
+                      setStep("perks");
+                    }}
                   />
                 ) : null}
                 {tileEnabled("homeBiometric") ? (
                   <NavTile
                     accent="biometric"
+                    active={activeHomeAccent === "biometric"}
                     icon={<Fingerprint size={18} />}
                     label="Biometric"
-                    onClick={() => setStep("biometric")}
+                    onClick={() => {
+                      setActiveHomeAccent("biometric");
+                      setStep("biometric");
+                    }}
                   />
                 ) : null}
               </div>
@@ -1703,11 +1753,13 @@ function NavTile({
   onClick,
   badge,
   accent = "qr",
+  active = false,
 }: {
   icon?: React.ReactNode;
   label: string;
   onClick: () => void;
   badge?: boolean;
+  active?: boolean;
   accent?:
     | "profile"
     | "devices"
@@ -1727,6 +1779,8 @@ function NavTile({
       type="button"
       onClick={onClick}
       data-accent={accent}
+      data-active={active ? "true" : "false"}
+      aria-pressed={active}
       className="portal-shine-tile relative flex min-h-[5.25rem] touch-manipulation flex-col items-center justify-center gap-2.5 rounded-2xl px-2 py-4 text-[11px] font-medium leading-tight text-white/90 sm:px-3 sm:text-xs"
     >
       {badge ? (

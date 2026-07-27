@@ -386,9 +386,8 @@ html[data-theme="day"] ::selection {
   animation: weightCelebratePulse 1.2s linear infinite;
 }
 
-/* ——— Member Portal: premium glass tiles (display-only) ——— */
+/* ——— Member Portal: premium glass (display-only) ——— */
 .portal-shine-card,
-.portal-shine-tile,
 .portal-shine-stat {
   --shine-accent: #c9a227;
   --shine-glow: rgba(201, 162, 39, 0.35);
@@ -424,7 +423,6 @@ html[data-theme="day"] ::selection {
 }
 
 .portal-shine-card::before,
-.portal-shine-tile::before,
 .portal-shine-stat::before {
   content: "";
   position: absolute;
@@ -450,8 +448,7 @@ html[data-theme="day"] ::selection {
   z-index: 2;
 }
 
-.portal-shine-card::after,
-.portal-shine-tile::after {
+.portal-shine-card::after {
   content: "";
   position: absolute;
   top: -35%;
@@ -469,20 +466,73 @@ html[data-theme="day"] ::selection {
 }
 
 .portal-shine-card > *,
-.portal-shine-tile > *,
 .portal-shine-stat > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Home tiles: neutral glass by default; color shine only when active/clicked */
+.portal-shine-tile {
+  --shine-accent: #ffffff;
+  --shine-glow: rgba(255, 255, 255, 0.05);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: all 0.3s ease;
+}
+
+.portal-shine-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.08) 30%,
+    transparent 55%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.7;
+  transition: opacity 0.3s ease, background 0.3s ease;
+}
+
+.portal-shine-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: transparent;
+  pointer-events: none;
+  z-index: 0;
+  transition: background 0.3s ease;
+}
+
+.portal-shine-tile > * {
   position: relative;
   z-index: 1;
 }
 
 .portal-shine-tile:hover {
   transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--shine-accent) 65%, transparent),
-    0 0 36px color-mix(in srgb, var(--shine-accent) 48%, transparent),
-    0 14px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .portal-shine-tile:active {
@@ -496,6 +546,106 @@ html[data-theme="day"] ::selection {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: all 0.3s ease;
+}
+
+/* Accent tokens (applied only when tile is active) */
+.portal-shine-tile[data-accent="profile"] {
+  --shine-accent: #3b82f6;
+  --shine-glow: rgba(59, 130, 246, 0.42);
+}
+.portal-shine-tile[data-accent="devices"] {
+  --shine-accent: #08b6d4;
+  --shine-glow: rgba(8, 182, 212, 0.4);
+}
+.portal-shine-tile[data-accent="payments"] {
+  --shine-accent: #22c55e;
+  --shine-glow: rgba(34, 197, 94, 0.4);
+}
+.portal-shine-tile[data-accent="alerts"] {
+  --shine-accent: #ef4444;
+  --shine-glow: rgba(239, 68, 68, 0.42);
+}
+.portal-shine-tile[data-accent="chat"] {
+  --shine-accent: #facd15;
+  --shine-glow: rgba(250, 205, 21, 0.45);
+}
+.portal-shine-tile[data-accent="training"] {
+  --shine-accent: #a855f7;
+  --shine-glow: rgba(168, 85, 247, 0.42);
+}
+.portal-shine-tile[data-accent="perks"] {
+  --shine-accent: #ec4899;
+  --shine-glow: rgba(236, 72, 153, 0.42);
+}
+.portal-shine-tile[data-accent="qr"] {
+  --shine-accent: #c9a227;
+  --shine-glow: rgba(201, 162, 39, 0.42);
+}
+.portal-shine-tile[data-accent="attendance"] {
+  --shine-accent: #14b8a6;
+  --shine-glow: rgba(20, 184, 166, 0.4);
+}
+.portal-shine-tile[data-accent="weight"] {
+  --shine-accent: #f97316;
+  --shine-glow: rgba(249, 115, 22, 0.4);
+}
+.portal-shine-tile[data-accent="book"] {
+  --shine-accent: #6366f1;
+  --shine-glow: rgba(99, 102, 241, 0.4);
+}
+.portal-shine-tile[data-accent="biometric"] {
+  --shine-accent: #94a3b8;
+  --shine-glow: rgba(148, 163, 184, 0.38);
+}
+
+/* Only the clicked / current tile gets coloured liquid-glass edges */
+.portal-shine-tile[data-active="true"] {
+  border-color: color-mix(in srgb, var(--shine-accent) 45%, transparent);
+  background:
+    radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--shine-accent) 22%, transparent),
+      transparent 58%
+    ),
+    rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.35),
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 40%, transparent),
+    0 0 28px var(--shine-glow),
+    0 0 44px color-mix(in srgb, var(--shine-accent) 28%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.portal-shine-tile[data-active="true"]::before {
+  opacity: 1;
+  padding: 1.5px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--shine-accent) 95%, #fff) 0%,
+    var(--shine-accent) 14%,
+    color-mix(in srgb, var(--shine-accent) 45%, transparent) 32%,
+    transparent 48%,
+    transparent 60%,
+    color-mix(in srgb, var(--shine-accent) 55%, transparent) 82%,
+    var(--shine-accent) 100%
+  );
+}
+
+.portal-shine-tile[data-active="true"]::after {
+  background: radial-gradient(
+    120% 120% at 0% 0%,
+    color-mix(in srgb, var(--shine-accent) 20%, transparent),
+    transparent 60%
+  );
+}
+
+.portal-shine-tile[data-active="true"] .portal-shine-tile__icon {
   color: #fff;
   background:
     radial-gradient(
@@ -505,58 +655,9 @@ html[data-theme="day"] ::selection {
     ),
     rgba(255, 255, 255, 0.06);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--shine-accent) 40%, transparent),
-    0 0 16px color-mix(in srgb, var(--shine-accent) 35%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 45%, transparent),
+    0 0 16px color-mix(in srgb, var(--shine-accent) 40%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
-}
-
-.portal-shine-tile[data-accent="profile"] {
-  --shine-accent: #3b82f6;
-  --shine-glow: rgba(59, 130, 246, 0.38);
-}
-.portal-shine-tile[data-accent="devices"] {
-  --shine-accent: #22d3ee;
-  --shine-glow: rgba(34, 211, 238, 0.36);
-}
-.portal-shine-tile[data-accent="payments"] {
-  --shine-accent: #22c55e;
-  --shine-glow: rgba(34, 197, 94, 0.36);
-}
-.portal-shine-tile[data-accent="alerts"] {
-  --shine-accent: #ef4444;
-  --shine-glow: rgba(239, 68, 68, 0.38);
-}
-.portal-shine-tile[data-accent="chat"] {
-  --shine-accent: #eab308;
-  --shine-glow: rgba(234, 179, 8, 0.38);
-}
-.portal-shine-tile[data-accent="training"] {
-  --shine-accent: #a855f7;
-  --shine-glow: rgba(168, 85, 247, 0.38);
-}
-.portal-shine-tile[data-accent="perks"] {
-  --shine-accent: #ec4899;
-  --shine-glow: rgba(236, 72, 153, 0.38);
-}
-.portal-shine-tile[data-accent="qr"] {
-  --shine-accent: #c9a227;
-  --shine-glow: rgba(201, 162, 39, 0.4);
-}
-.portal-shine-tile[data-accent="attendance"] {
-  --shine-accent: #14b8a6;
-  --shine-glow: rgba(20, 184, 166, 0.36);
-}
-.portal-shine-tile[data-accent="weight"] {
-  --shine-accent: #f97316;
-  --shine-glow: rgba(249, 115, 22, 0.36);
-}
-.portal-shine-tile[data-accent="book"] {
-  --shine-accent: #6366f1;
-  --shine-glow: rgba(99, 102, 241, 0.36);
-}
-.portal-shine-tile[data-accent="biometric"] {
-  --shine-accent: #94a3b8;
-  --shine-glow: rgba(148, 163, 184, 0.34);
 }
 
 .portal-shine-card {
@@ -590,7 +691,6 @@ html[data-theme="day"] ::selection {
 }
 
 html[data-theme="day"] .portal-shine-card,
-html[data-theme="day"] .portal-shine-tile,
 html[data-theme="day"] .portal-shine-stat {
   background:
     radial-gradient(
@@ -610,7 +710,36 @@ html[data-theme="day"] .portal-shine-stat {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
+html[data-theme="day"] .portal-shine-tile {
+  border-color: rgba(28, 34, 43, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 8px 20px rgba(28, 34, 43, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
 html[data-theme="day"] .portal-shine-tile__icon {
+  color: rgba(28, 34, 43, 0.72);
+  background: rgba(28, 34, 43, 0.04);
+}
+
+html[data-theme="day"] .portal-shine-tile[data-active="true"] {
+  border-color: color-mix(in srgb, var(--shine-accent) 40%, transparent);
+  background:
+    radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--shine-accent) 14%, transparent),
+      transparent 58%
+    ),
+    rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 10px 24px rgba(28, 34, 43, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 32%, transparent),
+    0 0 22px color-mix(in srgb, var(--shine-accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+html[data-theme="day"] .portal-shine-tile[data-active="true"] .portal-shine-tile__icon {
   color: color-mix(in srgb, var(--shine-accent) 75%, #1c222b);
   background:
     radial-gradient(
