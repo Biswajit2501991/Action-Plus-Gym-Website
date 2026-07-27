@@ -66,10 +66,20 @@ type QrCard = {
   planName: string | null;
   branch: string | null;
   paymentBy: string | null;
+  billingDate: string | null;
   nextPaymentDate: string | null;
   photoUrl: string | null;
   qrPayload: string;
 };
+
+/** Member-facing Next Payment Date = Gym Manager Bill Date (billing_date). */
+function displayNextPaymentDate(
+  billingDate?: string | null,
+  nextPaymentDate?: string | null,
+  paymentBy?: string | null,
+) {
+  return formatDate(billingDate || nextPaymentDate || paymentBy);
+}
 
 type Device = {
   id: string;
@@ -1336,7 +1346,11 @@ export function MemberPortalApp() {
                   <div>
                     <p className="text-muted">Next Payment Date</p>
                     <p className="text-white">
-                      {formatDate(member.nextPaymentDate || member.billingDate)}
+                      {displayNextPaymentDate(
+                        member.billingDate,
+                        member.nextPaymentDate,
+                        member.paymentBy,
+                      )}
                     </p>
                   </div>
                   <div>
@@ -1441,7 +1455,14 @@ export function MemberPortalApp() {
                 <Row label="Blood group" value={member.bloodGroup || "—"} />
                 <Row label="Emergency" value={member.emergencyContact || "—"} />
                 <Row label="Joined" value={formatDate(member.joiningDate)} />
-                <Row label="Next Payment Date" value={formatDate(member.nextPaymentDate)} />
+                <Row
+                  label="Next Payment Date"
+                  value={displayNextPaymentDate(
+                    member.billingDate,
+                    member.nextPaymentDate,
+                    member.paymentBy,
+                  )}
+                />
               </dl>
             </section>
           ) : null}
@@ -1474,7 +1495,14 @@ export function MemberPortalApp() {
               <dl className="mt-4 space-y-2 text-sm">
                 <Row label="Plan" value={card.planName || "—"} />
                 <Row label="Branch" value={card.branch || "—"} />
-                <Row label="Next Payment Date" value={formatDate(card.nextPaymentDate || card.paymentBy)} />
+                <Row
+                  label="Next Payment Date"
+                  value={displayNextPaymentDate(
+                    card.billingDate,
+                    card.nextPaymentDate,
+                    card.paymentBy,
+                  )}
+                />
               </dl>
             </section>
           ) : null}

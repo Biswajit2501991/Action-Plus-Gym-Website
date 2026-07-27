@@ -160,7 +160,10 @@ export function safeMemberPayload(
   branch: string | null,
   photoUrl: string | null,
 ) {
-  const endDate = member.next_payment_date || member.payment_by || null;
+  // Member-facing "Next Payment Date" = Gym Manager Bill Date (billing_date).
+  // next_payment_date is a derived +1 month field used internally — do not prefer it here.
+  const endDate =
+    member.billing_date || member.payment_by || member.next_payment_date || null;
   const medical = member.medical_answers_json || {};
   return {
     memberUuid: member.member_uuid,
