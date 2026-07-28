@@ -89,3 +89,29 @@ export function detectWebPushSupport(): WebPushSupport {
 
   return { ok: true, standalone };
 }
+
+/**
+ * True when this browser already has Notification permission + an active
+ * PushManager subscription for the Member Portal service worker.
+ */
+export async function detectExistingBillingPushSubscription(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return false;
+  }
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return false;
+  }
+
+  try {
+    const reg =
+      (await navigator.serviceWorker.getRegistration("/members")) ||
+      (await navigator.serviceWorker.getRegistration("/members/")) ||
+      (await navigator.serviceWorker.getRegistration());
+    if (!reg?.pushManager) return false;
+    const sub = await reg.pushManager.getSubscription();
+    return Boolean(sub?.endpoint);
+  } catch {
+    return false;
+  }
+}

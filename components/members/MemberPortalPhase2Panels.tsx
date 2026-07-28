@@ -41,7 +41,7 @@ import {
   writeTrainingCache,
   writeWeightCache,
 } from "@/lib/member-portal/panel-cache";
-import { detectWebPushSupport } from "@/lib/member-portal/web-push-support";
+import { detectWebPushSupport, detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
   type BillingAlert,
@@ -715,6 +715,8 @@ export function NotificationsPanel({
   const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [support, setSupport] = useState<ReturnType<typeof detectWebPushSupport> | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushChecked, setPushChecked] = useState(false);
 
   const billingAlert = useMemo(
     () =>
@@ -736,6 +738,20 @@ export function NotificationsPanel({
 
   useEffect(() => {
     setSupport(detectWebPushSupport());
+    let cancelled = false;
+    void (async () => {
+      try {
+        const enabled = await detectExistingBillingPushSubscription();
+        if (!cancelled) setPushEnabled(enabled);
+      } catch {
+        if (!cancelled) setPushEnabled(false);
+      } finally {
+        if (!cancelled) setPushChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function enable() {
@@ -772,10 +788,13 @@ export function NotificationsPanel({
         );
       }
 
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapid.publicKey),
-      });
+      const existing = await reg.pushManager.getSubscription();
+      const sub =
+        existing ||
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapid.publicKey),
+        }));
       const json = sub.toJSON();
       if (!json.endpoint || !json.keys) {
         throw new Error("Could not create a push subscription. Try again from the Home Screen app.");
@@ -788,7 +807,8 @@ export function NotificationsPanel({
           userAgent: navigator.userAgent,
         }),
       });
-      setStatus("Billing-day reminders enabled.");
+      setPushEnabled(true);
+      setStatus("Billing-day reminders are on for this device.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not enable push";
       setError(msg);
@@ -830,7 +850,7 @@ export function NotificationsPanel({
           device (Android Chrome works best; iPhone needs Home Screen).
         </p>
 
-        {needsHomeScreen ? (
+        {needsHomeScreen && !pushEnabled ? (
           <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
             <p className="font-semibold text-gold">Install on your Home Screen first</p>
             <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-white/80">
@@ -845,14 +865,27 @@ export function NotificationsPanel({
         {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
         {hint ? <p className="mt-2 text-xs leading-relaxed text-muted">{hint}</p> : null}
         {status ? <p className="mt-3 text-sm text-gold">{status}</p> : null}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void enable()}
-          className="mt-4 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
-        >
-          {busy ? "Enabling…" : "Enable billing-day push"}
-        </button>
+
+        {!pushChecked ? (
+          <p className="mt-4 text-sm text-muted">Checking reminder status…</p>
+        ) : pushEnabled ? (
+          <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-950/30 px-4 py-3">
+            <p className="text-sm font-semibold text-emerald-200">Billing-day reminders are on</p>
+            <p className="mt-1 text-xs leading-relaxed text-white/70">
+              This device is already set up for optional phone push on your billing day. In-app
+              Alerts above still work even if you later turn off browser notifications.
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void enable()}
+            className="mt-4 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+          >
+            {busy ? "Enabling…" : "Enable billing-day push"}
+          </button>
+        )}
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
           Android Chrome can enable push in the browser. iPhone/iPad require the Home Screen app (iOS
           16.4+). In-app Alerts above work even if push is off.
