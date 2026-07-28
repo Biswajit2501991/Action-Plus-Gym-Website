@@ -784,6 +784,19 @@ export function MemberPortalApp() {
     return `Hello ${name}`;
   }, [member]);
 
+  const nextPaymentDueToday = useMemo(
+    () =>
+      Boolean(
+        member &&
+          isNextPaymentDateToday({
+            billingDate: member.billingDate,
+            nextPaymentDate: member.nextPaymentDate,
+            paymentBy: member.paymentBy,
+          }),
+      ),
+    [member?.billingDate, member?.nextPaymentDate, member?.paymentBy, member],
+  );
+
   async function requestVerify() {
     setError(null);
     setBusy(true);
@@ -1423,15 +1436,17 @@ export function MemberPortalApp() {
                   </div>
                   <div
                     className={
-                      isNextPaymentDateToday({
-                        billingDate: member.billingDate,
-                        nextPaymentDate: member.nextPaymentDate,
-                        paymentBy: member.paymentBy,
-                      })
+                      nextPaymentDueToday
                         ? "portal-shine-stat portal-shine-stat--due-today"
                         : "portal-shine-stat"
                     }
                   >
+                    {nextPaymentDueToday ? (
+                      <span className="portal-shine-stat__today-badge" aria-label="Payment due today">
+                        <span className="portal-shine-stat__today-badge-dot" aria-hidden />
+                        Today
+                      </span>
+                    ) : null}
                     <span className="portal-shine-stat__icon" aria-hidden>
                       <CalendarDays size={13} strokeWidth={1.75} />
                     </span>
