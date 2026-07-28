@@ -478,13 +478,16 @@ html[data-theme="day"] ::selection {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.28),
+    0 6px 18px rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset,
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transition: all 0.3s ease;
@@ -541,8 +544,8 @@ html[data-theme="day"] ::selection {
 
 .portal-shine-tile__icon {
   display: flex;
-  height: 2.35rem;
-  width: 2.35rem;
+  height: 1.85rem;
+  width: 1.85rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -552,6 +555,76 @@ html[data-theme="day"] ::selection {
     0 0 0 1px rgba(255, 255, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transition: all 0.3s ease;
+}
+
+.portal-shine-tile__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline: 0.2rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+@media (min-width: 380px) {
+  .portal-shine-tile__label {
+    font-size: 0.6875rem;
+  }
+}
+
+/* Gold NEW pill — sits on the icon (Payments / Alerts / Chat) */
+.portal-shine-tile__badge {
+  position: absolute;
+  top: -0.35rem;
+  left: 50%;
+  z-index: 10;
+  display: inline-flex;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f0d878 0%, #c9a227 55%, #a8841a 100%);
+  padding: 0.12rem 0.4rem;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #0a0a0a;
+  box-shadow:
+    0 0 10px rgba(212, 175, 55, 0.85),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.portal-shine-tile__badge-dot {
+  height: 0.28rem;
+  width: 0.28rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  animation: portal-new-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes portal-new-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-shine-tile__badge-dot {
+    animation: none;
+  }
 }
 
 /* Accent tokens (applied only when tile is active) */

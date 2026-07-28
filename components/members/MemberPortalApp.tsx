@@ -1434,12 +1434,12 @@ export function MemberPortalApp() {
                 </div>
               </section>
 
-              <div className="grid grid-cols-2 gap-2.5 min-[380px]:grid-cols-3">
+              <div className="grid grid-cols-3 gap-2">
                 {tileEnabled("homeProfile") ? (
                   <NavTile
                     accent="profile"
                     active={activeHomeAccent === "profile"}
-                    icon={<User size={18} />}
+                    icon={<User size={15} strokeWidth={1.75} />}
                     label="Profile"
                     onClick={() => {
                       setActiveHomeAccent("profile");
@@ -1451,7 +1451,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="qr"
                     active={activeHomeAccent === "qr"}
-                    icon={<QrCode size={18} />}
+                    icon={<QrCode size={15} strokeWidth={1.75} />}
                     label="QR Card"
                     onClick={() => {
                       setActiveHomeAccent("qr");
@@ -1463,7 +1463,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="devices"
                     active={activeHomeAccent === "devices"}
-                    icon={<Smartphone size={18} />}
+                    icon={<Smartphone size={15} strokeWidth={1.75} />}
                     label="Devices"
                     onClick={() => {
                       setActiveHomeAccent("devices");
@@ -1475,7 +1475,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="payments"
                     active={activeHomeAccent === "payments"}
-                    icon={<CreditCard size={18} />}
+                    icon={<CreditCard size={15} strokeWidth={1.75} />}
                     label="Payments"
                     badge={paymentsUnread}
                     onClick={() => {
@@ -1488,7 +1488,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="attendance"
                     active={activeHomeAccent === "attendance"}
-                    icon={<ClipboardList size={18} />}
+                    icon={<ClipboardList size={15} strokeWidth={1.75} />}
                     label="Attendance"
                     onClick={() => {
                       setActiveHomeAccent("attendance");
@@ -1500,7 +1500,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="alerts"
                     active={activeHomeAccent === "alerts"}
-                    icon={<Bell size={18} />}
+                    icon={<Bell size={15} strokeWidth={1.75} />}
                     label="Alerts"
                     badge={alertsUnread}
                     onClick={() => {
@@ -1513,7 +1513,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="chat"
                     active={activeHomeAccent === "chat"}
-                    icon={<MessageCircle size={18} />}
+                    icon={<MessageCircle size={15} strokeWidth={1.75} />}
                     label="Chat"
                     badge={chatUnread}
                     onClick={() => {
@@ -1526,7 +1526,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="training"
                     active={activeHomeAccent === "training"}
-                    icon={<Dumbbell size={18} />}
+                    icon={<Dumbbell size={15} strokeWidth={1.75} />}
                     label="Training"
                     onClick={() => {
                       setActiveHomeAccent("training");
@@ -1539,8 +1539,8 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="weight"
                     active={activeHomeAccent === "weight"}
-                    icon={<Scale size={18} />}
-                    label="Weight Tracker"
+                    icon={<Scale size={15} strokeWidth={1.75} />}
+                    label="Weight"
                     onClick={() => {
                       setActiveHomeAccent("weight");
                       setStep("weight");
@@ -1551,7 +1551,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="book"
                     active={activeHomeAccent === "book"}
-                    icon={<CalendarDays size={18} />}
+                    icon={<CalendarDays size={15} strokeWidth={1.75} />}
                     label="Book"
                     onClick={() => {
                       setActiveHomeAccent("book");
@@ -1563,7 +1563,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="perks"
                     active={activeHomeAccent === "perks"}
-                    icon={<Gift size={18} />}
+                    icon={<Gift size={15} strokeWidth={1.75} />}
                     label="Perks"
                     onClick={() => {
                       setActiveHomeAccent("perks");
@@ -1575,7 +1575,7 @@ export function MemberPortalApp() {
                   <NavTile
                     accent="biometric"
                     active={activeHomeAccent === "biometric"}
-                    icon={<Fingerprint size={18} />}
+                    icon={<Fingerprint size={15} strokeWidth={1.75} />}
                     label="Biometric"
                     onClick={() => {
                       setActiveHomeAccent("biometric");
@@ -1817,23 +1817,23 @@ function NavTile({
       data-accent={accent}
       data-active={active ? "true" : "false"}
       aria-pressed={active}
-      className="portal-shine-tile relative flex min-h-[5.25rem] touch-manipulation flex-col items-center justify-center gap-2.5 rounded-2xl px-2 py-4 text-[11px] font-medium leading-tight text-white/90 sm:px-3 sm:text-xs"
+      aria-label={badge ? `${label} (new)` : label}
+      className="portal-shine-tile relative flex touch-manipulation flex-col items-center justify-center gap-1.5 px-1.5 py-2 text-white/90"
     >
-      {badge ? (
-        <span
-          className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black shadow-[0_0_10px_rgba(212,175,55,0.85)]"
-          aria-label="New notification"
-        >
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-black/70" />
-          New
-        </span>
-      ) : null}
-      {icon ? (
-        <span className="portal-shine-tile__icon" aria-hidden>
-          {icon}
-        </span>
-      ) : null}
-      {label}
+      <span className="relative flex items-center justify-center">
+        {badge ? (
+          <span className="portal-shine-tile__badge" aria-hidden>
+            <span className="portal-shine-tile__badge-dot" />
+            New
+          </span>
+        ) : null}
+        {icon ? (
+          <span className="portal-shine-tile__icon" aria-hidden>
+            {icon}
+          </span>
+        ) : null}
+      </span>
+      <span className="portal-shine-tile__label">{label}</span>
     </button>
   );
 }
