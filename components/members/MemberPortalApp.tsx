@@ -34,6 +34,7 @@ import { PortalBackButton } from "@/components/members/PortalBackButton";
 import {
   deriveBillingAlert,
   hasUnreadBillingAlert,
+  isNextPaymentDateToday,
 } from "@/lib/member-portal/billing-alerts";
 import {
   isWithinNewBadgeWindow,
@@ -1420,7 +1421,17 @@ export function MemberPortalApp() {
                       </p>
                     </div>
                   </div>
-                  <div className="portal-shine-stat">
+                  <div
+                    className={
+                      isNextPaymentDateToday({
+                        billingDate: member.billingDate,
+                        nextPaymentDate: member.nextPaymentDate,
+                        paymentBy: member.paymentBy,
+                      })
+                        ? "portal-shine-stat portal-shine-stat--due-today"
+                        : "portal-shine-stat"
+                    }
+                  >
                     <span className="portal-shine-stat__icon" aria-hidden>
                       <CalendarDays size={13} strokeWidth={1.75} />
                     </span>

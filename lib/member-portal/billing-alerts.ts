@@ -84,6 +84,18 @@ export function resolveBillingDate(input: {
   return parseDateOnly(input.billingDate) || parseDateOnly(input.nextPaymentDate);
 }
 
+/** True when the member-facing Next Payment date (Bill Date) is today — display cue only. */
+export function isNextPaymentDateToday(input: {
+  billingDate?: string | null;
+  nextPaymentDate?: string | null;
+  paymentBy?: string | null;
+}): boolean {
+  const source = input.billingDate || input.nextPaymentDate || input.paymentBy;
+  const d = parseDateOnly(source);
+  if (!d) return false;
+  return dateKey(d) === dateKey(todayLocal());
+}
+
 /**
  * Active members only:
  * - billing: today from billing date through payment-by (inclusive)
