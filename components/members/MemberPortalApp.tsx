@@ -536,12 +536,11 @@ export function MemberPortalApp() {
           const msg = e instanceof Error ? e.message : "";
           if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
             setNeedsReauth(/revoked/i.test(msg));
+            // Session expiry / idle logout → silent login. Keep only revoke messaging.
             setError(
               /revoked/i.test(msg)
                 ? "Access was revoked by the gym. Verify again to continue."
-                : /inactivity/i.test(msg)
-                  ? msg
-                  : null,
+                : null,
             );
           }
 
@@ -626,7 +625,8 @@ export function MemberPortalApp() {
     } else {
       setStep("mobile");
     }
-    setError("Signed out after 2 hours of inactivity. Please sign in again.");
+    // Idle logout is intentional — show login quietly (no error banner).
+    setError(null);
   }, [deviceId]);
 
   // Track activity and auto-logout after 2 hours idle while signed in.
@@ -683,7 +683,12 @@ export function MemberPortalApp() {
             }
             setStep("mobile");
           }
-          setError(msg || "Session expired. Please sign in again.");
+          // Expired / idle session → quiet login. Revoke still explains why.
+          setError(
+            /revoked/i.test(msg)
+              ? "Access was revoked by the gym. Verify again to continue."
+              : null,
+          );
         }
       }
     };
