@@ -1360,60 +1360,80 @@ export function MemberPortalApp() {
 
           {step === "home" ? (
             <>
-              <section className="portal-shine-card rounded-3xl p-5">
-                <div className="flex items-start gap-4">
+              <section className="portal-shine-card rounded-3xl p-4 sm:p-5">
+                <div className="flex items-start gap-3.5">
                   {member.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={member.photoUrl}
                       alt=""
-                      className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-[0_0_0_1px_rgba(201,162,39,0.55),0_0_18px_rgba(201,162,39,0.35)]"
+                      className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-[0_0_0_1px_rgba(201,162,39,0.55),0_0_18px_rgba(201,162,39,0.35)] sm:h-16 sm:w-16"
                     />
                   ) : (
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-gold shadow-[0_0_0_1px_rgba(201,162,39,0.45),0_0_16px_rgba(201,162,39,0.28)]">
-                      <User size={24} />
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-gold shadow-[0_0_0_1px_rgba(201,162,39,0.45),0_0_16px_rgba(201,162,39,0.28)] sm:h-16 sm:w-16">
+                      <User size={22} />
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-muted sm:text-xs">
                       Today&apos;s status
                     </p>
-                    <p className="mt-1 font-display text-2xl text-gold">{member.status}</p>
+                    <p className="mt-0.5 font-display text-xl text-gold sm:mt-1 sm:text-2xl">
+                      {member.status}
+                    </p>
                     <p className="mt-0.5 truncate text-sm text-white/70">{member.fullName}</p>
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2.5 text-sm">
-                  <div className="portal-shine-stat flex items-center gap-2.5">
+                <div className="portal-shine-stats mt-3">
+                  <div className="portal-shine-stat">
                     <span className="portal-shine-stat__icon" aria-hidden>
-                      <ClipboardList size={14} />
+                      <ClipboardList size={13} strokeWidth={1.75} />
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-muted">Plan</p>
-                      <p className="truncate text-white">{member.planName || "—"}</p>
+                    <div className="portal-shine-stat__body">
+                      <p className="portal-shine-stat__label">Plan</p>
+                      <p className="portal-shine-stat__value" title={member.planName || undefined}>
+                        {member.planName || "—"}
+                      </p>
                     </div>
                   </div>
-                  <div className="portal-shine-stat flex items-center gap-2.5">
+                  <div className="portal-shine-stat">
                     <span className="portal-shine-stat__icon" aria-hidden>
-                      <Hourglass size={14} />
+                      <Hourglass size={13} strokeWidth={1.75} />
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-muted">Remaining</p>
-                      <p className="text-white">
+                    <div className="portal-shine-stat__body">
+                      <p className="portal-shine-stat__label">Remaining</p>
+                      <p
+                        className="portal-shine-stat__value"
+                        title={
+                          member.remainingDays == null
+                            ? undefined
+                            : member.remainingDays >= 0
+                              ? `${member.remainingDays} days`
+                              : `${Math.abs(member.remainingDays)} days overdue`
+                        }
+                      >
                         {member.remainingDays == null
                           ? "—"
                           : member.remainingDays >= 0
                             ? `${member.remainingDays} days`
-                            : `${Math.abs(member.remainingDays)} days overdue`}
+                            : `${Math.abs(member.remainingDays)}d overdue`}
                       </p>
                     </div>
                   </div>
-                  <div className="portal-shine-stat flex items-center gap-2.5">
+                  <div className="portal-shine-stat">
                     <span className="portal-shine-stat__icon" aria-hidden>
-                      <CalendarDays size={14} />
+                      <CalendarDays size={13} strokeWidth={1.75} />
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-muted">Next Payment Date</p>
-                      <p className="text-white">
+                    <div className="portal-shine-stat__body">
+                      <p className="portal-shine-stat__label">Next Payment</p>
+                      <p
+                        className="portal-shine-stat__value"
+                        title={displayNextPaymentDate(
+                          member.billingDate,
+                          member.nextPaymentDate,
+                          member.paymentBy,
+                        )}
+                      >
                         {displayNextPaymentDate(
                           member.billingDate,
                           member.nextPaymentDate,
@@ -1422,13 +1442,15 @@ export function MemberPortalApp() {
                       </p>
                     </div>
                   </div>
-                  <div className="portal-shine-stat flex items-center gap-2.5">
+                  <div className="portal-shine-stat">
                     <span className="portal-shine-stat__icon" aria-hidden>
-                      <Building2 size={14} />
+                      <Building2 size={13} strokeWidth={1.75} />
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-muted">Branch</p>
-                      <p className="truncate text-white">{member.branch || "—"}</p>
+                    <div className="portal-shine-stat__body">
+                      <p className="portal-shine-stat__label">Branch</p>
+                      <p className="portal-shine-stat__value" title={member.branch || undefined}>
+                        {member.branch || "—"}
+                      </p>
                     </div>
                   </div>
                 </div>
