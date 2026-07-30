@@ -176,6 +176,39 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
+const WELCOME_SESSION_KEY = "apg_portal_welcome_shown_v1";
+
+function readWelcomeShownThisSession() {
+  try {
+    return sessionStorage.getItem(WELCOME_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markWelcomeShownThisSession() {
+  try {
+    sessionStorage.setItem(WELCOME_SESSION_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearWelcomeShownThisSession() {
+  try {
+    sessionStorage.removeItem(WELCOME_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function welcomeNudgeLine() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Your best sets start with showing up.";
+  if (hour < 17) return "One place for your plan, workouts, and progress.";
+  return "Consistency beats intensity — you’ve got this.";
+}
+
 export function MemberPortalApp() {
   const [step, setStep] = useState<Step>("mobile");
   const [mobile, setMobile] = useState("");
@@ -211,6 +244,8 @@ export function MemberPortalApp() {
   const [portalSections, setPortalSections] = useState<PortalSections>(
     () => ({ ...DEFAULT_PORTAL_SECTIONS }),
   );
+  /** Post-login welcome modal — once per browser session until logout. */
+  const [welcomeKind, setWelcomeKind] = useState<null | "returning" | "first">(null);
 
   const [liveTick, setLiveTick] = useState(0);
 
@@ -527,7 +562,20 @@ export function MemberPortalApp() {
       rememberThisDevice(String(m.mobile), getOrCreateDeviceId(), true);
     }
     setStep("home");
+    return m;
   }, [refreshMember, rememberThisDevice]);
+
+  /** After a real login (not session restore). Shows welcome once per session. */
+  const enterHomeAfterAuth = useCallback(
+    async (kind: "returning" | "first") => {
+      await loadMe();
+      if (!readWelcomeShownThisSession()) {
+        setWelcomeKind(kind);
+        markWelcomeShownThisSession();
+      }
+    },
+    [loadMe],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -785,7 +833,7 @@ export function MemberPortalApp() {
           if (done.needsPin) setStep("setPin");
           else {
             rememberThisDevice(mobile, deviceId, true);
-            await loadMe();
+            await enterHomeAfterAuth("returning");
           }
           return;
         }
@@ -808,7 +856,7 @@ export function MemberPortalApp() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [step, challengeId, mobile, deviceId, loadMe]);
+  }, [step, challengeId, mobile, deviceId, enterHomeAfterAuth, rememberThisDevice]);
 
   const greeting = useMemo(() => {
     const name = member?.fullName?.split(" ")[0] || "Member";
@@ -931,7 +979,7 @@ export function MemberPortalApp() {
       });
       rememberThisDevice(mobile, deviceId, true);
       setConfirmPin("");
-      await loadMe();
+      await enterHomeAfterAuth("first");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not set PIN");
     } finally {
@@ -948,7 +996,7 @@ export function MemberPortalApp() {
         body: JSON.stringify({ mobile, pin, deviceId }),
       });
       rememberThisDevice(mobile, deviceId, true);
-      await loadMe();
+      await enterHomeAfterAuth("returning");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "PIN login failed";
       const needsSetup =
@@ -977,6 +1025,8 @@ export function MemberPortalApp() {
     } catch {
       /* ignore */
     }
+    clearWelcomeShownThisSession();
+    setWelcomeKind(null);
     setMember(null);
     setCard(null);
     setPin("");
@@ -1367,7 +1417,7 @@ export function MemberPortalApp() {
           onBack={() => setStep("mobile")}
           mobile={mobile}
           deviceId={deviceId}
-          onLoggedIn={() => void loadMe()}
+          onLoggedIn={() => void enterHomeAfterAuth("returning")}
         />
       ) : null}
 
@@ -1856,6 +1906,55 @@ export function MemberPortalApp() {
               onLoggedIn={() => void loadMe()}
             />
           ) : null}
+        </div>
+      ) : null}
+
+      {welcomeKind && member ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="portal-welcome-title"
+          onClick={() => setWelcomeKind(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl border border-gold/40 bg-charcoal p-6 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="mx-auto grid h-14 w-14 place-items-center rounded-full gold-gradient text-2xl font-extrabold text-black"
+              aria-hidden
+            >
+              {welcomeKind === "first" ? "✦" : "👋"}
+            </div>
+            <h2
+              id="portal-welcome-title"
+              className="mt-4 font-display text-2xl text-gold"
+            >
+              {welcomeKind === "first"
+                ? "You’re in"
+                : `Welcome back${
+                    member.fullName?.split(" ")[0]
+                      ? `, ${member.fullName.split(" ")[0]}`
+                      : ""
+                  }`}
+            </h2>
+            <p className="mt-2 text-sm text-white/85">
+              {welcomeKind === "first"
+                ? "Welcome to Member Portal — one place to manage your membership, training, and progress."
+                : "One place to manage your membership, training, and progress."}
+            </p>
+            <p className="mt-3 text-xs font-medium tracking-wide text-gold/90">
+              {welcomeNudgeLine()}
+            </p>
+            <button
+              type="button"
+              className="mt-5 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
+              onClick={() => setWelcomeKind(null)}
+            >
+              Let’s go
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
