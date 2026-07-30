@@ -820,12 +820,13 @@ export function MemberPortalApp() {
       Boolean(
         member &&
           isNextPaymentDateToday({
+            status: member.status,
             billingDate: member.billingDate,
             nextPaymentDate: member.nextPaymentDate,
             paymentBy: member.paymentBy,
           }),
       ),
-    [member?.billingDate, member?.nextPaymentDate, member?.paymentBy, member],
+    [member?.status, member?.billingDate, member?.nextPaymentDate, member?.paymentBy, member],
   );
 
   async function requestVerify() {

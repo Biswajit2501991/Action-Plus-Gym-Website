@@ -84,12 +84,15 @@ export function resolveBillingDate(input: {
   return parseDateOnly(input.billingDate) || parseDateOnly(input.nextPaymentDate);
 }
 
-/** True when the member-facing Next Payment date (Bill Date) is today — display cue only. */
+/** True when Bill Date is today — display cue for Active members only. */
 export function isNextPaymentDateToday(input: {
   billingDate?: string | null;
   nextPaymentDate?: string | null;
   paymentBy?: string | null;
+  status?: string | null;
 }): boolean {
+  const status = String(input.status || "").trim().toLowerCase();
+  if (status && status !== "active") return false;
   const source = input.billingDate || input.nextPaymentDate || input.paymentBy;
   const d = parseDateOnly(source);
   if (!d) return false;
