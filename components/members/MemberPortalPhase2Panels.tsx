@@ -2405,7 +2405,7 @@ type WeightCachePayload = {
   today: string;
 };
 
-/** Basic-member Weight Tracker — logs to member_measurements (shared with Gym Manager). */
+/** Member Weight Tracker — shared with Gym Manager (Basic + PT). */
 export function WeightTrackerPanel({
   onBack,
   memberUuid = "",
@@ -2587,12 +2587,7 @@ export function WeightTrackerPanel({
       {initialLoad && !logs.length ? <p className="text-sm text-muted">Loading…</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-      {!canEdit ? (
-        <p className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
-          Weight Tracker is for Basic members. On a PT plan, your trainer tracks weight in Gym
-          Manager.
-        </p>
-      ) : (
+      {canEdit ? (
         <>
           <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-3 sm:p-4">
             <div className="flex items-center justify-between gap-2">
@@ -2718,6 +2713,10 @@ export function WeightTrackerPanel({
             </p>
           </div>
         </>
+      ) : (
+        <p className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-muted">
+          Weight logging is temporarily unavailable. Pull to refresh or try again shortly.
+        </p>
       )}
 
       {feedback ? (

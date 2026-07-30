@@ -65,7 +65,8 @@ export async function GET() {
     const member = await loadMemberPlan(svc.client, gymId, uuid);
     const planName = String(member?.plan_name || "").trim();
     const onPtPlan = isPtPlanName(planName);
-    const canEdit = !onPtPlan;
+    // Weight Tracker is available to Basic and PT when the portal tile is enabled.
+    const canEdit = true;
 
     const { data, error } = await svc.client
       .from("member_measurements")
@@ -146,16 +147,6 @@ export async function POST(req: Request) {
   try {
     const member = await loadMemberPlan(svc.client, gymId, uuid);
     const planName = String(member?.plan_name || "").trim();
-    if (isPtPlanName(planName)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "pt-plan-readonly",
-          message: "Weight Tracker is for Basic members. PT clients use the trainer Weight Progress tab.",
-        },
-        { status: 403 },
-      );
-    }
 
     const measuredAt = normalizeDate(body.date) || todayKeyIndia();
     const weightKg = normalizeWeightKg(body.weightKg);
@@ -190,7 +181,10 @@ export async function POST(req: Request) {
         measured_at: measuredAt,
         weight_kg: weightKg,
         notes: notes || null,
-        metrics_json: { source: "member_portal" },
+        metrics_json: {
+          source: "member_portal",
+          planName: planName || null,
+        },
         recorded_by: "member",
       })
       .select("id, measured_at, weight_kg, notes, recorded_by, created_at")

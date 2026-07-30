@@ -1613,8 +1613,7 @@ export function MemberPortalApp() {
                     }}
                   />
                 ) : null}
-                {tileEnabled("homeWeightTracker") &&
-                !/\bpt\b/i.test(String(member.planName || "")) ? (
+                {tileEnabled("homeWeightTracker") ? (
                   <NavTile
                     accent="weight"
                     active={activeHomeAccent === "weight"}
