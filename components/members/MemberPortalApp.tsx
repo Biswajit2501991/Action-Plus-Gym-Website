@@ -45,7 +45,10 @@ import {
   readKnownDeviceProfile,
   writeKnownDeviceProfile,
 } from "@/lib/member-portal/known-device";
-import { pickRandomWelcomeQuote } from "@/lib/member-portal/welcome-quotes";
+import {
+  pickRandomWelcomeQuote,
+  rememberLastWelcomeQuote,
+} from "@/lib/member-portal/welcome-quotes";
 import {
   DEFAULT_PORTAL_SECTIONS,
   homeTileKeyForStep,
@@ -560,15 +563,16 @@ export function MemberPortalApp() {
     return m;
   }, [refreshMember, rememberThisDevice]);
 
-  /** After a real login (not session restore). Shows welcome once per session. */
+  /** After a real login (not session restore). New random quote each login; once until logout. */
   const enterHomeAfterAuth = useCallback(
     async (kind: "returning" | "first") => {
       await loadMe();
-      if (!readWelcomeShownThisSession()) {
-        setWelcomeQuote(pickRandomWelcomeQuote());
-        setWelcomeKind(kind);
-        markWelcomeShownThisSession();
-      }
+      if (readWelcomeShownThisSession()) return;
+      const quote = pickRandomWelcomeQuote();
+      rememberLastWelcomeQuote(quote);
+      setWelcomeQuote(quote);
+      setWelcomeKind(kind);
+      markWelcomeShownThisSession();
     },
     [loadMe],
   );
@@ -1022,6 +1026,7 @@ export function MemberPortalApp() {
       /* ignore */
     }
     clearWelcomeShownThisSession();
+    // Keep last quote in sessionStorage so the next login avoids repeating it.
     setWelcomeKind(null);
     setWelcomeQuote("");
     setMember(null);

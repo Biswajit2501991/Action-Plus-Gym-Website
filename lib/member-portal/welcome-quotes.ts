@@ -52,10 +52,57 @@ export const PORTAL_WELCOME_QUOTES = [
   "Keep showing up. The results are coming.",
 ] as const;
 
-/** Pick one quote when the welcome popup opens (stable until dismissed). */
-export function pickRandomWelcomeQuote(): string {
-  const list = PORTAL_WELCOME_QUOTES;
+const LAST_QUOTE_KEY = "apg_portal_welcome_last_quote_v1";
+
+function readLastWelcomeQuote(): string {
+  try {
+    return String(sessionStorage.getItem(LAST_QUOTE_KEY) || "");
+  } catch {
+    return "";
+  }
+}
+
+export function rememberLastWelcomeQuote(quote: string) {
+  try {
+    sessionStorage.setItem(LAST_QUOTE_KEY, String(quote || ""));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearLastWelcomeQuote() {
+  try {
+    sessionStorage.removeItem(LAST_QUOTE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function secureRandomIndex(maxExclusive: number): number {
+  if (maxExclusive <= 0) return 0;
+  try {
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      return buf[0]! % maxExclusive;
+    }
+  } catch {
+    /* fall through */
+  }
+  return Math.floor(Math.random() * maxExclusive);
+}
+
+/**
+ * Pick one quote when the welcome popup opens.
+ * Avoids immediately repeating the last quote shown this browser session.
+ */
+export function pickRandomWelcomeQuote(excludeQuote?: string): string {
+  const list = [...PORTAL_WELCOME_QUOTES];
   if (!list.length) return "Keep showing up. The results are coming.";
-  const index = Math.floor(Math.random() * list.length);
-  return list[index] ?? list[0];
+
+  const exclude = String(excludeQuote || readLastWelcomeQuote() || "").trim();
+  const pool = exclude ? list.filter((q) => q !== exclude) : list;
+  const choices = pool.length ? pool : list;
+  const index = secureRandomIndex(choices.length);
+  return choices[index] ?? list[0]!;
 }
