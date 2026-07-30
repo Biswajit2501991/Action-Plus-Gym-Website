@@ -416,10 +416,11 @@ html[data-theme="day"] ::selection {
     0 10px 28px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  /* Avoid `transition: all` — Android compositors glitch when blur/mask/glow animate together. */
   transition:
     box-shadow 0.25s ease,
-    transform 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .portal-shine-card::before,
@@ -490,7 +491,11 @@ html[data-theme="day"] ::selection {
     0 6px 18px rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset,
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  transition: all 0.3s ease;
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.2s ease;
 }
 
 .portal-shine-tile::before {
@@ -554,7 +559,10 @@ html[data-theme="day"] ::selection {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  transition: all 0.3s ease;
+  transition:
+    box-shadow 0.25s ease,
+    color 0.25s ease,
+    background-color 0.25s ease;
 }
 
 .portal-shine-tile__label {
@@ -970,4 +978,103 @@ html[data-theme="day"] .portal-shine-tile[data-active="true"] .portal-shine-tile
       transparent 65%
     ),
     rgba(28, 34, 43, 0.04);
+}
+
+/*
+ * Android / touch GPU safety (Member Portal home).
+ * Chromium on many Android phones/tablets corrupts layers when
+ * backdrop-filter + mask-composite borders + large glow shadows
+ * remount after tile navigation (vertical yellow/blue streak glitch).
+ * Class `portal-gpu-safe` is set by MemberPortalApp for Android / coarse pointers.
+ * Keep coloured accents via solid borders; drop compositor-heavy effects.
+ */
+html.portal-gpu-safe .portal-shine-card,
+html.portal-gpu-safe .portal-shine-stat,
+html.portal-gpu-safe .portal-shine-tile {
+  isolation: auto;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  /* Opaque-enough fill so glass still reads without blur */
+  background-color: rgba(22, 22, 22, 0.92);
+  transform: none !important;
+}
+
+html.portal-gpu-safe .portal-shine-card::before,
+html.portal-gpu-safe .portal-shine-stat::before,
+html.portal-gpu-safe .portal-shine-tile::before,
+html.portal-gpu-safe .portal-shine-card::after,
+html.portal-gpu-safe .portal-shine-tile::after {
+  content: none !important;
+  display: none !important;
+}
+
+html.portal-gpu-safe .portal-shine-card,
+html.portal-gpu-safe .portal-shine-stat {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 38%, transparent),
+    0 8px 20px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+html.portal-gpu-safe .portal-shine-tile {
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html.portal-gpu-safe .portal-shine-tile:hover,
+html.portal-gpu-safe .portal-shine-tile:active {
+  transform: none !important;
+}
+
+html.portal-gpu-safe .portal-shine-tile[data-active="true"] {
+  background:
+    radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--shine-accent) 18%, transparent),
+      transparent 58%
+    ),
+    rgba(22, 22, 22, 0.94);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.32),
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+html.portal-gpu-safe .portal-shine-tile[data-active="true"] .portal-shine-tile__icon {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 45%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+html.portal-gpu-safe .portal-shine-tile__badge,
+html.portal-gpu-safe .portal-shine-stat__today-badge {
+  /* Soften large gold bloom that can smear on Android GPUs */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+html.portal-gpu-safe .portal-shine-stat--due-today,
+html.portal-gpu-safe .portal-shine-tile__badge-dot,
+html.portal-gpu-safe .portal-shine-stat__today-badge-dot {
+  animation: none !important;
+}
+
+html.portal-gpu-safe[data-theme="day"] .portal-shine-card,
+html.portal-gpu-safe[data-theme="day"] .portal-shine-stat,
+html.portal-gpu-safe[data-theme="day"] .portal-shine-tile {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+
+html.portal-gpu-safe[data-theme="day"] .portal-shine-tile[data-active="true"] {
+  background:
+    radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--shine-accent) 12%, transparent),
+      transparent 58%
+    ),
+    rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 8px 18px rgba(28, 34, 43, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--shine-accent) 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }

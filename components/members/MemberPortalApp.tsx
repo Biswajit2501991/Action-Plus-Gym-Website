@@ -214,6 +214,37 @@ export function MemberPortalApp() {
 
   const [liveTick, setLiveTick] = useState(0);
 
+  // Android / coarse-pointer: opt into GPU-safe portal glass (see globals.css).
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const root = document.documentElement;
+    const sync = () => {
+      const android = /Android/i.test(navigator.userAgent || "");
+      let coarse = false;
+      try {
+        coarse = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      } catch {
+        coarse = false;
+      }
+      root.classList.toggle("portal-gpu-safe", android || coarse);
+    };
+    sync();
+    let mq: MediaQueryList | null = null;
+    try {
+      mq = window.matchMedia("(hover: none) and (pointer: coarse)");
+      if (typeof mq.addEventListener === "function") mq.addEventListener("change", sync);
+      else if (typeof mq.addListener === "function") mq.addListener(sync);
+    } catch {
+      mq = null;
+    }
+    return () => {
+      root.classList.remove("portal-gpu-safe");
+      if (!mq) return;
+      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", sync);
+      else if (typeof mq.removeListener === "function") mq.removeListener(sync);
+    };
+  }, []);
+
   const tileEnabled = useCallback(
     (key: keyof PortalSections) => portalSections[key] !== false,
     [portalSections],
