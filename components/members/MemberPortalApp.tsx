@@ -45,6 +45,7 @@ import {
   readKnownDeviceProfile,
   writeKnownDeviceProfile,
 } from "@/lib/member-portal/known-device";
+import { pickRandomWelcomeQuote } from "@/lib/member-portal/welcome-quotes";
 import {
   DEFAULT_PORTAL_SECTIONS,
   homeTileKeyForStep,
@@ -202,13 +203,6 @@ function clearWelcomeShownThisSession() {
   }
 }
 
-function welcomeNudgeLine() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Your best sets start with showing up.";
-  if (hour < 17) return "One place for your plan, workouts, and progress.";
-  return "Consistency beats intensity — you’ve got this.";
-}
-
 export function MemberPortalApp() {
   const [step, setStep] = useState<Step>("mobile");
   const [mobile, setMobile] = useState("");
@@ -246,6 +240,7 @@ export function MemberPortalApp() {
   );
   /** Post-login welcome modal — once per browser session until logout. */
   const [welcomeKind, setWelcomeKind] = useState<null | "returning" | "first">(null);
+  const [welcomeQuote, setWelcomeQuote] = useState("");
 
   const [liveTick, setLiveTick] = useState(0);
 
@@ -570,6 +565,7 @@ export function MemberPortalApp() {
     async (kind: "returning" | "first") => {
       await loadMe();
       if (!readWelcomeShownThisSession()) {
+        setWelcomeQuote(pickRandomWelcomeQuote());
         setWelcomeKind(kind);
         markWelcomeShownThisSession();
       }
@@ -1027,6 +1023,7 @@ export function MemberPortalApp() {
     }
     clearWelcomeShownThisSession();
     setWelcomeKind(null);
+    setWelcomeQuote("");
     setMember(null);
     setCard(null);
     setPin("");
@@ -1915,7 +1912,10 @@ export function MemberPortalApp() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="portal-welcome-title"
-          onClick={() => setWelcomeKind(null)}
+          onClick={() => {
+            setWelcomeKind(null);
+            setWelcomeQuote("");
+          }}
         >
           <div
             className="w-full max-w-sm rounded-3xl border border-gold/40 bg-charcoal p-6 text-center shadow-2xl"
@@ -1944,13 +1944,16 @@ export function MemberPortalApp() {
                 ? "Welcome to Member Portal — one place to manage your membership, training, and progress."
                 : "One place to manage your membership, training, and progress."}
             </p>
-            <p className="mt-3 text-xs font-medium tracking-wide text-gold/90">
-              {welcomeNudgeLine()}
+            <p className="mt-3 text-sm font-medium leading-relaxed text-gold/90">
+              {welcomeQuote ? `“${welcomeQuote}”` : null}
             </p>
             <button
               type="button"
               className="mt-5 min-h-12 w-full touch-manipulation rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black"
-              onClick={() => setWelcomeKind(null)}
+              onClick={() => {
+                setWelcomeKind(null);
+                setWelcomeQuote("");
+              }}
             >
               Let’s go
             </button>
