@@ -814,6 +814,89 @@ html[data-theme="day"] ::selection {
   color: #fff;
 }
 
+/* Remaining overdue — neon red tile (display-only; no billing data changes) */
+.portal-shine-stat--remaining-overdue {
+  --shine-accent: #ff2b2b;
+  --shine-glow: rgba(255, 43, 43, 0.45);
+  border: 1.5px solid #ff2b2b;
+  background: #050505 !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 43, 43, 0.95),
+    0 0 10px rgba(255, 43, 43, 0.55),
+    0 0 18px rgba(255, 43, 43, 0.28),
+    inset 0 0 0 1px rgba(255, 43, 43, 0.35);
+}
+
+.portal-shine-stat--remaining-overdue::before,
+.portal-shine-stat--remaining-overdue::after {
+  content: none !important;
+  display: none !important;
+}
+
+.portal-shine-stat--remaining-overdue .portal-shine-stat__icon {
+  color: #fff;
+  background: transparent;
+  box-shadow:
+    0 0 0 1.5px #ff2b2b,
+    0 0 8px rgba(255, 43, 43, 0.45);
+}
+
+.portal-shine-stat--remaining-overdue .portal-shine-stat__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+}
+
+.portal-shine-stat--remaining-overdue .portal-shine-stat__label,
+.portal-shine-stat--remaining-overdue .portal-shine-stat__value {
+  margin: 0;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 0.15rem;
+  background: #ff2b2b;
+  color: #fff;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.portal-shine-stat--remaining-overdue .portal-shine-stat__label {
+  padding: 0.12rem 0.35rem;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.portal-shine-stat--remaining-overdue .portal-shine-stat__value {
+  padding: 0.14rem 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+/* Keep overdue neon look in day theme (alert stays dark/red) */
+html[data-theme="day"] .portal-shine-stat.portal-shine-stat--remaining-overdue {
+  background: #050505 !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 43, 43, 0.95),
+    0 0 10px rgba(255, 43, 43, 0.55),
+    0 0 18px rgba(255, 43, 43, 0.28),
+    inset 0 0 0 1px rgba(255, 43, 43, 0.35);
+}
+
+html[data-theme="day"] .portal-shine-stat--remaining-overdue .portal-shine-stat__label,
+html[data-theme="day"] .portal-shine-stat--remaining-overdue .portal-shine-stat__value {
+  color: #fff;
+  background: #ff2b2b;
+}
+
 /* Soft gold flash when Next Payment (Bill Date) is today — display only */
 .portal-shine-stat--due-today {
   border-color: rgba(255, 193, 7, 0.45);
@@ -1077,4 +1160,28 @@ html.portal-gpu-safe[data-theme="day"] .portal-shine-tile[data-active="true"] {
     0 8px 18px rgba(28, 34, 43, 0.08),
     0 0 0 1px color-mix(in srgb, var(--shine-accent) 40%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Overdue Remaining: solid red alert on Android — no large bloom/mask */
+html.portal-gpu-safe .portal-shine-stat.portal-shine-stat--remaining-overdue,
+html.portal-gpu-safe[data-theme="day"] .portal-shine-stat.portal-shine-stat--remaining-overdue {
+  background: #050505 !important;
+  background-color: #050505 !important;
+  border: 1.5px solid #ff2b2b;
+  box-shadow:
+    0 0 0 1px #ff2b2b,
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 43, 43, 0.35);
+}
+
+html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__icon {
+  color: #fff;
+  background: transparent;
+  box-shadow: 0 0 0 1.5px #ff2b2b;
+}
+
+html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__label,
+html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__value {
+  color: #fff;
+  background: #ff2b2b;
 }

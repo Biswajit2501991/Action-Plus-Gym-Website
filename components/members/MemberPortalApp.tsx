@@ -1494,7 +1494,13 @@ export function MemberPortalApp() {
                       </p>
                     </div>
                   </div>
-                  <div className="portal-shine-stat">
+                  <div
+                    className={
+                      member.remainingDays != null && member.remainingDays < 0
+                        ? "portal-shine-stat portal-shine-stat--remaining-overdue"
+                        : "portal-shine-stat"
+                    }
+                  >
                     <span className="portal-shine-stat__icon" aria-hidden>
                       <Hourglass size={13} strokeWidth={1.75} />
                     </span>
