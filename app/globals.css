@@ -846,39 +846,35 @@ html[data-theme="day"] ::selection {
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.28rem;
+  gap: 0.15rem;
 }
 
 .portal-shine-stat--remaining-overdue .portal-shine-stat__label,
 .portal-shine-stat--remaining-overdue .portal-shine-stat__value {
   margin: 0;
-  display: inline-block;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-radius: 0.15rem;
-  background: #ff2b2b;
-  color: #fff;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  background: transparent;
+  padding: 0;
 }
 
 .portal-shine-stat--remaining-overdue .portal-shine-stat__label {
-  padding: 0.12rem 0.35rem;
-  font-size: 0.5625rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.15;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
   text-transform: uppercase;
+  color: rgba(255, 140, 140, 0.92);
 }
 
 .portal-shine-stat--remaining-overdue .portal-shine-stat__value {
-  padding: 0.14rem 0.4rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   text-transform: none;
+  color: #fff;
 }
 
 /* Keep overdue neon look in day theme (alert stays dark/red) */
@@ -891,10 +887,14 @@ html[data-theme="day"] .portal-shine-stat.portal-shine-stat--remaining-overdue {
     inset 0 0 0 1px rgba(255, 43, 43, 0.35);
 }
 
-html[data-theme="day"] .portal-shine-stat--remaining-overdue .portal-shine-stat__label,
+html[data-theme="day"] .portal-shine-stat--remaining-overdue .portal-shine-stat__label {
+  color: rgba(255, 140, 140, 0.92);
+  background: transparent;
+}
+
 html[data-theme="day"] .portal-shine-stat--remaining-overdue .portal-shine-stat__value {
   color: #fff;
-  background: #ff2b2b;
+  background: transparent;
 }
 
 /* Soft gold flash when Next Payment (Bill Date) is today — display only */
@@ -1180,8 +1180,12 @@ html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__i
   box-shadow: 0 0 0 1.5px #ff2b2b;
 }
 
-html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__label,
+html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__label {
+  color: rgba(255, 140, 140, 0.92);
+  background: transparent;
+}
+
 html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__value {
   color: #fff;
-  background: #ff2b2b;
+  background: transparent;
 }
