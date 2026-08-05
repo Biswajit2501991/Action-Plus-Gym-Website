@@ -1904,6 +1904,7 @@ export function MemberPortalApp() {
               onBack={() => setStep("home")}
               memberUuid={member.memberUuid}
               liveTick={liveTick}
+              requestLockerEnabled={tileEnabled("perksRequestLocker")}
             />
           ) : null}
           {step === "biometric" ? (

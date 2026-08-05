@@ -3,6 +3,32 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
 import { randomToken } from "@/lib/member-portal/crypto";
+import {
+  DEFAULT_PORTAL_SECTIONS,
+  portalSectionsFromSettings,
+} from "@/lib/member-portal/portal-ui-config";
+import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
+
+async function isRequestLockerEnabled(): Promise<boolean> {
+  const svc = createServiceRoleClient();
+  if (!svc.ok) return DEFAULT_PORTAL_SECTIONS.perksRequestLocker !== false;
+  const gymId = portalGymId();
+  if (!gymId) return DEFAULT_PORTAL_SECTIONS.perksRequestLocker !== false;
+  const [{ data }, exerciseTypes] = await Promise.all([
+    svc.client
+      .from("member_portal_settings")
+      .select("portal_sections, basic_workout_options")
+      .eq("gym_id", gymId)
+      .maybeSingle(),
+    fetchExerciseTypeLookupValues(svc.client),
+  ]);
+  const sections = portalSectionsFromSettings({
+    portal_sections: data?.portal_sections,
+    basic_workout_options: data?.basic_workout_options,
+    exerciseTypes,
+  });
+  return sections.perksRequestLocker !== false;
+}
 
 export async function GET() {
   const session = await requireMemberSession();
@@ -102,6 +128,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: false, error: session.error },
       { status: session.status },
+    );
+  }
+
+  if (!(await isRequestLockerEnabled())) {
+    return NextResponse.json(
+      { ok: false, error: "Locker requests are currently disabled." },
+      { status: 403 },
     );
   }
 

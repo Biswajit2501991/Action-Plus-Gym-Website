@@ -2066,11 +2066,14 @@ export function PerksPanel({
   onBack,
   memberUuid = "",
   liveTick: _liveTick = 0,
+  requestLockerEnabled = true,
 }: {
   onBack: () => void;
   memberUuid?: string;
   /** Kept for call-site compat; Perks uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
+  /** From Settings → Member Portal → Home tiles → Request locker. */
+  requestLockerEnabled?: boolean;
 }) {
   const [data, setData] = useState<PerksData | null>(() =>
     readPerksCache<PerksData>(memberUuid),
@@ -2132,6 +2135,10 @@ export function PerksPanel({
   }, [reload, memberUuid, applyPerks]);
 
   async function requestLocker() {
+    if (!requestLockerEnabled) {
+      setError("Locker requests are currently disabled.");
+      return;
+    }
     try {
       const res = await api<{ ok: true; message?: string }>("/api/member/perks", {
         method: "POST",
@@ -2189,7 +2196,7 @@ export function PerksPanel({
           <p className="mt-1 text-white">
             {data.locker.locker_code} · {data.locker.status}
           </p>
-        ) : !initialLoad ? (
+        ) : !initialLoad && requestLockerEnabled ? (
           <button
             type="button"
             onClick={() => void requestLocker()}
@@ -2197,6 +2204,8 @@ export function PerksPanel({
           >
             Request locker
           </button>
+        ) : !initialLoad && !requestLockerEnabled ? (
+          <p className="mt-1 text-sm text-muted">Locker requests are currently unavailable.</p>
         ) : null}
       </div>
       <div>
