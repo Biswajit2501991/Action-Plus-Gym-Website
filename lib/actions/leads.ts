@@ -46,6 +46,9 @@ export type LeadResult =
   | { ok: false; error: string }
   | { ok: false; alreadyMember: true; note: string };
 
+/** Newsletter never returns alreadyMember — keep a narrow type for Footer. */
+export type NewsletterResult = { ok: true } | { ok: false; error: string };
+
 export async function submitLead(input: z.infer<typeof leadSchema>): Promise<LeadResult> {
   const parsed = leadSchema.safeParse(input);
   if (!parsed.success) {
@@ -98,7 +101,7 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
   return { ok: true };
 }
 
-export async function submitNewsletter(email: string): Promise<LeadResult> {
+export async function submitNewsletter(email: string): Promise<NewsletterResult> {
   if (!email || !email.includes("@")) {
     return { ok: false, error: "Enter a valid email." };
   }
