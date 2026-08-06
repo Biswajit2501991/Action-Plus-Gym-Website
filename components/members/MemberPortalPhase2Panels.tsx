@@ -805,10 +805,13 @@ export function NotificationsPanel({
           endpoint: json.endpoint,
           keys: json.keys,
           userAgent: navigator.userAgent,
+          confirm: true,
         }),
       });
       setPushEnabled(true);
-      setStatus("Billing-day reminders are on for this device.");
+      setStatus(
+        "Billing-day reminders are on. A confirmation notification was sent — close the app and check your lock screen if you want to verify.",
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not enable push";
       setError(msg);
@@ -846,17 +849,17 @@ export function NotificationsPanel({
       <div className="mt-8 border-t border-white/10 pt-6">
         <h3 className="text-sm font-semibold text-white">Optional phone reminders</h3>
         <p className="mt-1 text-sm text-muted">
-          Allow browser notifications once. On your billing day the gym can also remind you on this
-          device (Android Chrome works best; iPhone needs Home Screen).
+          Allow notifications once. On your billing day (India time) the gym can remind you on this
+          phone even when Member Portal is closed. iPhone needs the Home Screen app (iOS 16.4+).
         </p>
 
         {needsHomeScreen && !pushEnabled ? (
           <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
             <p className="font-semibold text-gold">Install on your Home Screen first</p>
             <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-white/80">
-              <li>Tap Share in Safari (or Chrome menu → Share)</li>
+              <li>Tap Share in Safari</li>
               <li>Choose Add to Home Screen</li>
-              <li>Open Action Plus from the new icon</li>
+              <li>Open Action Plus from the new icon (not the Safari tab)</li>
               <li>Return here and tap Enable billing-day push</li>
             </ol>
           </div>
@@ -869,12 +872,22 @@ export function NotificationsPanel({
         {!pushChecked ? (
           <p className="mt-4 text-sm text-muted">Checking reminder status…</p>
         ) : pushEnabled ? (
-          <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-950/30 px-4 py-3">
-            <p className="text-sm font-semibold text-emerald-200">Billing-day reminders are on</p>
-            <p className="mt-1 text-xs leading-relaxed text-white/70">
-              This device is already set up for optional phone push on your billing day. In-app
-              Alerts above still work even if you later turn off browser notifications.
-            </p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-950/30 px-4 py-3">
+              <p className="text-sm font-semibold text-emerald-200">Billing-day reminders are on</p>
+              <p className="mt-1 text-xs leading-relaxed text-white/70">
+                You&apos;ll get a phone notification on your billing day even if this app is closed.
+                In-app Alerts above still work if browser notifications are off.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void enable()}
+              className="min-h-11 w-full touch-manipulation rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/90 disabled:opacity-50"
+            >
+              {busy ? "Sending…" : "Send test notification"}
+            </button>
           </div>
         ) : (
           <button
@@ -887,8 +900,9 @@ export function NotificationsPanel({
           </button>
         )}
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
-          Android Chrome can enable push in the browser. iPhone/iPad require the Home Screen app (iOS
-          16.4+). In-app Alerts above work even if push is off.
+          Safari on iPhone only delivers push from the Home Screen app, not a normal Safari tab.
+          Android Chrome can enable push in the browser. Use Send test notification, then close the
+          app to confirm lock-screen delivery.
         </p>
       </div>
     </section>

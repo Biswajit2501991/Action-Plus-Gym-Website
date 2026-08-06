@@ -8,18 +8,46 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Action Plus Gym", body: "You have a new notification.", url: "/members" };
+  // iOS/Safari require a user-visible notification for every push while the app is closed.
+  let data = {
+    title: "Action Plus Gym",
+    body: "You have a new notification.",
+    url: "/members",
+    tag: "member-portal",
+  };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
-    /* ignore */
+    try {
+      if (event.data) {
+        const text = event.data.text();
+        if (text) data.body = text;
+      }
+    } catch {
+      /* ignore */
+    }
   }
+
+  const title = data.title || "Action Plus Gym";
+  const options = {
+    body: data.body || "",
+    icon: "/apg-icon-v3-192.png",
+    badge: "/apg-icon-v3-192.png",
+    data: { url: data.url || "/members" },
+    tag: data.tag || "member-portal",
+    renotify: true,
+    // Helps Safari surface the alert when the Home Screen app is not open.
+    requireInteraction: false,
+  };
+
   event.waitUntil(
-    self.registration.showNotification(data.title || "Action Plus Gym", {
-      body: data.body || "",
-      icon: "/apg-icon-v3-192.png",
-      badge: "/apg-icon-v3-192.png",
-      data: { url: data.url || "/members" },
+    self.registration.showNotification(title, options).catch(() => {
+      // Never leave a push unhandled — Apple drops the subscription if we fail silently.
+      return self.registration.showNotification("Action Plus Gym", {
+        body: "Open Member Portal for details.",
+        data: { url: "/members" },
+        tag: "member-portal-fallback",
+      });
     }),
   );
 });
@@ -34,7 +62,8 @@ self.addEventListener("notificationclick", (event) => {
           return client.focus();
         }
       }
-      return clients.openWindow(url);
+      if (clients.openWindow) return clients.openWindow(url);
+      return undefined;
     }),
   );
 });

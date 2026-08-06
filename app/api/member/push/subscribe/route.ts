@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession, auditLog } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
+import {
+  configureWebPush,
+  sendPushToSubscription,
+} from "@/lib/member-portal/billing-push";
 
 export async function POST(req: Request) {
   const session = await requireMemberSession();
@@ -16,6 +20,8 @@ export async function POST(req: Request) {
     endpoint?: string;
     keys?: { p256dh?: string; auth?: string };
     userAgent?: string;
+    /** When true, send a one-shot confirmation so the member can verify closed-app push. */
+    confirm?: boolean;
   } = {};
   try {
     body = await req.json();
@@ -38,9 +44,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
   }
 
+  const gymId = portalGymId();
   const { error } = await svc.client.from("member_portal_push_subscriptions").upsert(
     {
-      gym_id: portalGymId(),
+      gym_id: gymId,
       member_uuid: session.member.member_uuid,
       endpoint,
       p256dh,
@@ -59,7 +66,25 @@ export async function POST(req: Request) {
     eventType: "push_subscribed",
   });
 
-  return NextResponse.json({ ok: true });
+  let confirmed = false;
+  if (body.confirm) {
+    const vapid = configureWebPush();
+    if (vapid.ok) {
+      confirmed = await sendPushToSubscription(svc.client, {
+        gymId,
+        memberUuid: session.member.member_uuid,
+        sub: { endpoint, p256dh, auth },
+        title: "Reminders enabled",
+        body: "You'll get a billing-day reminder on this phone even when Member Portal is closed.",
+        url: "/members",
+        kind: "push_confirm",
+        tag: "push-confirm",
+        log: true,
+      });
+    }
+  }
+
+  return NextResponse.json({ ok: true, confirmed });
 }
 
 export async function DELETE(req: Request) {
