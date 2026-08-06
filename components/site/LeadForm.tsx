@@ -42,7 +42,7 @@ export function LeadForm({
       if (result.ok) {
         setMessage("Thank you — we will be in touch shortly.");
         (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
-      } else if ("alreadyMember" in result && result.alreadyMember) {
+      } else if ("alreadyMember" in result) {
         // Existing member — nothing saved; show note only.
         setNote(result.note);
       } else {
