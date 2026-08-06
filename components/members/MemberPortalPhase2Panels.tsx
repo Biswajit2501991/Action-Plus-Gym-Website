@@ -1305,12 +1305,12 @@ export function TrainingPanel({
     // liveTick intentionally omitted — soft TTL + visibility covers freshness without UI flicker.
   }, [reload, memberUuid, applyTraining]);
 
-  const loadPtChat = useCallback(async () => {
+  const loadPtChat = useCallback(async (opts?: { silent?: boolean }) => {
     if (!onPtPlan) {
       setPtChatMessages([]);
       return;
     }
-    setPtChatLoading(true);
+    if (!opts?.silent) setPtChatLoading(true);
     setPtChatError(null);
     try {
       const res = await api<{
@@ -1319,9 +1319,11 @@ export function TrainingPanel({
       }>("/api/member/pt-chat");
       setPtChatMessages(res.messages || []);
     } catch (e) {
-      setPtChatError(e instanceof Error ? e.message : "Could not load trainer chat");
+      if (!opts?.silent) {
+        setPtChatError(e instanceof Error ? e.message : "Could not load trainer chat");
+      }
     } finally {
-      setPtChatLoading(false);
+      if (!opts?.silent) setPtChatLoading(false);
     }
   }, [onPtPlan]);
 
@@ -1334,7 +1336,7 @@ export function TrainingPanel({
     if (!ptChatOpen) return;
     void loadPtChat();
     const id = window.setInterval(() => {
-      if (document.visibilityState === "visible") void loadPtChat();
+      if (document.visibilityState === "visible") void loadPtChat({ silent: true });
     }, 12_000);
     return () => window.clearInterval(id);
   }, [onPtPlan, ptChatOpen, loadPtChat]);
@@ -1358,8 +1360,17 @@ export function TrainingPanel({
   async function sendPtChat() {
     const text = ptChatText.trim();
     if (!text || ptChatBusy || !onPtPlan) return;
+    const optimistic = {
+      id: `local-${Date.now()}`,
+      by: "You",
+      text,
+      ts: new Date().toISOString(),
+      from: "member",
+    };
+    setPtChatText("");
     setPtChatBusy(true);
     setPtChatError(null);
+    setPtChatMessages((prev) => [...prev, optimistic]);
     try {
       const res = await api<{
         ok: true;
@@ -1369,8 +1380,9 @@ export function TrainingPanel({
         body: JSON.stringify({ text }),
       });
       setPtChatMessages(res.messages || []);
-      setPtChatText("");
     } catch (e) {
+      setPtChatMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setPtChatText(text);
       setPtChatError(e instanceof Error ? e.message : "Could not send");
     } finally {
       setPtChatBusy(false);

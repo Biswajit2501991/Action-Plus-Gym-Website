@@ -41,25 +41,25 @@ export async function GET() {
 
   const { data: profileRow } = await svc.client
     .from("pt_client_profiles")
-    .select("plan_json")
+    .select("chat:plan_json->chat, lastTrainerChatAt:plan_json->lastTrainerChatAt")
     .eq("gym_id", gymId)
     .eq("member_id", member.id)
     .maybeSingle();
 
-  const planJson =
-    profileRow?.plan_json && typeof profileRow.plan_json === "object"
-      ? (profileRow.plan_json as Record<string, unknown>)
-      : {};
-  const chat = Array.isArray(planJson.chat) ? planJson.chat : [];
-  let latestTrainerAt: string | null = null;
-  for (const row of chat) {
-    if (!row || typeof row !== "object") continue;
-    const msg = row as { from?: string; ts?: string };
-    if (String(msg.from || "trainer") === "member") continue;
-    const ts = String(msg.ts || "").trim();
-    if (!ts) continue;
-    if (!latestTrainerAt || (Date.parse(ts) || 0) > (Date.parse(latestTrainerAt) || 0)) {
-      latestTrainerAt = ts;
+  const chat = Array.isArray(profileRow?.chat) ? profileRow.chat : [];
+  let latestTrainerAt: string | null = profileRow?.lastTrainerChatAt
+    ? String(profileRow.lastTrainerChatAt)
+    : null;
+  if (!latestTrainerAt) {
+    for (const row of chat) {
+      if (!row || typeof row !== "object") continue;
+      const msg = row as { from?: string; ts?: string };
+      if (String(msg.from || "trainer") === "member") continue;
+      const ts = String(msg.ts || "").trim();
+      if (!ts) continue;
+      if (!latestTrainerAt || (Date.parse(ts) || 0) > (Date.parse(latestTrainerAt) || 0)) {
+        latestTrainerAt = ts;
+      }
     }
   }
 

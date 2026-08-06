@@ -82,7 +82,9 @@ export async function GET() {
 
   const { data: profileRow, error: profileErr } = await svc.client
     .from("pt_client_profiles")
-    .select("id, member_id, plan_json, updated_at")
+    .select(
+      "id, member_id, chat:plan_json->chat, lastTrainerChatAt:plan_json->lastTrainerChatAt",
+    )
     .eq("gym_id", gymId)
     .eq("member_id", member.id)
     .maybeSingle();
@@ -91,11 +93,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: profileErr.message }, { status: 500 });
   }
 
-  const planJson =
-    profileRow?.plan_json && typeof profileRow.plan_json === "object"
-      ? (profileRow.plan_json as Record<string, unknown>)
-      : {};
-  const messages = normalizeChatList(planJson.chat);
+  const messages = normalizeChatList(profileRow?.chat);
   const latestTrainer = messages.find((m) => m.from !== "member") || null;
 
   return NextResponse.json({
