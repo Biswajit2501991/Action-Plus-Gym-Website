@@ -1216,6 +1216,7 @@ export function TrainingPanel({
   const [dietTextOpen, setDietTextOpen] = useState(false);
   const [dietImageOpen, setDietImageOpen] = useState(false);
   const [dietImageIndex, setDietImageIndex] = useState(0);
+  const [ptChatOpen, setPtChatOpen] = useState(false);
   const [ptChatMessages, setPtChatMessages] = useState<
     Array<{ id: string; by?: string; text: string; ts?: string; from?: string }>
   >([]);
@@ -1223,6 +1224,7 @@ export function TrainingPanel({
   const [ptChatBusy, setPtChatBusy] = useState(false);
   const [ptChatError, setPtChatError] = useState<string | null>(null);
   const [ptChatLoading, setPtChatLoading] = useState(false);
+  const ptChatScrollRef = useRef<HTMLDivElement | null>(null);
   const formHydratedDateRef = useRef<string | null>(null);
   const ptHydratedDayRef = useRef<string | null>(null);
 
@@ -1326,14 +1328,32 @@ export function TrainingPanel({
   useEffect(() => {
     if (!onPtPlan) {
       setPtChatMessages([]);
+      setPtChatOpen(false);
       return;
     }
+    if (!ptChatOpen) return;
     void loadPtChat();
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void loadPtChat();
     }, 12_000);
     return () => window.clearInterval(id);
-  }, [onPtPlan, loadPtChat]);
+  }, [onPtPlan, ptChatOpen, loadPtChat]);
+
+  useEffect(() => {
+    if (!ptChatOpen) return;
+    const el = ptChatScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [ptChatOpen, ptChatMessages.length]);
+
+  useEffect(() => {
+    if (!ptChatOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPtChatOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ptChatOpen]);
 
   async function sendPtChat() {
     const text = ptChatText.trim();
@@ -1542,15 +1562,36 @@ export function TrainingPanel({
   return (
     <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-4 space-y-5 sm:p-5">
       <PortalBackButton onClick={onBack} />
-      <h2 className="font-display text-2xl text-white">Training</h2>
-      {data?.planName ? (
-        <p className="text-xs text-muted">
-          Plan · <span className="text-white/85">{data.planName}</span>
-          {onPtPlan
-            ? " · Your PT schedule days"
-            : " · Log your own workouts"}
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-2xl text-white">Training</h2>
+          {data?.planName ? (
+            <p className="mt-1 text-xs text-muted">
+              Plan · <span className="text-white/85">{data.planName}</span>
+              {onPtPlan
+                ? " · Your PT schedule days"
+                : " · Log your own workouts"}
+            </p>
+          ) : null}
+        </div>
+        {onPtPlan ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPtChatOpen(true);
+              void loadPtChat();
+            }}
+            className="relative shrink-0 touch-manipulation rounded-full border border-gold/45 bg-gold/15 px-4 py-2 text-sm font-semibold text-gold"
+          >
+            Chat
+            {trainerChatIsNew ? (
+              <span className="ml-1.5 inline-flex rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase text-black">
+                New
+              </span>
+            ) : null}
+          </button>
+        ) : null}
+      </div>
       {initialLoad && !data ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : null}
@@ -1833,74 +1874,99 @@ export function TrainingPanel({
       </Block>
       ) : null}
 
-      {onPtPlan ? (
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-lg text-white">Chat</h3>
-            {trainerChatIsNew ? (
-              <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold">
-                New
-              </span>
-            ) : null}
-          </div>
-          <p className="text-xs text-muted">
-            Message your trainer. Replies also appear in Gym Manager → PT Clients → Chat Trainer.
-          </p>
-          <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-3">
-            {ptChatLoading && !ptChatMessages.length ? (
-              <p className="text-xs text-muted">Loading chat…</p>
-            ) : null}
-            {ptChatMessages.map((m) => {
-              const fromMember = m.from === "member";
-              return (
-                <div
-                  key={m.id}
-                  className={`rounded-xl px-3 py-2 text-sm ${
-                    fromMember
-                      ? "ml-6 bg-gold/15 text-white"
-                      : "mr-6 border border-white/10 bg-white/[0.04] text-white/90"
-                  }`}
-                >
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                    {fromMember ? "You" : m.by || "Trainer"}
-                  </p>
-                  <p className="mt-0.5 whitespace-pre-wrap">{m.text}</p>
-                  {m.ts ? (
-                    <p className="mt-1 text-[10px] text-muted">
-                      {new Date(String(m.ts).replace(" ", "T")).toLocaleString()}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-            {!ptChatLoading && !ptChatMessages.length ? (
-              <p className="text-xs text-muted">No messages yet — say hello to your trainer.</p>
-            ) : null}
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={ptChatText}
-              onChange={(e) => setPtChatText(e.target.value)}
-              placeholder="Write to your trainer…"
-              disabled={ptChatBusy}
-              className="min-h-11 flex-1 rounded-xl border border-white/12 bg-black/50 px-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-gold/40"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void sendPtChat();
-                }
-              }}
-            />
-            <button
-              type="button"
-              disabled={ptChatBusy || !ptChatText.trim()}
-              onClick={() => void sendPtChat()}
-              className="min-h-11 shrink-0 rounded-full gold-gradient px-4 text-sm font-semibold text-black disabled:opacity-50"
+      {onPtPlan && ptChatOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/80 p-3 sm:items-center sm:p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pt-chat-title"
+          onClick={() => setPtChatOpen(false)}
+        >
+          <div
+            className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-gold/35 bg-charcoal shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold">
+                  Trainer
+                </p>
+                <h3 id="pt-chat-title" className="font-display text-xl text-white">
+                  Chat
+                </h3>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  Messages sync with Gym Manager → Chat Trainer.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPtChatOpen(false)}
+                className="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/80"
+              >
+                Close
+              </button>
+            </div>
+            <div
+              ref={ptChatScrollRef}
+              className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3"
             >
-              {ptChatBusy ? "…" : "Send"}
-            </button>
+              {ptChatLoading && !ptChatMessages.length ? (
+                <p className="text-xs text-muted">Loading chat…</p>
+              ) : null}
+              {ptChatMessages.map((m) => {
+                const fromMember = m.from === "member";
+                return (
+                  <div
+                    key={m.id}
+                    className={`rounded-xl px-3 py-2 text-sm ${
+                      fromMember
+                        ? "ml-6 bg-gold/15 text-white"
+                        : "mr-6 border border-white/10 bg-white/[0.04] text-white/90"
+                    }`}
+                  >
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      {fromMember ? "You" : m.by || "Trainer"}
+                    </p>
+                    <p className="mt-0.5 whitespace-pre-wrap">{m.text}</p>
+                    {m.ts ? (
+                      <p className="mt-1 text-[10px] text-muted">
+                        {new Date(String(m.ts).replace(" ", "T")).toLocaleString()}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {!ptChatLoading && !ptChatMessages.length ? (
+                <p className="text-xs text-muted">No messages yet — say hello to your trainer.</p>
+              ) : null}
+            </div>
+            <div className="border-t border-white/10 px-4 py-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  value={ptChatText}
+                  onChange={(e) => setPtChatText(e.target.value)}
+                  placeholder="Write to your trainer…"
+                  disabled={ptChatBusy}
+                  className="min-h-11 flex-1 rounded-xl border border-white/12 bg-black/50 px-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-gold/40"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void sendPtChat();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={ptChatBusy || !ptChatText.trim()}
+                  onClick={() => void sendPtChat()}
+                  className="min-h-11 shrink-0 rounded-full gold-gradient px-4 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  {ptChatBusy ? "…" : "Send"}
+                </button>
+              </div>
+              {ptChatError ? <p className="text-xs text-red-300">{ptChatError}</p> : null}
+            </div>
           </div>
-          {ptChatError ? <p className="text-xs text-red-300">{ptChatError}</p> : null}
         </div>
       ) : null}
 

@@ -189,18 +189,29 @@ export async function POST(req: Request) {
     updatedAt: nowIso,
   };
 
-  const { error: upsertErr } = await svc.client.from("pt_client_profiles").upsert(
-    {
+  // Table may only have PK on id (no unique on gym_id+member_id) — update/insert like Gym Manager.
+  if (profileRow?.id) {
+    const { error: updErr } = await svc.client
+      .from("pt_client_profiles")
+      .update({
+        plan_json: planJson,
+        updated_at: nowIso,
+      })
+      .eq("id", profileRow.id)
+      .eq("gym_id", gymId);
+    if (updErr) {
+      return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+    }
+  } else {
+    const { error: insErr } = await svc.client.from("pt_client_profiles").insert({
       gym_id: gymId,
       member_id: member.id,
       plan_json: planJson,
       updated_at: nowIso,
-    },
-    { onConflict: "gym_id,member_id" },
-  );
-
-  if (upsertErr) {
-    return NextResponse.json({ ok: false, error: upsertErr.message }, { status: 500 });
+    });
+    if (insErr) {
+      return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 });
+    }
   }
 
   await auditLog({
