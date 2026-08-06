@@ -428,6 +428,28 @@ export function MemberPortalApp() {
     liveTick,
   ]);
 
+  /** Late payment notice (overdue) — used only to style Alerts tile red (display-only). */
+  const hasLatePaymentNotice = useMemo(() => {
+    if (!member) return false;
+    return (
+      deriveBillingAlert({
+        status: member.status,
+        billingDate: member.billingDate,
+        paymentBy: member.paymentBy,
+        nextPaymentDate: member.nextPaymentDate,
+        amount: member.amount,
+      })?.kind === "overdue"
+    );
+  }, [
+    member,
+    member?.status,
+    member?.billingDate,
+    member?.paymentBy,
+    member?.nextPaymentDate,
+    member?.amount,
+    liveTick,
+  ]);
+
   /** Warm panel caches on home so cards open instantly (fresh fetch still runs in background). */
   useEffect(() => {
     if (step !== "home" || !member?.memberUuid) return;
@@ -1641,6 +1663,7 @@ export function MemberPortalApp() {
                     icon={<Bell size={15} strokeWidth={1.75} />}
                     label="Alerts"
                     badge={alertsUnread}
+                    urgent={hasLatePaymentNotice}
                     onClick={() => {
                       setActiveHomeAccent("alerts");
                       setStep("notifications");
@@ -1983,12 +2006,15 @@ function NavTile({
   badge,
   accent = "qr",
   active = false,
+  urgent = false,
 }: {
   icon?: React.ReactNode;
   label: string;
   onClick: () => void;
   badge?: boolean;
   active?: boolean;
+  /** Late payment / critical — neon red box (same language as Remaining overdue). */
+  urgent?: boolean;
   accent?:
     | "profile"
     | "devices"
@@ -2009,9 +2035,22 @@ function NavTile({
       onClick={onClick}
       data-accent={accent}
       data-active={active ? "true" : "false"}
+      data-urgent={urgent ? "true" : "false"}
       aria-pressed={active}
-      aria-label={badge ? `${label} (new)` : label}
-      className="portal-shine-tile relative flex touch-manipulation flex-col items-center justify-center gap-1.5 px-1.5 py-2 text-white/90"
+      aria-label={
+        badge
+          ? urgent
+            ? `${label} (new, late payment notice)`
+            : `${label} (new)`
+          : urgent
+            ? `${label} (late payment notice)`
+            : label
+      }
+      className={
+        urgent
+          ? "portal-shine-tile portal-shine-tile--alert-overdue relative flex touch-manipulation flex-col items-center justify-center gap-1.5 px-1.5 py-2 text-white/90"
+          : "portal-shine-tile relative flex touch-manipulation flex-col items-center justify-center gap-1.5 px-1.5 py-2 text-white/90"
+      }
     >
       <span className="relative flex items-center justify-center">
         {badge ? (

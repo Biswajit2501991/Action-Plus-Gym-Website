@@ -901,7 +901,7 @@ function BillingAlertCard({ alert }: { alert: BillingAlert }) {
     <article
       className={
         overdue
-          ? "rounded-2xl border border-rose-400/40 bg-rose-950/35 px-4 py-4"
+          ? "portal-alert-card portal-alert-card--overdue rounded-2xl px-4 py-4"
           : "rounded-2xl border border-gold/35 bg-gold/10 px-4 py-4"
       }
     >
@@ -909,7 +909,7 @@ function BillingAlertCard({ alert }: { alert: BillingAlert }) {
         <p
           className={
             overdue
-              ? "text-sm font-semibold text-rose-200"
+              ? "text-sm font-semibold text-[#ff8c8c]"
               : "text-sm font-semibold text-gold"
           }
         >
@@ -918,7 +918,7 @@ function BillingAlertCard({ alert }: { alert: BillingAlert }) {
         <span
           className={
             overdue
-              ? "shrink-0 rounded-full bg-rose-400/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-200"
+              ? "shrink-0 rounded-full bg-[#ff2b2b]/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#ffb3b3]"
               : "shrink-0 rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold"
           }
         >
