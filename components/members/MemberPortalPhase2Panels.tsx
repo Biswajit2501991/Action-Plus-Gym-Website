@@ -1139,10 +1139,19 @@ export function ChatPanel({
   );
 }
 
+type DietImage = {
+  id: string;
+  name: string;
+  mime: string;
+  dataUrl: string;
+  uploadedAt?: string | null;
+};
+
 type TrainingData = {
   pt: Array<Record<string, unknown>>;
   workouts: Array<Record<string, unknown>>;
   diets: Array<Record<string, unknown>>;
+  dietImages?: DietImage[];
   measurements: Array<Record<string, unknown>>;
   focusByDate?: Record<string, string>;
   today?: string;
@@ -1202,6 +1211,9 @@ export function TrainingPanel({
   const [ptNotesMsg, setPtNotesMsg] = useState<string | null>(null);
   const [exercisesExpanded, setExercisesExpanded] = useState(false);
   const [initialLoad, setInitialLoad] = useState(() => !readTrainingCache(memberUuid));
+  const [dietTextOpen, setDietTextOpen] = useState(false);
+  const [dietImageOpen, setDietImageOpen] = useState(false);
+  const [dietImageIndex, setDietImageIndex] = useState(0);
   const formHydratedDateRef = useRef<string | null>(null);
   const ptHydratedDayRef = useRef<string | null>(null);
 
@@ -1439,7 +1451,26 @@ export function TrainingPanel({
   const showPtAssignment = onPtPlan && (data?.pt || []).length > 0;
   const showPtWorkouts =
     onPtPlan && showPtWorkoutDetails && (data?.workouts || []).length > 0;
-  const showPtDiet = onPtPlan && (data?.diets || []).length > 0;
+  const dietImages = data?.dietImages || [];
+  const showPtDiet =
+    onPtPlan && ((data?.diets || []).length > 0 || dietImages.length > 0);
+  const primaryDiet = (data?.diets || [])[0] || null;
+  const dietPlanText = (() => {
+    const plan = String(primaryDiet?.dietPlan || "").trim();
+    if (plan) return plan;
+    const title = String(primaryDiet?.title || "").trim();
+    if (!title || title === "Diet plan from your trainer") return "";
+    // Legacy/stub rows may only have title — strip trailing macro summary if present.
+    return title.replace(/\s*\([^)]*(kcal|protein|water)[^)]*\)\s*$/i, "").trim() || title;
+  })();
+  const dietMacros = primaryDiet
+    ? [
+        primaryDiet.calories ? `${String(primaryDiet.calories)} kcal` : "",
+        primaryDiet.protein ? `${String(primaryDiet.protein)} protein` : "",
+        primaryDiet.water ? `${String(primaryDiet.water)} water` : "",
+      ].filter(Boolean)
+    : [];
+  const activeDietImage = dietImages[dietImageIndex] || null;
 
   return (
     <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-4 space-y-5 sm:p-5">
@@ -1687,12 +1718,159 @@ export function TrainingPanel({
       ) : null}
       {showPtDiet ? (
       <Block title="Diet" empty="No diet plan assigned.">
-        {(data?.diets || []).map((d) => (
-          <p key={String(d.id)} className="text-sm text-white/85 whitespace-pre-wrap">
-            {String(d.title)}
-          </p>
-        ))}
+        <p className="text-sm text-white/75">
+          View the diet plan and photos your trainer added under Diet Plan Documents.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={!dietPlanText}
+            onClick={() => setDietTextOpen(true)}
+            className="min-h-11 flex-1 touch-manipulation rounded-full gold-gradient px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-40 sm:flex-none"
+          >
+            View your Diet
+          </button>
+          <button
+            type="button"
+            disabled={!dietImages.length}
+            onClick={() => {
+              setDietImageIndex(0);
+              setDietImageOpen(true);
+            }}
+            className="min-h-11 flex-1 touch-manipulation rounded-full border border-gold/40 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-40 sm:flex-none"
+          >
+            Diet Image{dietImages.length > 1 ? ` (${dietImages.length})` : ""}
+          </button>
+        </div>
+        {!dietPlanText && !dietImages.length ? (
+          <p className="mt-2 text-xs text-muted">No diet plan assigned yet.</p>
+        ) : null}
+        {!dietPlanText && dietImages.length ? (
+          <p className="mt-2 text-xs text-muted">Diet text not set — open Diet Image for photos.</p>
+        ) : null}
+        {dietPlanText && !dietImages.length ? (
+          <p className="mt-2 text-xs text-muted">No diet photos attached yet.</p>
+        ) : null}
       </Block>
+      ) : null}
+
+      {dietTextOpen && dietPlanText ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="diet-text-title"
+          onClick={() => setDietTextOpen(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-gold/35 bg-charcoal p-5 shadow-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+                  Diet plan
+                </p>
+                <h3 id="diet-text-title" className="mt-1 font-display text-2xl text-white">
+                  Your diet
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDietTextOpen(false)}
+                className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/80"
+                aria-label="Close"
+              >
+                Close
+              </button>
+            </div>
+            {dietMacros.length ? (
+              <p className="mt-3 text-xs text-gold/90">{dietMacros.join(" · ")}</p>
+            ) : null}
+            <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/90 select-none">
+              {dietPlanText}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {dietImageOpen && activeDietImage ? (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-black/95"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Diet images"
+          onClick={() => setDietImageOpen(false)}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div
+            className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">
+                {activeDietImage.name || "Diet image"}
+              </p>
+              <p className="text-[11px] text-muted">
+                {dietImageIndex + 1} / {dietImages.length}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDietImageOpen(false)}
+              className="shrink-0 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/85"
+            >
+              Close
+            </button>
+          </div>
+          <div
+            className="relative flex min-h-0 flex-1 items-center justify-center p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- inline trainer data URLs */}
+            <img
+              src={activeDietImage.dataUrl}
+              alt={activeDietImage.name || "Diet plan document"}
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              className="max-h-full max-w-full select-none object-contain"
+              style={{ WebkitUserSelect: "none", userSelect: "none" }}
+            />
+          </div>
+          <div
+            className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              disabled={dietImages.length < 2}
+              onClick={() =>
+                setDietImageIndex((i) =>
+                  dietImages.length ? (i - 1 + dietImages.length) % dietImages.length : 0,
+                )
+              }
+              className="min-h-11 flex-1 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              disabled={dietImages.length < 2}
+              onClick={() =>
+                setDietImageIndex((i) =>
+                  dietImages.length ? (i + 1) % dietImages.length : 0,
+                )
+              }
+              className="min-h-11 flex-1 rounded-full gold-gradient px-4 py-2 text-sm font-semibold text-black disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+          <p className="px-4 pb-4 text-center text-[10px] leading-relaxed text-white/45">
+            Screenshots cannot be fully blocked on phones. Please keep your diet plan private.
+          </p>
+        </div>
       ) : null}
 
       {showMeasurements ? (

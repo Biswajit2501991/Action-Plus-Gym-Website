@@ -10,6 +10,15 @@ import {
 } from "@/lib/member-portal/portal-ui-config";
 import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 
+type DietAttachment = {
+  id?: string;
+  name?: string;
+  mime?: string;
+  size?: number;
+  dataUrl?: string;
+  uploadedAt?: string;
+};
+
 type PlanJson = {
   trainerId?: string;
   trainer?: string;
@@ -22,7 +31,44 @@ type PlanJson = {
   water?: string;
   sessions?: number | string | Array<Record<string, unknown>>;
   ptWorkoutNotes?: string;
+  /** Gym Manager PT Client → Diet Plan Documents (inline base64 data URLs). */
+  dietAttachments?: DietAttachment[];
 };
+
+function normalizeDietImages(attachments: unknown): Array<{
+  id: string;
+  name: string;
+  mime: string;
+  dataUrl: string;
+  uploadedAt: string | null;
+}> {
+  if (!Array.isArray(attachments)) return [];
+  const out: Array<{
+    id: string;
+    name: string;
+    mime: string;
+    dataUrl: string;
+    uploadedAt: string | null;
+  }> = [];
+  for (const raw of attachments) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as DietAttachment;
+    const dataUrl = String(row.dataUrl || "").trim();
+    const mime = String(row.mime || "").trim().toLowerCase();
+    if (!dataUrl.startsWith("data:image/")) continue;
+    if (mime && !mime.startsWith("image/")) continue;
+    out.push({
+      id: String(row.id || `diet-img-${out.length + 1}`),
+      name: String(row.name || `Diet image ${out.length + 1}`).slice(0, 180),
+      mime: mime || "image/*",
+      dataUrl,
+      uploadedAt: row.uploadedAt ? String(row.uploadedAt) : null,
+    });
+    // Cap payload size for portal — staff can store many docs; member viewer shows recent images.
+    if (out.length >= 24) break;
+  }
+  return out;
+}
 
 /** Gym runs in India — schedule keys are local calendar dates. */
 function todayKeyIndia() {
@@ -169,6 +215,13 @@ export async function GET() {
 
   let focusByDate: Record<string, string> = {};
   let ptWorkoutNotes = "";
+  let dietImages: Array<{
+    id: string;
+    name: string;
+    mime: string;
+    dataUrl: string;
+    uploadedAt: string | null;
+  }> = [];
   const today = todayKeyIndia();
 
   // Source of truth for Gym Manager PT Clients: pt_client_profiles.plan_json
@@ -277,23 +330,32 @@ export async function GET() {
       ptWorkoutNotes = "";
     }
 
-    if (onPtPlan && portalSections.ptDiet && diets.length === 0 && dietPlanText) {
-      const macros = [
-        planJson.calories ? `${planJson.calories} kcal` : "",
-        planJson.protein ? `${planJson.protein} protein` : "",
-        planJson.water ? `${planJson.water} water` : "",
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      diets = [
-        {
-          id: `diet-${member.id}`,
-          title: macros ? `${dietPlanText} (${macros})` : dietPlanText,
-          kind: "diet_plan",
-        },
-      ];
+    if (onPtPlan && portalSections.ptDiet) {
+      dietImages = normalizeDietImages(planJson.dietAttachments);
+      if (diets.length === 0 && (dietPlanText || dietImages.length)) {
+        const macros = [
+          planJson.calories ? `${planJson.calories} kcal` : "",
+          planJson.protein ? `${planJson.protein} protein` : "",
+          planJson.water ? `${planJson.water} water` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        const titleBase = dietPlanText || "Diet plan from your trainer";
+        diets = [
+          {
+            id: `diet-${member.id}`,
+            title: macros ? `${titleBase} (${macros})` : titleBase,
+            kind: "diet_plan",
+            dietPlan: dietPlanText || null,
+            calories: planJson.calories ? String(planJson.calories) : null,
+            protein: planJson.protein ? String(planJson.protein) : null,
+            water: planJson.water ? String(planJson.water) : null,
+          },
+        ];
+      }
     } else if (onPtPlan && !portalSections.ptDiet) {
       diets = [];
+      dietImages = [];
     }
 
     if (!onPtPlan) {
@@ -390,6 +452,7 @@ export async function GET() {
     pt: portalSections.ptAssignment ? pt : [],
     workouts: onPtPlan && !portalSections.ptWorkoutDetails ? [] : workouts,
     diets: onPtPlan && !portalSections.ptDiet ? [] : diets,
+    dietImages: onPtPlan && portalSections.ptDiet ? dietImages : [],
     measurements: portalSections.measurements ? measurements.data || [] : [],
     showMeasurements: portalSections.measurements,
     showPtSchedule: portalSections.ptSchedule,
