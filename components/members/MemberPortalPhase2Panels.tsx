@@ -1925,7 +1925,7 @@ export function TrainingPanel({
                     }`}
                   >
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      {fromMember ? "You" : m.by || "Trainer"}
+                      {fromMember ? "You" : "Trainer"}
                     </p>
                     <p className="mt-0.5 whitespace-pre-wrap">{m.text}</p>
                     {m.ts ? (
