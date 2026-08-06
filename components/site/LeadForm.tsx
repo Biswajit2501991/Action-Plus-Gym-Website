@@ -21,11 +21,13 @@ export function LeadForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState(defaultSource);
 
   function onSubmit(formData: FormData) {
     setMessage(null);
+    setNote(null);
     setError(null);
     startTransition(async () => {
       const result = await submitLead({
@@ -40,6 +42,9 @@ export function LeadForm({
       if (result.ok) {
         setMessage("Thank you — we will be in touch shortly.");
         (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
+      } else if ("alreadyMember" in result && result.alreadyMember) {
+        // Existing member — nothing saved; show note only.
+        setNote(result.note);
       } else {
         setError(result.error);
       }
@@ -119,6 +124,11 @@ export function LeadForm({
           {pending ? "Sending..." : "Submit"}
         </Button>
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+        {note ? (
+          <p className="rounded-2xl border border-gold/35 bg-gold/10 px-3 py-2.5 text-sm leading-relaxed text-gold">
+            {note}
+          </p>
+        ) : null}
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
       </div>
     </form>

@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { GYM_ID } from "@/lib/config";
+import { findMembersByMobile } from "@/lib/member-portal/members";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
 const leadSchema = z.object({
@@ -20,6 +21,16 @@ const leadSchema = z.object({
   website: z.string().optional(), // honeypot
 });
 
+/** Join Now / Free Trial / Contact — skip saving when mobile already belongs to a member. */
+const MEMBER_CHECK_SOURCES = new Set([
+  "website",
+  "website_trial",
+  "website_contact",
+]);
+
+export const ALREADY_MEMBER_NOTE =
+  "You are already a member. Please contact the gym for your membership update or any queries.";
+
 const rateMap = new Map<string, number>();
 
 function rateLimit(key: string, windowMs = 60_000) {
@@ -30,7 +41,10 @@ function rateLimit(key: string, windowMs = 60_000) {
   return true;
 }
 
-export type LeadResult = { ok: true } | { ok: false; error: string };
+export type LeadResult =
+  | { ok: true }
+  | { ok: false; error: string }
+  | { ok: false; alreadyMember: true; note: string };
 
 export async function submitLead(input: z.infer<typeof leadSchema>): Promise<LeadResult> {
   const parsed = leadSchema.safeParse(input);
@@ -45,6 +59,19 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
   const key = `${parsed.data.mobile}:${parsed.data.source}`;
   if (!rateLimit(key)) {
     return { ok: false, error: "Please wait a moment before submitting again." };
+  }
+
+  // Existing members: show a note and do not create a website lead/visitor row.
+  if (MEMBER_CHECK_SOURCES.has(parsed.data.source)) {
+    try {
+      const listed = await findMembersByMobile(parsed.data.mobile);
+      if (listed.ok && listed.members.length > 0) {
+        return { ok: false, alreadyMember: true, note: ALREADY_MEMBER_NOTE };
+      }
+      // Lookup failure → fall through and save (do not block genuine new leads).
+    } catch (err) {
+      console.error("lead member-mobile check", err);
+    }
   }
 
   const supabase = createAnonServerClient();
