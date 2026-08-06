@@ -28,7 +28,7 @@ const MEMBER_CHECK_SOURCES = new Set([
   "website_contact",
 ]);
 
-export const ALREADY_MEMBER_NOTE =
+const ALREADY_MEMBER_NOTE =
   "You are already a member. Please contact the gym for your membership update or any queries.";
 
 const rateMap = new Map<string, number>();
