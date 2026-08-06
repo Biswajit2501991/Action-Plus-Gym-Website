@@ -3,35 +3,77 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const INDIA_TZ = "Asia/Kolkata";
 
+export const DEFAULT_BILLING_PUSH_TITLE = "Billing date reminder";
+export const DEFAULT_BILLING_PUSH_BODY =
+  "Today is your billing date. Please clear your payment within one week to avoid a fine.";
+export const DEFAULT_OVERDUE_PUSH_TITLE = "Late payment notice";
+export const DEFAULT_OVERDUE_PUSH_BODY =
+  "A fine has been added to your plan. Please clear within 1 week to avoid deactivation or membership cancellation, or reach out to the gym if there is any issue.";
+
 /** Calendar YYYY-MM-DD in India. */
 export function indiaCalendarDateKey(input: Date | string = new Date()): string {
-  const d = typeof input === "string" ? new Date(input) : input;
-  if (Number.isNaN(d.getTime()) && typeof input === "string") {
-    const m = String(input).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (typeof input === "string") {
+    const m = String(input).trim().match(/^(\d{4}-\d{2}-\d{2})/);
     if (m) return m[1];
+    const d = new Date(input);
+    if (Number.isNaN(d.getTime())) return indiaCalendarDateKey(new Date());
+    return indiaCalendarDateKey(d);
   }
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: INDIA_TZ,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(d);
+  }).format(input);
 }
 
-/** Day-of-month (1–31) in India for a stored date / timestamp. */
-export function indiaDayOfMonth(raw: string | null | undefined): number | null {
+/** Current hour (0–23) in India. */
+export function indiaHour(now: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: INDIA_TZ,
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const raw = Number(parts.find((p) => p.type === "hour")?.value);
+  if (!Number.isFinite(raw)) return 0;
+  return raw === 24 ? 0 : raw;
+}
+
+/** Parse stored date to YYYY-MM-DD (calendar, no UTC shift). */
+export function dateOnlyKey(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const s = String(raw).trim();
-  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (ymd) return Number(ymd[3]);
-  const d = new Date(s);
+  const m = String(raw).trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+  const d = new Date(String(raw));
   if (Number.isNaN(d.getTime())) return null;
-  return Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: INDIA_TZ,
-      day: "numeric",
-    }).format(d),
-  );
+  return indiaCalendarDateKey(d);
+}
+
+export function addDaysToYmd(ymd: string, days: number): string {
+  const [y, mo, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Payment By: stored payment_by, else billing_date + 7 days. */
+export function resolvePaymentByYmd(member: {
+  billing_date?: string | null;
+  payment_by?: string | null;
+  next_payment_date?: string | null;
+}): string | null {
+  const stored = dateOnlyKey(member.payment_by);
+  if (stored) return stored;
+  const billing = dateOnlyKey(member.billing_date) || dateOnlyKey(member.next_payment_date);
+  if (!billing) return null;
+  return addDaysToYmd(billing, 7);
+}
+
+export function resolveBillingYmd(member: {
+  billing_date?: string | null;
+  next_payment_date?: string | null;
+}): string | null {
+  return dateOnlyKey(member.billing_date) || dateOnlyKey(member.next_payment_date);
 }
 
 export function configureWebPush():
@@ -108,7 +150,6 @@ export async function sendPushToSubscription(
       err && typeof err === "object" && "statusCode" in err
         ? Number((err as { statusCode?: number }).statusCode)
         : 0;
-    // Gone / not found — remove stale Apple/FCM endpoints so cron stays healthy.
     if (statusCode === 404 || statusCode === 410) {
       await svc
         .from("member_portal_push_subscriptions")
@@ -160,24 +201,51 @@ export async function sendPushToMemberSubscriptions(
   return { sent, failed };
 }
 
-export function memberDueOnBillingDay(
-  member: {
-    next_payment_date?: string | null;
-    billing_date?: string | null;
-  },
-  matchField: "billing_date" | "next_payment_date",
-  todayYmd: string,
-  todayDay: number,
-): boolean {
-  if (matchField === "next_payment_date") {
-    const raw = member.next_payment_date;
-    if (!raw) return false;
-    const key = /^\d{4}-\d{2}-\d{2}/.test(String(raw))
-      ? String(raw).slice(0, 10)
-      : indiaCalendarDateKey(String(raw));
-    return key === todayYmd;
-  }
+/** True if a successful push of this kind was already logged today (IST). */
+export async function alreadySentKindToday(
+  svc: SupabaseClient,
+  opts: { gymId: string; memberUuid: string; kind: string; todayYmd: string },
+): Promise<boolean> {
+  const startIst = `${opts.todayYmd}T00:00:00+05:30`;
+  const endIst = `${addDaysToYmd(opts.todayYmd, 1)}T00:00:00+05:30`;
+  const { data } = await svc
+    .from("member_portal_push_send_log")
+    .select("id")
+    .eq("gym_id", opts.gymId)
+    .eq("member_uuid", opts.memberUuid)
+    .eq("kind", opts.kind)
+    .eq("success", true)
+    .gte("created_at", startIst)
+    .lt("created_at", endIst)
+    .limit(1);
+  return Boolean(data && data.length);
+}
 
-  const day = indiaDayOfMonth(member.billing_date);
-  return day === todayDay;
+/**
+ * True if overdue push already sent for this Payment By cycle
+ * (any successful payment_overdue after the payment-by date).
+ */
+export async function alreadySentOverdueForCycle(
+  svc: SupabaseClient,
+  opts: { gymId: string; memberUuid: string; paymentByYmd: string },
+): Promise<boolean> {
+  const after = `${opts.paymentByYmd}T00:00:00+05:30`;
+  const { data } = await svc
+    .from("member_portal_push_send_log")
+    .select("id")
+    .eq("gym_id", opts.gymId)
+    .eq("member_uuid", opts.memberUuid)
+    .eq("kind", "payment_overdue")
+    .eq("success", true)
+    .gte("created_at", after)
+    .limit(1);
+  return Boolean(data && data.length);
+}
+
+export function clampPushHourIst(value: unknown, fallback = 8): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  const h = Math.floor(n);
+  if (h < 0 || h > 23) return fallback;
+  return h;
 }

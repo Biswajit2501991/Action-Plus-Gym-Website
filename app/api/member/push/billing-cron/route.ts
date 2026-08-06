@@ -2,21 +2,30 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { portalGymId } from "@/lib/member-portal/config";
 import {
+  DEFAULT_BILLING_PUSH_BODY,
+  DEFAULT_BILLING_PUSH_TITLE,
+  DEFAULT_OVERDUE_PUSH_BODY,
+  DEFAULT_OVERDUE_PUSH_TITLE,
+  alreadySentKindToday,
+  alreadySentOverdueForCycle,
+  clampPushHourIst,
   configureWebPush,
   indiaCalendarDateKey,
-  indiaDayOfMonth,
-  memberDueOnBillingDay,
+  indiaHour,
+  resolveBillingYmd,
+  resolvePaymentByYmd,
   sendPushToMemberSubscriptions,
 } from "@/lib/member-portal/billing-push";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Cron / internal: send billing-day Web Push (India calendar day).
+ * Cron / internal: billing-date + Payment-By-overdue Web Push (India time).
  * Auth: Authorization: Bearer $MEMBER_PORTAL_CRON_SECRET
  *
- * Schedule this daily (e.g. GitHub Actions workflow billing-push-cron.yml
- * or any external cron) — enabling reminders alone does not send pushes.
+ * Run hourly at :30 UTC (= :00 IST). Sends only when current IST hour matches
+ * member_portal_settings.billing_push_hour_ist (default 8).
+ * Pass ?force_time=1 to skip the hour gate (manual test).
  */
 async function runBillingPushCron(req: Request) {
   const secret = String(process.env.MEMBER_PORTAL_CRON_SECRET || "").trim();
@@ -47,22 +56,36 @@ async function runBillingPushCron(req: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
   }
 
-  const title = settings?.billing_push_title || "Billing reminder";
-  const body =
-    settings?.billing_push_body ||
-    "Your membership billing date is today. Please renew at the gym.";
-  const matchField =
-    settings?.billing_match_field === "billing_date"
-      ? "billing_date"
-      : "next_payment_date";
+  const url = new URL(req.url);
+  const forceTime = url.searchParams.get("force_time") === "1";
+  const configuredHour = clampPushHourIst(settings?.billing_push_hour_ist, 8);
+  const nowHour = indiaHour(new Date());
+  if (!forceTime && nowHour !== configuredHour) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "outside-trigger-hour",
+      configuredHourIst: configuredHour,
+      currentHourIst: nowHour,
+    });
+  }
+
+  const billingTitle =
+    String(settings?.billing_push_title || "").trim() || DEFAULT_BILLING_PUSH_TITLE;
+  const billingBody =
+    String(settings?.billing_push_body || "").trim() || DEFAULT_BILLING_PUSH_BODY;
+  const overdueTitle =
+    String(settings?.billing_push_overdue_title || "").trim() || DEFAULT_OVERDUE_PUSH_TITLE;
+  const overdueBody =
+    String(settings?.billing_push_overdue_body || "").trim() || DEFAULT_OVERDUE_PUSH_BODY;
 
   const todayYmd = indiaCalendarDateKey(new Date());
-  const todayDay = Number(todayYmd.slice(8, 10));
-  const yyyyMm = todayYmd.slice(0, 7);
 
   const { data: members, error: mErr } = await svc.client
     .from("members")
-    .select("member_uuid, full_name, next_payment_date, billing_date, status, portal_enabled")
+    .select(
+      "member_uuid, full_name, next_payment_date, billing_date, payment_by, status, portal_enabled",
+    )
     .eq("gym_id", gymId)
     .eq("portal_enabled", true)
     .is("deleted_at", null)
@@ -71,37 +94,80 @@ async function runBillingPushCron(req: Request) {
     return NextResponse.json({ ok: false, error: mErr.message }, { status: 500 });
   }
 
-  const due = (members || []).filter((m) =>
-    memberDueOnBillingDay(m, matchField, todayYmd, todayDay),
-  );
-
+  let billingDue = 0;
+  let overdueDue = 0;
   let sent = 0;
   let failed = 0;
+  let skippedDup = 0;
 
-  for (const m of due) {
+  for (const m of members || []) {
     if (!m.member_uuid) continue;
-    const result = await sendPushToMemberSubscriptions(svc.client, {
-      gymId,
-      memberUuid: m.member_uuid,
-      title,
-      body: body.replace("{name}", m.full_name || "Member"),
-      url: "/members",
-      kind: "billing_day",
-      tag: `billing-${yyyyMm}`,
-    });
-    sent += result.sent;
-    failed += result.failed;
+    const name = m.full_name || "Member";
+
+    const billingYmd = resolveBillingYmd(m);
+    if (billingYmd && billingYmd === todayYmd) {
+      billingDue += 1;
+      const dup = await alreadySentKindToday(svc.client, {
+        gymId,
+        memberUuid: m.member_uuid,
+        kind: "billing_date",
+        todayYmd,
+      });
+      if (dup) {
+        skippedDup += 1;
+      } else {
+        const result = await sendPushToMemberSubscriptions(svc.client, {
+          gymId,
+          memberUuid: m.member_uuid,
+          title: billingTitle,
+          body: billingBody.replace("{name}", name),
+          url: "/members",
+          kind: "billing_date",
+          tag: `billing-date-${todayYmd}`,
+        });
+        sent += result.sent;
+        failed += result.failed;
+      }
+    }
+
+    const paymentByYmd = resolvePaymentByYmd(m);
+    // Payment By is over → today is strictly after Payment By (IST calendar).
+    if (paymentByYmd && todayYmd > paymentByYmd) {
+      overdueDue += 1;
+      const dup = await alreadySentOverdueForCycle(svc.client, {
+        gymId,
+        memberUuid: m.member_uuid,
+        paymentByYmd,
+      });
+      if (dup) {
+        skippedDup += 1;
+      } else {
+        const result = await sendPushToMemberSubscriptions(svc.client, {
+          gymId,
+          memberUuid: m.member_uuid,
+          title: overdueTitle,
+          body: overdueBody.replace("{name}", name),
+          url: "/members",
+          kind: "payment_overdue",
+          tag: `payment-overdue-${paymentByYmd}`,
+        });
+        sent += result.sent;
+        failed += result.failed;
+      }
+    }
   }
 
   return NextResponse.json({
     ok: true,
-    dueCount: due.length,
+    todayIndia: todayYmd,
+    triggerHourIst: configuredHour,
+    currentHourIst: nowHour,
+    forceTime,
+    billingDue,
+    overdueDue,
     sent,
     failed,
-    matchField,
-    todayIndia: todayYmd,
-    // Keep for debugging timezone regressions without exposing member data.
-    todayDayIndia: indiaDayOfMonth(todayYmd),
+    skippedDup,
   });
 }
 
@@ -109,7 +175,6 @@ export async function POST(req: Request) {
   return runBillingPushCron(req);
 }
 
-/** Some cron hosts only support GET — same auth via Authorization header. */
 export async function GET(req: Request) {
   return runBillingPushCron(req);
 }

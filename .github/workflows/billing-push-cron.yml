@@ -1,4 +1,5 @@
-# Daily billing-day Web Push (India morning ≈ 08:00 IST).
+# Hourly at :30 UTC (= every IST hour at :00). Sends only when
+# member_portal_settings.billing_push_hour_ist matches current IST hour.
 # Required GitHub secrets:
 #   MEMBER_PORTAL_SITE_URL   e.g. https://actionplusgym.com
 #   MEMBER_PORTAL_CRON_SECRET  same value as Railway MEMBER_PORTAL_CRON_SECRET
@@ -6,8 +7,7 @@ name: Billing push cron
 
 on:
   schedule:
-    # 02:30 UTC = 08:00 India Standard Time
-    - cron: "30 2 * * *"
+    - cron: "30 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Send billing-day push
+      - name: Send billing / overdue push
         env:
           SITE_URL: ${{ secrets.MEMBER_PORTAL_SITE_URL }}
           CRON_SECRET: ${{ secrets.MEMBER_PORTAL_CRON_SECRET }}

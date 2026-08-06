@@ -876,8 +876,9 @@ export function NotificationsPanel({
             <div className="rounded-2xl border border-emerald-400/30 bg-emerald-950/30 px-4 py-3">
               <p className="text-sm font-semibold text-emerald-200">Billing-day reminders are on</p>
               <p className="mt-1 text-xs leading-relaxed text-white/70">
-                You&apos;ll get a phone notification on your billing day even if this app is closed.
-                In-app Alerts above still work if browser notifications are off.
+                You&apos;ll get a phone notification on your billing date and when Payment By is
+                overdue — even if this app is closed. In-app Alerts above still work if browser
+                notifications are off.
               </p>
             </div>
             <button
