@@ -87,7 +87,9 @@ export default async function HomePage() {
       {sections.reviews !== false && content.reviews ? (
         <Reviews reviews={content.reviews} />
       ) : null}
-      {sections.contact !== false ? <LeadForm /> : null}
+      {sections.contact !== false ? (
+        <LeadForm contactPhone={settings.phone} contactEmail={settings.email} />
+      ) : null}
       {sections.footer !== false ? (
         <Footer settings={settings} hours={content.hours} />
       ) : null}

@@ -107,6 +107,8 @@ export default async function ContactPage() {
                   defaultSource="website_contact"
                   title="Send an enquiry"
                   subtitle="We respond quickly during opening hours."
+                  contactPhone={settings.phone}
+                  contactEmail={settings.email}
                 />
               </div>
             </div>

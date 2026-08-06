@@ -12,6 +12,8 @@ export function LeadForm({
   subtitle = "Leave your details and our team will contact you shortly.",
   interestPlan,
   embedded = false,
+  contactPhone,
+  contactEmail,
 }: {
   defaultSource?: "website" | "website_trial" | "website_contact";
   title?: string;
@@ -19,12 +21,17 @@ export function LeadForm({
   interestPlan?: string;
   /** Side-by-side layouts (e.g. Contact page) — no outer section padding. */
   embedded?: boolean;
+  contactPhone?: string;
+  contactEmail?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [memberNote, setMemberNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState(defaultSource);
+
+  const gymPhone = contactPhone?.trim() || "+91 70471 57510";
+  const gymEmail = contactEmail?.trim() || "gymactionplus@gmail.com";
 
   function closeMemberNote() {
     setMemberNote(null);
@@ -95,6 +102,34 @@ export function LeadForm({
           Already a member
         </h3>
         <p className="mt-3 text-sm leading-relaxed text-white/85">{memberNote}</p>
+        <dl className="mt-5 space-y-3 border-t border-white/10 pt-4 text-sm">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+              Phone
+            </dt>
+            <dd className="mt-1">
+              <a
+                href={`tel:${gymPhone.replace(/[^\d+]/g, "")}`}
+                className="font-medium text-gold hover:underline"
+              >
+                {gymPhone}
+              </a>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+              Email
+            </dt>
+            <dd className="mt-1">
+              <a
+                href={`mailto:${gymEmail}`}
+                className="font-medium text-gold hover:underline"
+              >
+                {gymEmail}
+              </a>
+            </dd>
+          </div>
+        </dl>
       </div>
     </div>
   ) : null;
