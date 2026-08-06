@@ -233,6 +233,7 @@ export function MemberPortalApp() {
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [chatUnread, setChatUnread] = useState(false);
+  const [trainingUnread, setTrainingUnread] = useState(false);
   const [alertsUnread, setAlertsUnread] = useState(false);
   const [paymentsUnread, setPaymentsUnread] = useState(false);
   const [knownDevice, setKnownDevice] = useState(false);
@@ -364,6 +365,44 @@ export function MemberPortalApp() {
     }, 8_000);
     return () => window.clearInterval(id);
   }, [member?.memberUuid, refreshChatUnread, liveTick]);
+
+  const refreshTrainingUnread = useCallback(async () => {
+    if (!member?.memberUuid) {
+      setTrainingUnread(false);
+      return;
+    }
+    try {
+      const data = await api<{
+        ok: true;
+        onPtPlan?: boolean;
+        latestTrainerAt: string | null;
+        latestTrainerAtMs?: number | null;
+      }>("/api/member/pt-chat/unread");
+      if (!data.onPtPlan) {
+        setTrainingUnread(false);
+        return;
+      }
+      const startedMs =
+        data.latestTrainerAtMs != null && Number.isFinite(data.latestTrainerAtMs)
+          ? Number(data.latestTrainerAtMs)
+          : toBadgeStartMs(data.latestTrainerAt);
+      setTrainingUnread(isWithinNewBadgeWindow(startedMs));
+    } catch {
+      /* ignore badge errors */
+    }
+  }, [member?.memberUuid]);
+
+  useEffect(() => {
+    if (!member?.memberUuid) {
+      setTrainingUnread(false);
+      return;
+    }
+    void refreshTrainingUnread();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshTrainingUnread();
+    }, 12_000);
+    return () => window.clearInterval(id);
+  }, [member?.memberUuid, refreshTrainingUnread, liveTick]);
 
   const refreshPaymentsUnread = useCallback(async () => {
     if (!member?.memberUuid) {
@@ -1689,6 +1728,7 @@ export function MemberPortalApp() {
                     active={activeHomeAccent === "training"}
                     icon={<Dumbbell size={15} strokeWidth={1.75} />}
                     label="Training"
+                    badge={trainingUnread}
                     onClick={() => {
                       setActiveHomeAccent("training");
                       setStep("training");

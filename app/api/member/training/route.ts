@@ -222,6 +222,8 @@ export async function GET() {
     dataUrl: string;
     uploadedAt: string | null;
   }> = [];
+  let dietUpdatedAt: string | null = null;
+  let latestTrainerChatAt: string | null = null;
   const today = todayKeyIndia();
 
   // Source of truth for Gym Manager PT Clients: pt_client_profiles.plan_json
@@ -332,6 +334,21 @@ export async function GET() {
 
     if (onPtPlan && portalSections.ptDiet) {
       dietImages = normalizeDietImages(planJson.dietAttachments);
+      const lastDietAt = String(
+        (planJson as { lastDietAt?: string }).lastDietAt || "",
+      ).trim();
+      const latestUpload = dietImages.reduce<string | null>((best, img) => {
+        const ts = String(img.uploadedAt || "").trim();
+        if (!ts) return best;
+        if (!best) return ts;
+        return Date.parse(ts) > Date.parse(best) ? ts : best;
+      }, null);
+      const candidates = [lastDietAt, latestUpload].filter(Boolean) as string[];
+      if (candidates.length) {
+        dietUpdatedAt = candidates.sort(
+          (a, b) => (Date.parse(b) || 0) - (Date.parse(a) || 0),
+        )[0];
+      }
       if (diets.length === 0 && (dietPlanText || dietImages.length)) {
         const macros = [
           planJson.calories ? `${planJson.calories} kcal` : "",
@@ -356,11 +373,38 @@ export async function GET() {
     } else if (onPtPlan && !portalSections.ptDiet) {
       diets = [];
       dietImages = [];
+      dietUpdatedAt = null;
+    }
+
+    if (onPtPlan) {
+      const chatRaw = Array.isArray((planJson as { chat?: unknown }).chat)
+        ? ((planJson as { chat: Array<Record<string, unknown>> }).chat || [])
+        : [];
+      for (const row of chatRaw) {
+        const from = String(row?.from || "trainer");
+        if (from === "member") continue;
+        const ts = String(row?.ts || "").trim();
+        if (!ts) continue;
+        if (
+          !latestTrainerChatAt ||
+          (Date.parse(ts) || 0) > (Date.parse(latestTrainerChatAt) || 0)
+        ) {
+          latestTrainerChatAt = ts;
+        }
+      }
+      // Newest-first storage: first non-member message is usually latest trainer note.
+      if (!latestTrainerChatAt) {
+        const legacy = chatRaw.find((row) => String(row?.from || "trainer") !== "member");
+        if (legacy?.ts) latestTrainerChatAt = String(legacy.ts);
+      }
     }
 
     if (!onPtPlan) {
       // Hide trainer-managed PT UI for basic plans; pt_client_profiles rows stay in DB.
       pt = [];
+      latestTrainerChatAt = null;
+      dietUpdatedAt = null;
+      dietImages = [];
     }
   }
 
@@ -453,6 +497,8 @@ export async function GET() {
     workouts: onPtPlan && !portalSections.ptWorkoutDetails ? [] : workouts,
     diets: onPtPlan && !portalSections.ptDiet ? [] : diets,
     dietImages: onPtPlan && portalSections.ptDiet ? dietImages : [],
+    dietUpdatedAt: onPtPlan && portalSections.ptDiet ? dietUpdatedAt : null,
+    latestTrainerChatAt: onPtPlan ? latestTrainerChatAt : null,
     measurements: portalSections.measurements ? measurements.data || [] : [],
     showMeasurements: portalSections.measurements,
     showPtSchedule: portalSections.ptSchedule,
