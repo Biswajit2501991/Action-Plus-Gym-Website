@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { X } from "lucide-react";
 import { submitLead } from "@/lib/actions/leads";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -21,13 +22,26 @@ export function LeadForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [memberNote, setMemberNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState(defaultSource);
 
+  function closeMemberNote() {
+    setMemberNote(null);
+  }
+
+  useEffect(() => {
+    if (!memberNote) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMemberNote(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [memberNote]);
+
   function onSubmit(formData: FormData) {
     setMessage(null);
-    setNote(null);
+    setMemberNote(null);
     setError(null);
     startTransition(async () => {
       const result = await submitLead({
@@ -43,13 +57,47 @@ export function LeadForm({
         setMessage("Thank you — we will be in touch shortly.");
         (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
       } else if ("alreadyMember" in result) {
-        // Existing member — nothing saved; show note only.
-        setNote(result.note);
+        // Existing member — nothing saved; show popup note only.
+        setMemberNote(result.note);
       } else {
         setError(result.error);
       }
     });
   }
+
+  const alreadyMemberPopup = memberNote ? (
+    <div
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="already-member-title"
+      onClick={closeMemberNote}
+    >
+      <div
+        className="relative w-full max-w-md rounded-3xl border border-gold/35 bg-charcoal p-6 shadow-2xl md:p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={closeMemberNote}
+          className="absolute right-3 top-3 rounded-full border border-white/15 bg-black/40 p-2 text-white/80 transition hover:border-gold/40 hover:text-gold"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <p className="pr-10 text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+          Membership
+        </p>
+        <h3
+          id="already-member-title"
+          className="mt-2 font-display text-2xl text-white"
+        >
+          Already a member
+        </h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/85">{memberNote}</p>
+      </div>
+    </div>
+  ) : null;
 
   const form = (
     <form
@@ -124,24 +172,29 @@ export function LeadForm({
           {pending ? "Sending..." : "Submit"}
         </Button>
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        {note ? (
-          <p className="rounded-2xl border border-gold/35 bg-gold/10 px-3 py-2.5 text-sm leading-relaxed text-gold">
-            {note}
-          </p>
-        ) : null}
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
       </div>
     </form>
   );
 
-  if (embedded) return form;
+  if (embedded) {
+    return (
+      <>
+        {form}
+        {alreadyMemberPopup}
+      </>
+    );
+  }
 
   return (
-    <section id="join" className="section-pad">
-      <div className="container-site">
-        <SectionHeading eyebrow="Join" title={title} subtitle={subtitle} />
-        {form}
-      </div>
-    </section>
+    <>
+      <section id="join" className="section-pad">
+        <div className="container-site">
+          <SectionHeading eyebrow="Join" title={title} subtitle={subtitle} />
+          {form}
+        </div>
+      </section>
+      {alreadyMemberPopup}
+    </>
   );
 }
