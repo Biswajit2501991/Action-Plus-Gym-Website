@@ -1561,19 +1561,8 @@ export function TrainingPanel({
 
   return (
     <section className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-charcoal/50 p-4 space-y-5 sm:p-5">
-      <PortalBackButton onClick={onBack} />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-display text-2xl text-white">Training</h2>
-          {data?.planName ? (
-            <p className="mt-1 text-xs text-muted">
-              Plan · <span className="text-white/85">{data.planName}</span>
-              {onPtPlan
-                ? " · Your PT schedule days"
-                : " · Log your own workouts"}
-            </p>
-          ) : null}
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <PortalBackButton onClick={onBack} />
         {onPtPlan ? (
           <button
             type="button"
@@ -1590,6 +1579,17 @@ export function TrainingPanel({
               </span>
             ) : null}
           </button>
+        ) : null}
+      </div>
+      <div>
+        <h2 className="font-display text-2xl text-white">Training</h2>
+        {data?.planName ? (
+          <p className="mt-1 text-xs text-muted">
+            Plan · <span className="text-white/85">{data.planName}</span>
+            {onPtPlan
+              ? " · Your PT schedule days"
+              : " · Log your own workouts"}
+          </p>
         ) : null}
       </div>
       {initialLoad && !data ? (
