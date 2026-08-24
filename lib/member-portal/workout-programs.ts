@@ -6,6 +6,7 @@ export type WorkoutExercise = {
   muscle: string;
   setsReps: string;
   rest: string;
+  mp4Url?: string | null;
 };
 
 export type WorkoutDay = {
@@ -306,4 +307,18 @@ export function restSecondsFromLabel(rest: string) {
   const nums = String(rest || "").match(/\d+/g);
   if (!nums?.length) return 60;
   return Math.max(15, Math.min(300, Number(nums[nums.length - 1])));
+}
+
+export function listUniqueWorkoutExercises() {
+  const map = new Map<string, string>();
+  for (const program of Object.values(PROGRAMS)) {
+    for (const day of program.days) {
+      for (const ex of day.exercises) {
+        if (!map.has(ex.exerciseKey)) map.set(ex.exerciseKey, ex.name);
+      }
+    }
+  }
+  return [...map.entries()]
+    .map(([exerciseKey, name]) => ({ exerciseKey, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

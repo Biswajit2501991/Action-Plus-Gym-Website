@@ -3,6 +3,10 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
 import { loadMemberWorkoutPlanContext } from "@/lib/member-portal/workout-plan-settings";
 import {
+  attachWorkoutVideos,
+  loadWorkoutExerciseMediaMap,
+} from "@/lib/member-portal/workout-plan-media";
+import {
   getWorkoutProgram,
   SHARED_PROGRESSION,
   TRAINER_NOTE,
@@ -79,7 +83,11 @@ export async function GET() {
     ? await loadProgress(svc.client, ctx.gymId, session.member.member_uuid)
     : null;
   const level = parseLevel(progress?.level);
-  const program = level ? getWorkoutProgram(level) : null;
+  const rawProgram = level ? getWorkoutProgram(level) : null;
+  const mediaByKey = svc.ok
+    ? await loadWorkoutExerciseMediaMap(svc.client, ctx.gymId)
+    : {};
+  const program = rawProgram ? attachWorkoutVideos(rawProgram, mediaByKey) : null;
 
   return NextResponse.json({
     ok: true,
@@ -209,13 +217,19 @@ export async function POST(req: Request) {
     );
   }
 
+  const mediaByKey = await loadWorkoutExerciseMediaMap(svc.client, ctx.gymId);
+
   return NextResponse.json({
     ok: true,
     eligible: true,
     member: { name: ctx.member.fullName, trainerLabel: "Self" },
     levels: WORKOUT_LEVELS,
     activeLevel: level,
-    program: { ...program, progression: SHARED_PROGRESSION, trainerNote: TRAINER_NOTE },
+    program: {
+      ...attachWorkoutVideos(program, mediaByKey),
+      progression: SHARED_PROGRESSION,
+      trainerNote: TRAINER_NOTE,
+    },
     progress: {
       startedAt: data?.started_at || startedAt,
       currentWeek: Number(data?.current_week) || 1,

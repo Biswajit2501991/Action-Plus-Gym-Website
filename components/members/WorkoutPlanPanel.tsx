@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Play, Square } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Play, Square, X } from "lucide-react";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { restSecondsFromLabel } from "@/lib/member-portal/workout-programs";
 
@@ -13,6 +13,7 @@ type Exercise = {
   muscle: string;
   setsReps: string;
   rest: string;
+  mp4Url?: string | null;
 };
 
 type Day = {
@@ -75,10 +76,30 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(true);
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
   const [openDay, setOpenDay] = useState<string | null>(null);
-  const [videoName, setVideoName] = useState<string | null>(null);
+  const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
   const [timerKey, setTimerKey] = useState<string | null>(null);
   const [timerLeft, setTimerLeft] = useState(0);
   const [timerOn, setTimerOn] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const closeVideo = useCallback(() => {
+    const el = videoRef.current;
+    if (el) {
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
+    }
+    setVideo(null);
+  }, []);
+
+  useEffect(() => {
+    if (!video) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeVideo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [video, closeVideo]);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -256,7 +277,7 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
                                 <button
                                   type="button"
                                   className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2 py-1 text-[11px] text-white/90"
-                                  onClick={() => setVideoName(ex.name)}
+                                  onClick={() => setVideo({ name: ex.name, url: ex.mp4Url || null })}
                                 >
                                   <Play size={12} /> Video
                                 </button>
@@ -360,20 +381,45 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
         </>
       ) : null}
 
-      {videoName ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-charcoal p-4">
-            <p className="font-medium text-white">{videoName}</p>
-            <p className="mt-3 text-sm text-muted">
-              Demo video is not mapped yet. Timer and Done still work — the workout is not blocked.
-            </p>
-            <button
-              type="button"
-              className="mt-4 w-full rounded-xl border border-white/15 py-2 text-sm text-white"
-              onClick={() => setVideoName(null)}
-            >
-              Close
-            </button>
+      {video ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-4 sm:items-center"
+          onClick={closeVideo}
+          role="presentation"
+        >
+          <div
+            className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-charcoal p-3 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={video.name}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="truncate font-medium text-white">{video.name}</p>
+              <button
+                type="button"
+                className="rounded-full border border-white/15 p-1.5 text-white/80"
+                aria-label="Close video"
+                onClick={closeVideo}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {video.url ? (
+              <video
+                ref={videoRef}
+                key={video.url}
+                src={video.url}
+                controls
+                playsInline
+                autoPlay
+                className="max-h-[70vh] w-full rounded-xl bg-black"
+              />
+            ) : (
+              <p className="px-1 py-6 text-sm text-muted">
+                Demo video is not uploaded yet. Timer and Done still work.
+              </p>
+            )}
           </div>
         </div>
       ) : null}
