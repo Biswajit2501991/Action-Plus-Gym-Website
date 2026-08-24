@@ -676,6 +676,10 @@ html[data-theme="day"] ::selection {
   --shine-accent: #f97316;
   --shine-glow: rgba(249, 115, 22, 0.4);
 }
+.portal-shine-tile[data-accent="workout"] {
+  --shine-accent: #38bdf8;
+  --shine-glow: rgba(56, 189, 248, 0.42);
+}
 .portal-shine-tile[data-accent="book"] {
   --shine-accent: #6366f1;
   --shine-glow: rgba(99, 102, 241, 0.4);

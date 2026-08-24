@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Activity,
   Bell,
   Building2,
   CalendarDays,
@@ -31,6 +32,7 @@ import {
   WeightTrackerPanel,
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
+import { WorkoutPlanPanel } from "@/components/members/WorkoutPlanPanel";
 import {
   deriveBillingAlert,
   hasUnreadBillingAlert,
@@ -125,6 +127,7 @@ type Step =
   | "chat"
   | "training"
   | "weight"
+  | "workoutPlan"
   | "bookings"
   | "perks"
   | "biometric";
@@ -1495,6 +1498,7 @@ export function MemberPortalApp() {
         step === "chat" ||
         step === "training" ||
         step === "weight" ||
+        step === "workoutPlan" ||
         step === "bookings" ||
         step === "perks" ||
         step === "biometric") ? (
@@ -1747,6 +1751,18 @@ export function MemberPortalApp() {
                     }}
                   />
                 ) : null}
+                {tileEnabled("homeWorkoutPlan") ? (
+                  <NavTile
+                    accent="workout"
+                    active={activeHomeAccent === "workout"}
+                    icon={<Activity size={15} strokeWidth={1.75} />}
+                    label="Workout Plan"
+                    onClick={() => {
+                      setActiveHomeAccent("workout");
+                      setStep("workoutPlan");
+                    }}
+                  />
+                ) : null}
                 {tileEnabled("homeBook") ? (
                   <NavTile
                     accent="book"
@@ -1955,6 +1971,9 @@ export function MemberPortalApp() {
               memberUuid={member.memberUuid}
             />
           ) : null}
+          {step === "workoutPlan" ? (
+            <WorkoutPlanPanel onBack={() => setStep("home")} />
+          ) : null}
           {step === "bookings" ? (
             <BookingsPanel
               onBack={() => setStep("home")}
@@ -2066,6 +2085,7 @@ function NavTile({
     | "qr"
     | "attendance"
     | "weight"
+    | "workout"
     | "book"
     | "biometric";
 }) {

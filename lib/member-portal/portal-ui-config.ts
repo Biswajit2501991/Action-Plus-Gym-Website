@@ -13,6 +13,8 @@ export type PortalSections = {
   homeChat: boolean;
   homeTraining: boolean;
   homeWeightTracker: boolean;
+  /** Self-guided 12-week Workout Plan (Basic members). Default on; tester allowlist still limits who sees it. */
+  homeWorkoutPlan: boolean;
   homeBook: boolean;
   homePerks: boolean;
   /** Inside Perks: show/allow "Request locker" (not a home tile itself). */
@@ -51,6 +53,7 @@ export const DEFAULT_PORTAL_SECTIONS: PortalSections = {
   homeChat: true,
   homeTraining: true,
   homeWeightTracker: true,
+  homeWorkoutPlan: true,
   homeBook: true,
   homePerks: true,
   perksRequestLocker: true,
@@ -130,6 +133,7 @@ const HOME_TILE_KEYS: (keyof PortalSections)[] = [
   "homeBook",
   "homePerks",
   "homeBiometric",
+  "homeWorkoutPlan",
 ];
 
 /** Decode `__pht__:v1:<bits>` markers stored in settings_lookup_values.exerciseTypes. */
@@ -203,6 +207,8 @@ export function homeTileKeyForStep(
       return "homeTraining";
     case "weight":
       return "homeWeightTracker";
+    case "workoutPlan":
+      return "homeWorkoutPlan";
     case "bookings":
       return "homeBook";
     case "perks":

@@ -64,18 +64,46 @@ export async function GET() {
         const [{ data }, exerciseTypes] = await Promise.all([
           svc.client
             .from("member_portal_settings")
-            .select("portal_sections, basic_workout_options")
+            .select(
+              "portal_sections, basic_workout_options, workout_plan_by_status, workout_plan_tester_names",
+            )
             .eq("gym_id", gymId)
             .maybeSingle(),
           fetchExerciseTypeLookupValues(svc.client),
         ]);
-        return portalSectionsFromSettings({
-          portal_sections: data?.portal_sections,
-          basic_workout_options: data?.basic_workout_options,
+        let row = data as Record<string, unknown> | null;
+        if (!row && data === null) {
+          const fallback = await svc.client
+            .from("member_portal_settings")
+            .select("portal_sections, basic_workout_options")
+            .eq("gym_id", gymId)
+            .maybeSingle();
+          row = (fallback.data as Record<string, unknown> | null) || null;
+        }
+        const sections = portalSectionsFromSettings({
+          portal_sections: row?.portal_sections,
+          basic_workout_options: row?.basic_workout_options,
           exerciseTypes,
         });
+        const {
+          evaluateWorkoutPlanVisibility,
+          normalizeWorkoutPlanByStatus,
+          normalizeWorkoutPlanTesterNames,
+        } = await import("@/lib/member-portal/workout-plan-access");
+        const gate = evaluateWorkoutPlanVisibility({
+          gymTileOn: sections.homeWorkoutPlan !== false,
+          byStatus: normalizeWorkoutPlanByStatus(row?.workout_plan_by_status),
+          testerNames: normalizeWorkoutPlanTesterNames(row?.workout_plan_tester_names),
+          memberSwitchOn: true,
+          status: member.status,
+          planName: member.plan_name,
+          fullName: member.full_name,
+          memberCode: member.member_code,
+        });
+        return { ...sections, homeWorkoutPlan: gate.visible };
+
       })(),
-      DEFAULT_PORTAL_SECTIONS,
+      { ...DEFAULT_PORTAL_SECTIONS, homeWorkoutPlan: false },
     ),
   ]);
 
