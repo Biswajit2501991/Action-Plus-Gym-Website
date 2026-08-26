@@ -65,6 +65,7 @@ type Payload = {
   program?: Program | null;
   progress?: { startedAt?: string | null; currentWeek?: number; completions?: Completions };
   today?: string;
+  action?: string;
 };
 
 function resolveExerciseVideoUrl(
@@ -284,9 +285,76 @@ export function WorkoutPlanPanel({
       ...(data || { eligible: true }),
       ...next,
       eligible: true,
+      // Slim progress responses omit program/videos — keep current UI payload.
+      program: next.program ?? data?.program ?? null,
+      videos: next.videos ?? data?.videos,
+      member: next.member ?? data?.member,
+      levels: next.levels ?? data?.levels,
     };
     applyPayload(merged);
     return merged;
+  };
+
+  /** Instant green tick; persist in background; roll back if save fails. */
+  const markProgress = async (input: {
+    dayId: string;
+    exerciseKey?: string;
+    date: string;
+    dayComplete?: boolean;
+  }) => {
+    const snapshot = data;
+    if (!snapshot?.program) {
+      await save({ action: "progress", ...input });
+      return;
+    }
+    const day = snapshot.program.days.find((d) => d.dayId === input.dayId);
+    if (!day || day.restDay) return;
+
+    const date = input.date;
+    const prevRow = snapshot.progress?.completions?.[date];
+    const done = new Set(prevRow?.dayId === input.dayId ? prevRow.exercisesDone : []);
+    if (input.exerciseKey) done.add(input.exerciseKey);
+    const allKeys = day.exercises.map((ex) => ex.exerciseKey);
+    const dayComplete =
+      input.dayComplete === true ||
+      (allKeys.length > 0 && allKeys.every((key) => done.has(key)));
+
+    const optimistic: Payload = {
+      ...snapshot,
+      progress: {
+        startedAt: snapshot.progress?.startedAt ?? null,
+        currentWeek: snapshot.progress?.currentWeek ?? 1,
+        completions: {
+          ...(snapshot.progress?.completions || {}),
+          [date]: {
+            dayId: input.dayId,
+            exercisesDone: [...done],
+            dayComplete,
+          },
+        },
+      },
+    };
+    applyPayload(optimistic);
+    setError(null);
+
+    try {
+      const next = await callApi({
+        method: "POST",
+        body: JSON.stringify({ action: "progress", ...input }),
+      });
+      applyPayload({
+        ...optimistic,
+        activeLevel: next.activeLevel ?? optimistic.activeLevel,
+        progress: next.progress || optimistic.progress,
+        today: next.today || optimistic.today,
+        program: next.program ?? optimistic.program,
+        videos: next.videos ?? optimistic.videos,
+        eligible: true,
+      });
+    } catch (err) {
+      applyPayload(snapshot);
+      setError(err instanceof Error ? err.message : "Could not save progress");
+    }
   };
 
   const selectLevel = async (levelId: LevelId) => {
@@ -536,8 +604,7 @@ export function WorkoutPlanPanel({
                                     type="button"
                                     className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 px-2 py-1 text-[11px] text-emerald-200"
                                     onClick={() =>
-                                      void save({
-                                        action: "progress",
+                                      void markProgress({
                                         dayId: day.dayId,
                                         exerciseKey: ex.exerciseKey,
                                         date: today,
@@ -555,8 +622,7 @@ export function WorkoutPlanPanel({
                           <button
                             type="button"
                             onClick={() =>
-                              void save({
-                                action: "progress",
+                              void markProgress({
                                 dayId: day.dayId,
                                 date: today,
                                 dayComplete: true,

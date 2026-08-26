@@ -233,6 +233,27 @@ export async function POST(req: Request) {
     );
   }
 
+  const progressPayload = {
+    startedAt: data?.started_at || startedAt,
+    currentWeek: Number(data?.current_week) || 1,
+    completions: (data?.completions || completions) as Completions,
+  };
+
+  // Progress ticks: slim response (no media reload) for fast Done.
+  if (action === "progress") {
+    return NextResponse.json(
+      {
+        ok: true,
+        action: "progress",
+        eligible: true,
+        activeLevel: level,
+        progress: progressPayload,
+        today: todayIst(),
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const mediaByKey = await loadWorkoutExerciseMediaMap(svc.client, ctx.gymId);
 
   return NextResponse.json(
@@ -248,11 +269,7 @@ export async function POST(req: Request) {
         progression: SHARED_PROGRESSION,
         trainerNote: TRAINER_NOTE,
       },
-      progress: {
-        startedAt: data?.started_at || startedAt,
-        currentWeek: Number(data?.current_week) || 1,
-        completions: data?.completions || completions,
-      },
+      progress: progressPayload,
       today: todayIst(),
     },
     { headers: { "Cache-Control": "no-store" } },
