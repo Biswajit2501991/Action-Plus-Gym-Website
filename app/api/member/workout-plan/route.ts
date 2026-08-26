@@ -7,6 +7,10 @@ import {
   loadWorkoutExerciseMediaMap,
 } from "@/lib/member-portal/workout-plan-media";
 import {
+  loadWorkoutDayExtras,
+  mergeProgramDayExtras,
+} from "@/lib/member-portal/workout-plan-day-extras";
+import {
   getWorkoutProgram,
   SHARED_PROGRESSION,
   TRAINER_NOTE,
@@ -84,31 +88,41 @@ export async function GET() {
     : null;
   const level = parseLevel(progress?.level);
   const rawProgram = level ? getWorkoutProgram(level) : null;
-  const mediaByKey = svc.ok
-    ? await loadWorkoutExerciseMediaMap(svc.client, ctx.gymId)
-    : {};
-  const program = rawProgram ? attachWorkoutVideos(rawProgram, mediaByKey) : null;
+  const extras =
+    rawProgram && svc.ok
+      ? await loadWorkoutDayExtras(svc.client, ctx.gymId, level as string)
+      : [];
+  const mergedProgram = rawProgram ? mergeProgramDayExtras(rawProgram, extras) : null;
+  const mediaByKey = await loadWorkoutExerciseMediaMap(
+    svc.ok ? svc.client : null,
+    ctx.gymId,
+  );
+  const program = mergedProgram ? attachWorkoutVideos(mergedProgram, mediaByKey) : null;
 
-  return NextResponse.json({
-    ok: true,
-    eligible: true,
-    reason: null,
-    member: { name: ctx.member.fullName, trainerLabel: "Self" },
-    levels: WORKOUT_LEVELS,
-    activeLevel: level,
-    program: program
-      ? { ...program, progression: SHARED_PROGRESSION, trainerNote: TRAINER_NOTE }
-      : null,
-    progress: {
-      startedAt: progress?.started_at || null,
-      currentWeek: Number(progress?.current_week) || 1,
-      completions:
-        progress?.completions && typeof progress.completions === "object"
-          ? progress.completions
-          : {},
+  return NextResponse.json(
+    {
+      ok: true,
+      eligible: true,
+      reason: null,
+      member: { name: ctx.member.fullName, trainerLabel: "Self" },
+      levels: WORKOUT_LEVELS,
+      activeLevel: level,
+      videos: mediaByKey,
+      program: program
+        ? { ...program, progression: SHARED_PROGRESSION, trainerNote: TRAINER_NOTE }
+        : null,
+      progress: {
+        startedAt: progress?.started_at || null,
+        currentWeek: Number(progress?.current_week) || 1,
+        completions:
+          progress?.completions && typeof progress.completions === "object"
+            ? progress.completions
+            : {},
+      },
+      today: todayIst(),
     },
-    today: todayIst(),
-  });
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(req: Request) {
@@ -165,10 +179,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "level-required" }, { status: 400 });
   }
 
-  const program = getWorkoutProgram(level);
-  if (!program) {
+  const programBase = getWorkoutProgram(level);
+  if (!programBase) {
     return NextResponse.json({ ok: false, error: "unknown-program" }, { status: 400 });
   }
+  const extras = await loadWorkoutDayExtras(svc.client, ctx.gymId, level);
+  const program = mergeProgramDayExtras(programBase, extras);
 
   if (action === "progress") {
     const date = String(body.date || todayIst()).slice(0, 10);
@@ -197,7 +213,7 @@ export async function POST(req: Request) {
     gym_id: ctx.gymId,
     member_uuid: session.member.member_uuid,
     level,
-    program_version: program.version,
+    program_version: programBase.version,
     started_at: startedAt,
     current_week: Number(existing?.current_week) || 1,
     completions,
@@ -219,22 +235,26 @@ export async function POST(req: Request) {
 
   const mediaByKey = await loadWorkoutExerciseMediaMap(svc.client, ctx.gymId);
 
-  return NextResponse.json({
-    ok: true,
-    eligible: true,
-    member: { name: ctx.member.fullName, trainerLabel: "Self" },
-    levels: WORKOUT_LEVELS,
-    activeLevel: level,
-    program: {
-      ...attachWorkoutVideos(program, mediaByKey),
-      progression: SHARED_PROGRESSION,
-      trainerNote: TRAINER_NOTE,
+  return NextResponse.json(
+    {
+      ok: true,
+      eligible: true,
+      member: { name: ctx.member.fullName, trainerLabel: "Self" },
+      levels: WORKOUT_LEVELS,
+      activeLevel: level,
+      videos: mediaByKey,
+      program: {
+        ...attachWorkoutVideos(program, mediaByKey),
+        progression: SHARED_PROGRESSION,
+        trainerNote: TRAINER_NOTE,
+      },
+      progress: {
+        startedAt: data?.started_at || startedAt,
+        currentWeek: Number(data?.current_week) || 1,
+        completions: data?.completions || completions,
+      },
+      today: todayIst(),
     },
-    progress: {
-      startedAt: data?.started_at || startedAt,
-      currentWeek: Number(data?.current_week) || 1,
-      completions: data?.completions || completions,
-    },
-    today: todayIst(),
-  });
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
