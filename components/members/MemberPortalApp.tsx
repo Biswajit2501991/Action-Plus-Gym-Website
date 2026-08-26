@@ -1972,7 +1972,10 @@ export function MemberPortalApp() {
             />
           ) : null}
           {step === "workoutPlan" ? (
-            <WorkoutPlanPanel onBack={() => setStep("home")} />
+            <WorkoutPlanPanel
+              onBack={() => setStep("home")}
+              memberUuid={member.memberUuid}
+            />
           ) : null}
           {step === "bookings" ? (
             <BookingsPanel

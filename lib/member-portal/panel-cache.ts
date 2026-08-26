@@ -7,6 +7,7 @@
 const TRAINING_PREFIX = "apg_portal_training_v1_";
 const ATTENDANCE_PREFIX = "apg_portal_attendance_v1_";
 const PAYMENTS_PREFIX = "apg_portal_payments_v1_";
+const WORKOUT_PLAN_PREFIX = "apg_portal_workout_plan_v1_";
 const PERKS_PREFIX = "apg_portal_perks_v1_";
 const WEIGHT_PREFIX = "apg_portal_weight_v1_";
 const BOOKINGS_PREFIX = "apg_portal_bookings_v1_";
@@ -61,6 +62,8 @@ export const TRAINING_SOFT_TTL_MS = 45_000;
 export const PANEL_SOFT_TTL_MS = TRAINING_SOFT_TTL_MS;
 /** Payments history rarely changes — keep UI instant across panel re-opens. */
 export const PAYMENTS_SOFT_TTL_MS = 5 * 60 * 1000;
+/** Workout Plan program + progress — same soft window as Payments. */
+export const WORKOUT_PLAN_SOFT_TTL_MS = 5 * 60 * 1000;
 
 function isFresh(savedAt: number) {
   return Number.isFinite(savedAt) && Date.now() - savedAt < MAX_AGE_MS;
@@ -140,6 +143,20 @@ export function readPaymentsCache<T>(memberUuid: string): T | null {
 
 export function writePaymentsCache<T>(memberUuid: string, data: T) {
   writeKeyedCache(PAYMENTS_PREFIX, memberUuid, data);
+}
+
+export function peekWorkoutPlanCache<T>(
+  memberUuid: string,
+): { data: T; savedAt: number; ageMs: number } | null {
+  return peekKeyedCache<T>(WORKOUT_PLAN_PREFIX, memberUuid);
+}
+
+export function readWorkoutPlanCache<T>(memberUuid: string): T | null {
+  return peekWorkoutPlanCache<T>(memberUuid)?.data ?? null;
+}
+
+export function writeWorkoutPlanCache<T>(memberUuid: string, data: T) {
+  writeKeyedCache(WORKOUT_PLAN_PREFIX, memberUuid, data);
 }
 
 export function peekPerksCache<T>(

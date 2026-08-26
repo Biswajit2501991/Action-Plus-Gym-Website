@@ -7,6 +7,12 @@ import {
   PORTAL_BACK_BUTTON_CLASS,
 } from "@/components/members/PortalBackButton";
 import { restSecondsFromLabel } from "@/lib/member-portal/workout-programs";
+import {
+  peekWorkoutPlanCache,
+  readWorkoutPlanCache,
+  WORKOUT_PLAN_SOFT_TTL_MS,
+  writeWorkoutPlanCache,
+} from "@/lib/member-portal/panel-cache";
 
 type LevelId = "beginner" | "intermediate" | "advanced";
 
@@ -91,13 +97,25 @@ async function callApi(init?: RequestInit): Promise<Payload> {
   return data;
 }
 
-export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
-  const [data, setData] = useState<Payload | null>(null);
+export function WorkoutPlanPanel({
+  onBack,
+  memberUuid = "",
+}: {
+  onBack: () => void;
+  memberUuid?: string;
+}) {
+  const [data, setData] = useState<Payload | null>(() => {
+    const cached = readWorkoutPlanCache<Payload>(memberUuid);
+    return cached && typeof cached === "object" ? cached : null;
+  });
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(true);
+  const [busy, setBusy] = useState(() => !readWorkoutPlanCache<Payload>(memberUuid));
   const [pickingLevel, setPickingLevel] = useState(false);
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
-  const [openDay, setOpenDay] = useState<string | null>(null);
+  const [openDay, setOpenDay] = useState<string | null>(() => {
+    const cached = readWorkoutPlanCache<Payload>(memberUuid);
+    return cached?.program?.days.find((d) => !d.restDay)?.dayId || null;
+  });
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
   const [timerOpen, setTimerOpen] = useState(false);
   const [timerKey, setTimerKey] = useState<string | null>(null);
@@ -181,24 +199,66 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [video, timerOpen, closeVideo, closeTimer]);
 
-  const refresh = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await callApi();
+  const applyPayload = useCallback(
+    (next: Payload) => {
       setData(next);
+      writeWorkoutPlanCache(memberUuid, next);
       const first = next.program?.days.find((d) => !d.restDay)?.dayId;
       setOpenDay((prev) => prev || first || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load Workout Plan");
-    } finally {
+      setError(null);
       setBusy(false);
-    }
-  }, []);
+    },
+    [memberUuid],
+  );
+
+  const refresh = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+      if (!force) {
+        const peek = peekWorkoutPlanCache<Payload>(memberUuid);
+        if (peek && peek.ageMs < WORKOUT_PLAN_SOFT_TTL_MS) {
+          applyPayload(peek.data);
+          return peek.data;
+        }
+      }
+      if (!readWorkoutPlanCache<Payload>(memberUuid)) setBusy(true);
+      setError(null);
+      try {
+        const next = await callApi();
+        applyPayload(next);
+        return next;
+      } catch (err) {
+        if (!readWorkoutPlanCache<Payload>(memberUuid)) {
+          setError(err instanceof Error ? err.message : "Could not load Workout Plan");
+        }
+        setBusy(false);
+        throw err;
+      }
+    },
+    [applyPayload, memberUuid],
+  );
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    const cached = readWorkoutPlanCache<Payload>(memberUuid);
+    if (cached) applyPayload(cached);
+
+    const pull = (force: boolean) => {
+      void refresh({ force }).catch(() => {
+        if (cancelled) return;
+      });
+    };
+
+    pull(false);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh, memberUuid, applyPayload]);
 
   useEffect(() => {
     if (!timerOn || timerLeft <= 0) return;
@@ -220,8 +280,13 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
 
   const save = async (body: Record<string, unknown>) => {
     const next = await callApi({ method: "POST", body: JSON.stringify(body) });
-    setData((prev) => ({ ...(prev || { eligible: true }), ...next, eligible: true }));
-    return next;
+    const merged: Payload = {
+      ...(data || { eligible: true }),
+      ...next,
+      eligible: true,
+    };
+    applyPayload(merged);
+    return merged;
   };
 
   const selectLevel = async (levelId: LevelId) => {
