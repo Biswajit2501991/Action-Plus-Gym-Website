@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Play, Square, X } from "lucide-react";
+import { Check, ChevronDown, Pause, Play, RotateCcw, X } from "lucide-react";
 import {
   PortalBackButton,
   PORTAL_BACK_BUTTON_CLASS,
@@ -55,14 +55,32 @@ type Payload = {
   member?: { name: string; trainerLabel: string };
   levels?: Array<{ id: LevelId; title: string; subtitle: string }>;
   activeLevel?: LevelId | null;
+  videos?: Record<string, string>;
   program?: Program | null;
   progress?: { startedAt?: string | null; currentWeek?: number; completions?: Completions };
   today?: string;
 };
 
+function resolveExerciseVideoUrl(
+  exercise: Exercise,
+  videos?: Record<string, string> | null,
+) {
+  const direct = String(exercise.mp4Url || "").trim();
+  if (direct) return direct;
+  if (!videos) return null;
+  const nameKey = exercise.name.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return (
+    videos[exercise.exerciseKey] ||
+    videos[exercise.name] ||
+    videos[nameKey] ||
+    null
+  );
+}
+
 async function callApi(init?: RequestInit): Promise<Payload> {
   const res = await fetch("/api/member/workout-plan", {
     ...init,
+    cache: "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     credentials: "include",
   });
@@ -81,7 +99,10 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
+  const [timerOpen, setTimerOpen] = useState(false);
   const [timerKey, setTimerKey] = useState<string | null>(null);
+  const [timerName, setTimerName] = useState("");
+  const [timerTotal, setTimerTotal] = useState(60);
   const [timerLeft, setTimerLeft] = useState(0);
   const [timerOn, setTimerOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -96,14 +117,36 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
     setVideo(null);
   }, []);
 
+  const closeTimer = useCallback(() => {
+    setTimerOn(false);
+    setTimerOpen(false);
+    setTimerKey(null);
+    setTimerLeft(0);
+  }, []);
+
+  const openTimer = useCallback((ex: Exercise) => {
+    const total = restSecondsFromLabel(ex.rest);
+    setTimerKey(ex.exerciseKey);
+    setTimerName(ex.name);
+    setTimerTotal(total);
+    setTimerLeft(total);
+    setTimerOn(true);
+    setTimerOpen(true);
+  }, []);
+
   useEffect(() => {
-    if (!video) return;
+    if (!video && !timerOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeVideo();
+      if (event.key !== "Escape") return;
+      if (timerOpen) {
+        closeTimer();
+        return;
+      }
+      if (video) closeVideo();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [video, closeVideo]);
+  }, [video, timerOpen, closeVideo, closeTimer]);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -180,8 +223,7 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
       setTab("workout");
       setPickingLevel(false);
       closeVideo();
-      setTimerOn(false);
-      setTimerKey(null);
+      closeTimer();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change program");
     } finally {
@@ -363,7 +405,6 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
                       <div className="space-y-2 border-t border-white/10 px-3 py-3">
                         {day.exercises.map((ex) => {
                           const done = doneSet.has(ex.exerciseKey);
-                          const timing = timerKey === ex.exerciseKey;
                           return (
                             <div
                               key={ex.exerciseKey}
@@ -382,24 +423,21 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
                                 <button
                                   type="button"
                                   className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2 py-1 text-[11px] text-white/90"
-                                  onClick={() => setVideo({ name: ex.name, url: ex.mp4Url || null })}
+                                  onClick={() =>
+                                    setVideo({
+                                      name: ex.name,
+                                      url: resolveExerciseVideoUrl(ex, data.videos),
+                                    })
+                                  }
                                 >
                                   <Play size={12} /> Video
                                 </button>
                                 <button
                                   type="button"
-                                  className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2 py-1 text-[11px] text-white/90"
-                                  onClick={() => {
-                                    if (timing && timerOn) setTimerOn(false);
-                                    else {
-                                      setTimerKey(ex.exerciseKey);
-                                      setTimerLeft(restSecondsFromLabel(ex.rest));
-                                      setTimerOn(true);
-                                    }
-                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-gold/40 px-2 py-1 text-[11px] text-gold"
+                                  onClick={() => openTimer(ex)}
                                 >
-                                  {timing && timerOn ? <Square size={12} /> : <Play size={12} />}
-                                  {timing ? clock : "Timer"}
+                                  <Play size={12} /> Timer
                                 </button>
                                 {!done ? (
                                   <button
@@ -511,20 +549,126 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
               </button>
             </div>
             {video.url ? (
-              <video
-                ref={videoRef}
-                key={video.url}
-                src={video.url}
-                controls
-                playsInline
-                autoPlay
-                className="max-h-[70vh] w-full rounded-xl bg-black"
-              />
+              <div
+                className="overflow-hidden rounded-xl bg-black"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <video
+                  ref={videoRef}
+                  key={video.url}
+                  src={video.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="max-h-[70vh] min-h-[220px] w-full bg-black"
+                />
+              </div>
             ) : (
               <p className="px-1 py-6 text-sm text-muted">
                 Demo video is not uploaded yet. Timer and Done still work.
               </p>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {timerOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 p-4 sm:items-center"
+          onClick={closeTimer}
+          role="presentation"
+        >
+          <div
+            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-gold/35 bg-charcoal p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workout-timer-title"
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold">
+                  Rest timer
+                </p>
+                <h3
+                  id="workout-timer-title"
+                  className="mt-1 truncate font-display text-xl text-white"
+                >
+                  {timerName || "Timer"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-white/15 p-1.5 text-white/80"
+                aria-label="Close timer"
+                onClick={closeTimer}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/40 px-4 py-10 text-center">
+              <p
+                className={`font-display text-6xl tracking-wide sm:text-7xl ${
+                  timerLeft === 0 ? "text-emerald-300" : "text-gold"
+                }`}
+              >
+                {clock}
+              </p>
+              <p className="mt-3 text-xs text-muted">
+                {timerLeft === 0
+                  ? "Rest complete"
+                  : timerOn
+                    ? "Running"
+                    : "Paused"}
+                {" · "}
+                Target {Math.floor(timerTotal / 60)}:
+                {String(timerTotal % 60).padStart(2, "0")}
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {timerOn ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-3 text-sm font-medium text-white"
+                  onClick={() => setTimerOn(false)}
+                >
+                  <Pause size={16} /> Pause
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-gold/45 bg-gold/15 px-3 py-3 text-sm font-medium text-gold"
+                  onClick={() => {
+                    if (timerLeft <= 0) {
+                      setTimerLeft(timerTotal);
+                    }
+                    setTimerOn(true);
+                  }}
+                  disabled={!timerKey}
+                >
+                  <Play size={16} /> Continue
+                </button>
+              )}
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-3 text-sm font-medium text-white"
+                onClick={() => {
+                  setTimerLeft(timerTotal);
+                  setTimerOn(true);
+                }}
+              >
+                <RotateCcw size={16} /> Restart
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-3 text-sm font-medium text-white/85"
+                onClick={closeTimer}
+              >
+                <X size={16} /> Close
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
