@@ -47,7 +47,10 @@ import {
   type BillingAlert,
 } from "@/lib/member-portal/billing-alerts";
 import { isWithinNewBadgeWindow, toBadgeStartMs } from "@/lib/member-portal/new-badge";
-import { PortalBackButton } from "@/components/members/PortalBackButton";
+import {
+  PortalBackButton,
+  PORTAL_BACK_BUTTON_CLASS,
+} from "@/components/members/PortalBackButton";
 
 type Payment = {
   id: string;
@@ -55,6 +58,13 @@ type Payment = {
   amount: number;
   method: string | null;
   paidMonth: string | null;
+};
+
+type PaymentOption = {
+  id: string;
+  name: string;
+  upiId: string;
+  imageUrl: string | null;
 };
 
 type Attendance = {
@@ -451,6 +461,11 @@ export function PaymentsPanel({
   const [initialLoad, setInitialLoad] = useState(
     () => !readPaymentsCache<Payment[]>(memberUuid),
   );
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [options, setOptions] = useState<PaymentOption[]>([]);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const applyPayments = useCallback(
     (next: Payment[]) => {
@@ -502,13 +517,80 @@ export function PaymentsPanel({
     };
   }, [reload, memberUuid, applyPayments]);
 
+  useEffect(() => {
+    if (!optionsOpen) return;
+    let cancelled = false;
+    setOptionsLoading(true);
+    setOptionsError(null);
+    setCopiedId(null);
+    void api<{ ok: true; items: PaymentOption[] }>("/api/member/payment-options")
+      .then((data) => {
+        if (!cancelled) setOptions(Array.isArray(data.items) ? data.items : []);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setOptions([]);
+          setOptionsError(
+            e instanceof Error ? e.message : "Could not load payment options",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOptionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [optionsOpen]);
+
+  useEffect(() => {
+    if (!optionsOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOptionsOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [optionsOpen]);
+
+  async function copyUpi(id: string, upiId: string) {
+    if (!upiId) return;
+    try {
+      await navigator.clipboard.writeText(upiId);
+      setCopiedId(id);
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = upiId;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopiedId(id);
+      } catch {
+        setOptionsError("Could not copy UPI ID");
+      }
+    }
+  }
+
   if (receiptId) {
     return <ReceiptView paymentId={receiptId} onBack={() => setReceiptId(null)} />;
   }
 
   return (
     <section className="rounded-3xl border border-white/10 bg-charcoal/50 p-5">
-      <PortalBackButton onClick={onBack} />
+      <div className="flex items-center justify-between gap-2">
+        <PortalBackButton onClick={onBack} />
+        <button
+          type="button"
+          className={PORTAL_BACK_BUTTON_CLASS}
+          onClick={() => setOptionsOpen(true)}
+        >
+          Payment Option
+        </button>
+      </div>
       <h2 className="mt-3 font-display text-2xl text-white">Recent payments</h2>
       <p className="mt-1 text-sm text-muted">Last 3 payments from the gym ledger.</p>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
@@ -551,6 +633,88 @@ export function PaymentsPanel({
           <li className="text-sm text-muted">No payments yet.</li>
         ) : null}
       </ul>
+
+      {optionsOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-option-title"
+          onClick={() => setOptionsOpen(false)}
+        >
+          <div
+            className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/15 bg-charcoal p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h3
+                  id="payment-option-title"
+                  className="font-display text-xl text-white"
+                >
+                  Payment Option
+                </h3>
+                <p className="mt-1 text-xs text-muted">
+                  Scan a QR or copy the UPI ID to pay.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-white/15 px-2.5 py-1 text-sm text-white/80"
+                aria-label="Close payment options"
+                onClick={() => setOptionsOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            {optionsLoading ? (
+              <p className="text-sm text-muted">Loading…</p>
+            ) : null}
+            {optionsError ? (
+              <p className="text-sm text-red-300">{optionsError}</p>
+            ) : null}
+            {!optionsLoading && !optionsError && !options.length ? (
+              <p className="text-sm text-muted">No payment options yet.</p>
+            ) : null}
+            <ul className="space-y-4">
+              {options.map((opt) => (
+                <li
+                  key={opt.id}
+                  className="rounded-2xl border border-white/10 p-3"
+                >
+                  <p className="text-sm font-medium text-white">{opt.name}</p>
+                  {opt.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={opt.imageUrl}
+                      alt={opt.name}
+                      className="mx-auto mt-3 max-h-56 w-full object-contain"
+                    />
+                  ) : (
+                    <p className="mt-3 text-xs text-muted">QR image not available.</p>
+                  )}
+                  {opt.upiId ? (
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="min-w-0 break-all text-xs text-muted">
+                        {opt.upiId}
+                      </p>
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-full border border-gold/40 px-3 py-1.5 text-xs font-semibold text-gold"
+                        onClick={() => void copyUpi(opt.id, opt.upiId)}
+                      >
+                        {copiedId === opt.id ? "Copied" : "Copy UPI ID"}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-muted">UPI ID not set.</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
