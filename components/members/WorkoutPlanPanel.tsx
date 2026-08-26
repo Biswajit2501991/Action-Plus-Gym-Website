@@ -107,6 +107,13 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
   const [timerOn, setTimerOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  const closeTimer = useCallback(() => {
+    setTimerOn(false);
+    setTimerOpen(false);
+    setTimerKey(null);
+    setTimerLeft(0);
+  }, []);
+
   const closeVideo = useCallback(() => {
     const el = videoRef.current;
     if (el) {
@@ -115,16 +122,14 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
       el.load();
     }
     setVideo(null);
-  }, []);
-
-  const closeTimer = useCallback(() => {
+    // Closing the main video popup also stops the timer (combined session).
     setTimerOn(false);
     setTimerOpen(false);
     setTimerKey(null);
     setTimerLeft(0);
   }, []);
 
-  const openTimer = useCallback((ex: Exercise) => {
+  const startTimerForExercise = useCallback((ex: Exercise) => {
     const total = restSecondsFromLabel(ex.rest);
     setTimerKey(ex.exerciseKey);
     setTimerName(ex.name);
@@ -134,15 +139,43 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
     setTimerOpen(true);
   }, []);
 
+  /** Timer alone — closes any open video so only the timer popup shows. */
+  const openTimer = useCallback(
+    (ex: Exercise) => {
+      const el = videoRef.current;
+      if (el) {
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      }
+      setVideo(null);
+      startTimerForExercise(ex);
+    },
+    [startTimerForExercise],
+  );
+
+  /** Video opens combined popup and auto-starts the rest timer on top. */
+  const openVideoWithTimer = useCallback(
+    (ex: Exercise) => {
+      setVideo({
+        name: ex.name,
+        url: resolveExerciseVideoUrl(ex, data?.videos),
+      });
+      startTimerForExercise(ex);
+    },
+    [data?.videos, startTimerForExercise],
+  );
+
   useEffect(() => {
     if (!video && !timerOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (timerOpen) {
-        closeTimer();
+      // Combined session: Escape closes everything.
+      if (video) {
+        closeVideo();
         return;
       }
-      if (video) closeVideo();
+      if (timerOpen) closeTimer();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -223,7 +256,6 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
       setTab("workout");
       setPickingLevel(false);
       closeVideo();
-      closeTimer();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change program");
     } finally {
@@ -423,12 +455,7 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
                                 <button
                                   type="button"
                                   className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2 py-1 text-[11px] text-white/90"
-                                  onClick={() =>
-                                    setVideo({
-                                      name: ex.name,
-                                      url: resolveExerciseVideoUrl(ex, data.videos),
-                                    })
-                                  }
+                                  onClick={() => openVideoWithTimer(ex)}
                                 >
                                   <Play size={12} /> Video
                                 </button>
@@ -531,7 +558,7 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
           role="presentation"
         >
           <div
-            className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-charcoal p-3 shadow-2xl"
+            className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/15 bg-charcoal p-3 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -548,6 +575,98 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
                 <X size={16} />
               </button>
             </div>
+
+            {timerOpen ? (
+              <div className="mb-3 rounded-2xl border border-gold/35 bg-black/45 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">
+                    Rest timer
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-white/80"
+                    aria-label="Close timer only"
+                    onClick={closeTimer}
+                  >
+                    ✕ Close timer
+                  </button>
+                </div>
+                <p
+                  className={`text-center font-display text-5xl tracking-wide ${
+                    timerLeft === 0 ? "text-emerald-300" : "text-gold"
+                  }`}
+                >
+                  {clock}
+                </p>
+                <p className="mt-1 text-center text-[11px] text-muted">
+                  {timerLeft === 0
+                    ? "Rest complete"
+                    : timerOn
+                      ? "Running"
+                      : "Paused"}
+                  {" · "}
+                  Target {Math.floor(timerTotal / 60)}:
+                  {String(timerTotal % 60).padStart(2, "0")}
+                </p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {timerOn ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center gap-1 rounded-full border border-white/20 bg-white/5 px-2 py-2 text-xs font-medium text-white"
+                      onClick={() => setTimerOn(false)}
+                    >
+                      <Pause size={14} /> Pause
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center gap-1 rounded-full border border-gold/45 bg-gold/15 px-2 py-2 text-xs font-medium text-gold"
+                      onClick={() => {
+                        if (timerLeft <= 0) setTimerLeft(timerTotal);
+                        setTimerOn(true);
+                      }}
+                    >
+                      <Play size={14} /> Continue
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-1 rounded-full border border-white/20 bg-white/5 px-2 py-2 text-xs font-medium text-white"
+                    onClick={() => {
+                      setTimerLeft(timerTotal);
+                      setTimerOn(true);
+                    }}
+                  >
+                    <RotateCcw size={14} /> Restart
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-1 rounded-full border border-white/20 bg-white/5 px-2 py-2 text-xs font-medium text-white/85"
+                    onClick={closeTimer}
+                  >
+                    <X size={14} /> Hide
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-full border border-gold/40 px-3 py-1 text-[11px] font-semibold text-gold"
+                  onClick={() => {
+                    if (timerLeft <= 0) setTimerLeft(timerTotal || 60);
+                    if (!timerKey && video) {
+                      setTimerName(video.name);
+                    }
+                    setTimerOn(true);
+                    setTimerOpen(true);
+                  }}
+                >
+                  Show timer
+                </button>
+              </div>
+            )}
+
             {video.url ? (
               <div
                 className="overflow-hidden rounded-xl bg-black"
@@ -560,19 +679,19 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
                   controls
                   playsInline
                   preload="metadata"
-                  className="max-h-[70vh] min-h-[220px] w-full bg-black"
+                  className="max-h-[55vh] min-h-[200px] w-full bg-black"
                 />
               </div>
             ) : (
               <p className="px-1 py-6 text-sm text-muted">
-                Demo video is not uploaded yet. Timer and Done still work.
+                Demo video is not uploaded yet. Timer still works above.
               </p>
             )}
           </div>
         </div>
       ) : null}
 
-      {timerOpen ? (
+      {!video && timerOpen ? (
         <div
           className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 p-4 sm:items-center"
           onClick={closeTimer}
@@ -672,6 +791,7 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
           </div>
         </div>
       ) : null}
+
     </section>
   );
 }
