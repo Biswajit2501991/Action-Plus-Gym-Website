@@ -700,7 +700,11 @@ export function PaymentsPanel({
                       </p>
                       <button
                         type="button"
-                        className="shrink-0 rounded-full border border-gold/40 px-3 py-1.5 text-xs font-semibold text-gold"
+                        className={
+                          copiedId === opt.id
+                            ? "shrink-0 rounded-full border border-emerald-400/55 bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-200 shadow-[0_0_18px_rgba(52,211,153,0.35),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-sm"
+                            : "shrink-0 rounded-full border border-gold/40 px-3 py-1.5 text-xs font-semibold text-gold"
+                        }
                         onClick={() => void copyUpi(opt.id, opt.upiId)}
                       >
                         {copiedId === opt.id ? "Copied" : "Copy UPI ID"}
