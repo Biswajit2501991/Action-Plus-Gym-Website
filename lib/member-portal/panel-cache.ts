@@ -59,6 +59,8 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export const TRAINING_SOFT_TTL_MS = 45_000;
 export const PANEL_SOFT_TTL_MS = TRAINING_SOFT_TTL_MS;
+/** Payments history rarely changes — keep UI instant across panel re-opens. */
+export const PAYMENTS_SOFT_TTL_MS = 5 * 60 * 1000;
 
 function isFresh(savedAt: number) {
   return Number.isFinite(savedAt) && Date.now() - savedAt < MAX_AGE_MS;

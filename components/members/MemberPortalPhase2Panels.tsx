@@ -21,6 +21,7 @@ import {
 } from "@/lib/member-portal/chat-client";
 import {
   PANEL_SOFT_TTL_MS,
+  PAYMENTS_SOFT_TTL_MS,
   peekAttendanceCache,
   peekBookingsCache,
   peekPaymentsCache,
@@ -482,7 +483,7 @@ export function PaymentsPanel({
       const force = opts?.force === true;
       if (!force) {
         const peek = peekPaymentsCache<Payment[]>(memberUuid);
-        if (peek && peek.ageMs < PANEL_SOFT_TTL_MS) return peek.data;
+        if (peek && peek.ageMs < PAYMENTS_SOFT_TTL_MS) return peek.data;
       }
       const data = await api<{ ok: true; items: Payment[] }>("/api/member/payments");
       const next = data.items || [];
@@ -506,7 +507,8 @@ export function PaymentsPanel({
       });
     };
 
-    pull(true);
+    // Soft TTL — do not force-refresh every open (that made Payments feel slow).
+    pull(false);
     const onVisible = () => {
       if (document.visibilityState === "visible") pull(false);
     };

@@ -421,7 +421,7 @@ export function MemberPortalApp() {
       if (cached?.data?.length) {
         latestPaidAt = cached.data[0]?.paidAt || null;
       }
-      if (!latestPaidAt || (cached && cached.ageMs > 45_000)) {
+      if (!latestPaidAt || (cached && cached.ageMs > 5 * 60 * 1000)) {
         const data = await api<{ ok: true; items: Array<{ paidAt?: string | null }> }>(
           "/api/member/payments",
         );

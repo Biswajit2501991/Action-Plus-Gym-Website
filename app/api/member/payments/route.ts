@@ -31,7 +31,8 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
-  await auditLog({
+  // Do not block the list response on audit write (faster cold load).
+  void auditLog({
     memberUuid: session.member.member_uuid,
     eventType: "payments_viewed",
   });
@@ -47,5 +48,8 @@ export async function GET() {
     recordedBy: row.recorded_by || null,
   }));
 
-  return NextResponse.json({ ok: true, items });
+  return NextResponse.json(
+    { ok: true, items },
+    { headers: { "Cache-Control": "private, max-age=0, must-revalidate" } },
+  );
 }
