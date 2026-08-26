@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Play, Square, X } from "lucide-react";
-import { PortalBackButton } from "@/components/members/PortalBackButton";
+import {
+  PortalBackButton,
+  PORTAL_BACK_BUTTON_CLASS,
+} from "@/components/members/PortalBackButton";
 import { restSecondsFromLabel } from "@/lib/member-portal/workout-programs";
 
 type LevelId = "beginner" | "intermediate" | "advanced";
@@ -74,6 +77,7 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
+  const [pickingLevel, setPickingLevel] = useState(false);
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
@@ -141,6 +145,48 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
   const save = async (body: Record<string, unknown>) => {
     const next = await callApi({ method: "POST", body: JSON.stringify(body) });
     setData((prev) => ({ ...(prev || { eligible: true }), ...next, eligible: true }));
+    return next;
+  };
+
+  const selectLevel = async (levelId: LevelId) => {
+    const current = data?.activeLevel || data?.program?.level || null;
+    const levels = data?.levels || [];
+    const nextLabel =
+      levels.find((l) => l.id === levelId)?.title || levelId;
+    const currentLabel =
+      levels.find((l) => l.id === current)?.title || current || "";
+
+    if (pickingLevel && current === levelId) {
+      setPickingLevel(false);
+      return;
+    }
+
+    if (pickingLevel && current && current !== levelId) {
+      const ok = window.confirm(
+        `Switch from ${currentLabel} to ${nextLabel}?\n\nYour exercise list will change. Saved ticks stay — nothing is deleted.`,
+      );
+      if (!ok) return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await save({ action: "level", level: levelId });
+      const first =
+        next.program?.days.find((d) => !d.restDay)?.dayId ||
+        next.program?.days[0]?.dayId ||
+        null;
+      setOpenDay(first);
+      setTab("workout");
+      setPickingLevel(false);
+      closeVideo();
+      setTimerOn(false);
+      setTimerKey(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change program");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const clock = useMemo(() => {
@@ -149,14 +195,41 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
     return `${m}:${String(s).padStart(2, "0")}`;
   }, [timerLeft]);
 
+  const showLevelPicker = Boolean(data?.eligible && (!data.program || pickingLevel));
+  const showProgram = Boolean(data?.program && !pickingLevel);
+  const activeLevelId = data?.activeLevel || data?.program?.level || null;
+
   return (
     <section className="space-y-4">
-      <PortalBackButton onClick={onBack} />
+      <div className="flex items-center justify-between gap-2">
+        <PortalBackButton
+          onClick={() => {
+            if (pickingLevel && data?.program) {
+              setPickingLevel(false);
+              return;
+            }
+            onBack();
+          }}
+        />
+        {showProgram ? (
+          <button
+            type="button"
+            className={PORTAL_BACK_BUTTON_CLASS}
+            disabled={busy}
+            onClick={() => setPickingLevel(true)}
+          >
+            Change program
+          </button>
+        ) : null}
+      </div>
       <div>
         <p className="text-[11px] uppercase tracking-[0.18em] text-gold/80">Training</p>
         <h2 className="font-display text-2xl text-white">Workout Plan</h2>
         <p className="mt-1 text-xs text-muted">
           Member: {data?.member?.name || "—"} · Trainer: {data?.member?.trainerLabel || "Self"}
+          {activeLevelId && showProgram
+            ? ` · ${data?.program?.title || activeLevelId}`
+            : null}
         </p>
       </div>
 
@@ -173,28 +246,60 @@ export function WorkoutPlanPanel({ onBack }: { onBack: () => void }) {
         </p>
       ) : null}
 
-      {data?.eligible && !data.program ? (
+      {showLevelPicker ? (
         <div className="space-y-3">
-          <p className="text-sm text-white/80">Choose your 12-week program</p>
-          {(data.levels || []).map((level) => (
+          <p className="text-sm text-white/80">
+            {pickingLevel ? "Choose a different 12-week program" : "Choose your 12-week program"}
+          </p>
+          {pickingLevel ? (
+            <p className="text-xs text-muted">
+              Switching only changes the exercise list. Your saved ticks are kept.
+            </p>
+          ) : null}
+          {(data?.levels || []).map((level) => {
+            const isCurrent = activeLevelId === level.id;
+            return (
+              <button
+                key={level.id}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  void selectLevel(level.id);
+                }}
+                className={`w-full rounded-2xl border px-4 py-4 text-left hover:border-gold/40 ${
+                  isCurrent
+                    ? "border-gold/45 bg-gold/10"
+                    : "border-white/10 bg-white/5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-display text-lg uppercase tracking-wide text-gold">
+                    {level.title}
+                  </p>
+                  {isCurrent ? (
+                    <span className="rounded-full border border-emerald-400/45 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                      Current
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-muted">{level.subtitle}</p>
+              </button>
+            );
+          })}
+          {pickingLevel && data?.program ? (
             <button
-              key={level.id}
               type="button"
               disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                void save({ action: "level", level: level.id }).finally(() => setBusy(false));
-              }}
-              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left hover:border-gold/40"
+              className="w-full rounded-full border border-white/15 px-4 py-2 text-sm text-white/80"
+              onClick={() => setPickingLevel(false)}
             >
-              <p className="font-display text-lg uppercase tracking-wide text-gold">{level.title}</p>
-              <p className="mt-1 text-xs text-muted">{level.subtitle}</p>
+              Cancel
             </button>
-          ))}
+          ) : null}
         </div>
       ) : null}
 
-      {data?.program ? (
+      {showProgram && data?.program ? (
         <>
           <div className="flex gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 text-xs">
             {(
