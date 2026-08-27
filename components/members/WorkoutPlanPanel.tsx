@@ -222,6 +222,8 @@ export function WorkoutPlanPanel({
   const refresh = useCallback(
     async (opts?: { force?: boolean }) => {
       const force = opts?.force === true;
+      // Soft TTL may still paint from cache, but never skip the network when force=true
+      // (staff rename / visibility must pick up fresh exercise display names).
       if (!force) {
         const peek = peekWorkoutPlanCache<Payload>(memberUuid);
         // Never reuse a cached ineligible payload — staff may have just enabled this member.
@@ -260,6 +262,7 @@ export function WorkoutPlanPanel({
   useEffect(() => {
     let cancelled = false;
     const cached = readWorkoutPlanCache<Payload>(memberUuid);
+    // Instant paint from cache, then always force-network so renames/labels stay in sync.
     if (cached && cached.eligible !== false) applyPayload(cached);
 
     const pull = (force: boolean) => {
@@ -268,10 +271,9 @@ export function WorkoutPlanPanel({
       });
     };
 
-    // Always re-check eligibility on open (esp. after staff toggles per-member access).
-    pull(!cached || cached.eligible === false);
+    pull(true);
     const onVisible = () => {
-      if (document.visibilityState === "visible") pull(false);
+      if (document.visibilityState === "visible") pull(true);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
