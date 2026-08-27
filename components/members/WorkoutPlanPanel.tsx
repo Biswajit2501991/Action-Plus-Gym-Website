@@ -124,10 +124,7 @@ export function WorkoutPlanPanel({
   const [busy, setBusy] = useState(() => !readWorkoutPlanCache<Payload>(memberUuid));
   const [pickingLevel, setPickingLevel] = useState(false);
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
-  const [openDay, setOpenDay] = useState<string | null>(() => {
-    const cached = readWorkoutPlanCache<Payload>(memberUuid);
-    return cached?.program?.days.find((d) => !d.restDay)?.dayId || null;
-  });
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
   const [music, setMusic] = useState<{ title: string; mp4Url: string } | null>(null);
   const [musicOpen, setMusicOpen] = useState(false);
@@ -217,8 +214,6 @@ export function WorkoutPlanPanel({
     (next: Payload) => {
       setData(next);
       writeWorkoutPlanCache(memberUuid, next);
-      const first = next.program?.days.find((d) => !d.restDay)?.dayId;
-      setOpenDay((prev) => prev || first || null);
       setError(null);
       setBusy(false);
     },
