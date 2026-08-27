@@ -13,6 +13,12 @@ import {
   WORKOUT_PLAN_SOFT_TTL_MS,
   writeWorkoutPlanCache,
 } from "@/lib/member-portal/panel-cache";
+import {
+  completedDayIdsInWeek,
+  lastWeekMotivationMessage,
+  weekRowForDay,
+  weekWindows,
+} from "@/lib/member-portal/workout-plan-week";
 
 type LevelId = "beginner" | "intermediate" | "advanced";
 
@@ -279,6 +285,26 @@ export function WorkoutPlanPanel({
   const completions = data?.progress?.completions || {};
   const todayRow = completions[today];
 
+  const weekMeta = useMemo(() => {
+    if (!today || !data?.program) {
+      return {
+        weekCompleteIds: new Set<string>(),
+        motivation: null as string | null,
+      };
+    }
+    const { thisWeek, lastWeek } = weekWindows(today);
+    const weekCompleteIds = completedDayIdsInWeek(completions, thisWeek);
+    const planned = data.program.days.filter((d) => !d.restDay).length;
+    const lastDoneIds = completedDayIdsInWeek(completions, lastWeek);
+    const hadActivityLastWeek = lastWeek.some((date) => Boolean(completions[date]));
+    const motivation = lastWeekMotivationMessage({
+      plannedWorkDays: planned,
+      completedLastWeek: lastDoneIds.size,
+      hadActivityLastWeek,
+    });
+    return { weekCompleteIds, motivation, thisWeek };
+  }, [completions, data?.program, today]);
+
   const save = async (body: Record<string, unknown>) => {
     const next = await callApi({ method: "POST", body: JSON.stringify(body) });
     const merged: Payload = {
@@ -429,15 +455,22 @@ export function WorkoutPlanPanel({
           </button>
         ) : null}
       </div>
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.18em] text-gold/80">Training</p>
-        <h2 className="font-display text-2xl text-white">Workout Plan</h2>
-        <p className="mt-1 text-xs text-muted">
-          Member: {data?.member?.name || "—"} · Trainer: {data?.member?.trainerLabel || "Self"}
-          {activeLevelId && showProgram
-            ? ` · ${data?.program?.title || activeLevelId}`
-            : null}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-gold/80">Training</p>
+          <h2 className="font-display text-2xl text-white">Workout Plan</h2>
+          <p className="mt-1 text-xs text-muted">
+            Member: {data?.member?.name || "—"} · Trainer: {data?.member?.trainerLabel || "Self"}
+            {activeLevelId && showProgram
+              ? ` · ${data?.program?.title || activeLevelId}`
+              : null}
+          </p>
+        </div>
+        {showProgram && weekMeta.motivation ? (
+          <p className="max-w-sm rounded-2xl border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-gold/95 sm:text-right">
+            {weekMeta.motivation}
+          </p>
+        ) : null}
       </div>
 
       {error ? (
@@ -535,9 +568,21 @@ export function WorkoutPlanPanel({
             <div className="space-y-2">
               {data.program.days.map((day) => {
                 const open = openDay === day.dayId;
-                const complete = todayRow?.dayId === day.dayId && todayRow.dayComplete;
+                const weekDone = !day.restDay && weekMeta.weekCompleteIds.has(day.dayId);
+                const weekRow =
+                  weekRowForDay(
+                    completions,
+                    day.dayId,
+                    weekMeta.thisWeek || [],
+                    today,
+                  ) || null;
+                const todayMatch = todayRow?.dayId === day.dayId;
+                const complete =
+                  weekDone || (todayMatch && todayRow?.dayComplete === true);
                 const doneSet = new Set(
-                  todayRow?.dayId === day.dayId ? todayRow.exercisesDone : [],
+                  todayMatch
+                    ? todayRow?.exercisesDone || []
+                    : weekRow?.exercisesDone || [],
                 );
                 return (
                   <div
@@ -551,10 +596,25 @@ export function WorkoutPlanPanel({
                       className="flex w-full items-center justify-between px-3 py-3 text-left"
                       onClick={() => setOpenDay(open ? null : day.dayId)}
                     >
-                      <span className="flex items-center gap-2 text-sm text-white">
+                      <span
+                        className={`flex items-center gap-2 text-sm ${
+                          weekDone ? "font-semibold text-emerald-300" : "text-white"
+                        }`}
+                      >
                         {complete ? <Check size={16} className="text-emerald-400" /> : null}
-                        Day {day.dayNumber} · {day.label}
+                        <span>
+                          <span className={weekDone ? "text-emerald-300" : undefined}>
+                            Day {day.dayNumber}
+                          </span>
+                          {" · "}
+                          {day.label}
+                        </span>
                         {day.restDay ? <span className="text-xs text-muted"> (rest)</span> : null}
+                        {weekDone ? (
+                          <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200">
+                            This week
+                          </span>
+                        ) : null}
                       </span>
                       <ChevronDown
                         size={16}
