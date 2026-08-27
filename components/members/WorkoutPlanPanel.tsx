@@ -460,12 +460,8 @@ export function WorkoutPlanPanel({
     setBusy(true);
     setError(null);
     try {
-      const next = await save({ action: "level", level: levelId });
-      const first =
-        next.program?.days.find((d) => !d.restDay)?.dayId ||
-        next.program?.days[0]?.dayId ||
-        null;
-      setOpenDay(first);
+      await save({ action: "level", level: levelId });
+      setOpenDay(null);
       setTab("workout");
       setPickingLevel(false);
       closeVideo();
