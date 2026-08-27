@@ -16,6 +16,7 @@ import {
 import {
   completedDayIdsInWeek,
   lastWeekMotivationMessage,
+  thisWeekAimMessage,
   weekRowForDay,
   weekWindows,
 } from "@/lib/member-portal/workout-plan-week";
@@ -302,6 +303,7 @@ export function WorkoutPlanPanel({
       return {
         weekCompleteIds: new Set<string>(),
         motivation: null as string | null,
+        thisWeekAim: null as string | null,
       };
     }
     const { thisWeek, lastWeek } = weekWindows(today);
@@ -314,7 +316,12 @@ export function WorkoutPlanPanel({
       completedLastWeek: lastDoneIds.size,
       hadActivityLastWeek,
     });
-    return { weekCompleteIds, motivation, thisWeek };
+    return {
+      weekCompleteIds,
+      motivation,
+      thisWeekAim: thisWeekAimMessage(planned),
+      thisWeek,
+    };
   }, [completions, data?.program, today]);
 
   const save = async (body: Record<string, unknown>) => {
@@ -478,7 +485,9 @@ export function WorkoutPlanPanel({
               : null}
           </p>
         </div>
-        {showProgram && weekMeta.motivation ? (
+        {showProgram &&
+        weekMeta.motivation &&
+        weekMeta.motivation !== weekMeta.thisWeekAim ? (
           <p className="max-w-sm rounded-2xl border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-gold/95 sm:text-right">
             {weekMeta.motivation}
           </p>
@@ -575,6 +584,10 @@ export function WorkoutPlanPanel({
               </button>
             ))}
           </div>
+
+          {tab === "workout" && weekMeta.thisWeekAim ? (
+            <p className="text-sm leading-relaxed text-white/85">{weekMeta.thisWeekAim}</p>
+          ) : null}
 
           {tab === "workout" ? (
             <div className="space-y-2">

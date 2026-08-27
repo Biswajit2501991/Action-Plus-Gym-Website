@@ -128,7 +128,7 @@ export function lastWeekMotivationMessage(input: {
   const missed = planned - done;
 
   if (!input.hadActivityLastWeek) {
-    return `This week: aim for all ${planned} training day${planned === 1 ? "" : "s"}.`;
+    return `This week: Aim for all ${planned} training day${planned === 1 ? "" : "s"}.`;
   }
   if (missed <= 0) {
     return "All training days done last week — great work. Keep the streak.";
@@ -137,4 +137,11 @@ export function lastWeekMotivationMessage(input: {
     return "You missed 1 day last week — push hard this week.";
   }
   return `You missed ${missed} days last week — push hard this week.`;
+}
+
+/** Current-week goal line shown above the day list on the Workout tab. */
+export function thisWeekAimMessage(plannedWorkDays: number): string | null {
+  const planned = Math.max(0, Number(plannedWorkDays) || 0);
+  if (planned <= 0) return null;
+  return `This week: Aim for all ${planned} training day${planned === 1 ? "" : "s"}.`;
 }
