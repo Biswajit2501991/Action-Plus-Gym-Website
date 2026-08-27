@@ -515,9 +515,10 @@ export function WorkoutPlanPanel({
         ) : null}
       </div>
       {showProgram && music ? (
-        <div className="flex justify-start">
+        <div className="flex justify-end pr-0.5">
           <WorkoutPlanMusicButton
             disabled={busy}
+            playing={musicOpen}
             onClick={() => {
               // Close exercise video popup so only one media overlay is active.
               if (video) {

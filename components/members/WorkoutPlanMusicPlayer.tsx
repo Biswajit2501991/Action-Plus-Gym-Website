@@ -257,20 +257,45 @@ export function WorkoutPlanMusicPlayer({
 export function WorkoutPlanMusicButton({
   onClick,
   disabled,
+  playing,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  playing?: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold disabled:opacity-50"
       aria-label="Play gym music"
+      title="Music"
+      className={[
+        "group relative inline-flex h-12 w-12 items-center justify-center rounded-full",
+        "border border-white/35 bg-white/10 text-gold",
+        "shadow-[0_8px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-8px_18px_rgba(212,175,55,0.12)]",
+        "backdrop-blur-xl backdrop-saturate-150",
+        "transition-[transform,box-shadow,border-color] duration-300",
+        "hover:border-gold/55 hover:bg-white/14 hover:shadow-[0_10px_32px_rgba(212,175,55,0.28),inset_0_1px_0_rgba(255,255,255,0.55)]",
+        "active:scale-[0.96]",
+        "disabled:pointer-events-none disabled:opacity-45",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50",
+        playing ? "border-gold/60 bg-gold/15" : "",
+      ].join(" ")}
     >
-      <Music2 size={14} />
-      Music
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-[2px] rounded-full bg-gradient-to-br from-white/35 via-transparent to-gold/20 opacity-90"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -inset-px rounded-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.45),transparent_55%)]"
+      />
+      <Music2
+        size={20}
+        strokeWidth={1.75}
+        className="relative z-[1] drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] transition-transform duration-300 group-hover:scale-105"
+      />
     </button>
   );
 }
