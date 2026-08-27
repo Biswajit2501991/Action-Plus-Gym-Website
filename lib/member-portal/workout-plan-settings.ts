@@ -71,26 +71,17 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
     .eq("member_uuid", memberUuid)
     .maybeSingle();
 
-  let member = data as {
+  if (error) {
+    return { ok: false as const, error: error.message };
+  }
+
+  const member = data as {
     full_name?: string | null;
     member_code?: string | null;
     status?: string | null;
     plan_name?: string | null;
     portal_workout_plan_enabled?: boolean | null;
   } | null;
-
-  if (error) {
-    const retry = await svc.client
-      .from("members")
-      .select("full_name, member_code, status, plan_name")
-      .eq("gym_id", gymId)
-      .eq("member_uuid", memberUuid)
-      .maybeSingle();
-    if (retry.error || !retry.data) {
-      return { ok: false as const, error: retry.error?.message || error.message };
-    }
-    member = retry.data as typeof member;
-  }
 
   if (!member) return { ok: false as const, error: "member-not-found" };
 

@@ -223,7 +223,12 @@ export function WorkoutPlanPanel({
       const force = opts?.force === true;
       if (!force) {
         const peek = peekWorkoutPlanCache<Payload>(memberUuid);
-        if (peek && peek.ageMs < WORKOUT_PLAN_SOFT_TTL_MS) {
+        // Never reuse a cached ineligible payload — staff may have just enabled this member.
+        if (
+          peek &&
+          peek.ageMs < WORKOUT_PLAN_SOFT_TTL_MS &&
+          peek.data.eligible !== false
+        ) {
           applyPayload(peek.data);
           return peek.data;
         }
@@ -232,7 +237,13 @@ export function WorkoutPlanPanel({
       setError(null);
       try {
         const next = await callApi();
-        applyPayload(next);
+        if (next.eligible !== false) {
+          applyPayload(next);
+        } else {
+          setData(next);
+          setError(null);
+          setBusy(false);
+        }
         return next;
       } catch (err) {
         if (!readWorkoutPlanCache<Payload>(memberUuid)) {
@@ -248,7 +259,7 @@ export function WorkoutPlanPanel({
   useEffect(() => {
     let cancelled = false;
     const cached = readWorkoutPlanCache<Payload>(memberUuid);
-    if (cached) applyPayload(cached);
+    if (cached && cached.eligible !== false) applyPayload(cached);
 
     const pull = (force: boolean) => {
       void refresh({ force }).catch(() => {
@@ -256,7 +267,8 @@ export function WorkoutPlanPanel({
       });
     };
 
-    pull(false);
+    // Always re-check eligibility on open (esp. after staff toggles per-member access).
+    pull(!cached || cached.eligible === false);
     const onVisible = () => {
       if (document.visibilityState === "visible") pull(false);
     };

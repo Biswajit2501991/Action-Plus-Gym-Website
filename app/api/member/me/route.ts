@@ -85,18 +85,12 @@ export async function GET() {
           basic_workout_options: row?.basic_workout_options,
           exerciseTypes,
         });
-        const {
-          evaluateWorkoutPlanVisibility,
-          normalizeWorkoutPlanByStatus,
-        } = await import("@/lib/member-portal/workout-plan-access");
-        const gate = evaluateWorkoutPlanVisibility({
-          autoRolloutOn: sections.homeWorkoutPlan !== false,
-          byStatus: normalizeWorkoutPlanByStatus(row?.workout_plan_by_status),
-          memberSwitchOn: member.portal_workout_plan_enabled === true,
-          status: member.status,
-          planName: member.plan_name,
-        });
-        return { ...sections, homeWorkoutPlan: gate.visible };
+        const { loadMemberWorkoutPlanContext } = await import(
+          "@/lib/member-portal/workout-plan-settings"
+        );
+        const ctx = await loadMemberWorkoutPlanContext(member.member_uuid);
+        const visible = ctx.ok && ctx.gate.visible;
+        return { ...sections, homeWorkoutPlan: visible };
 
       })(),
       { ...DEFAULT_PORTAL_SECTIONS, homeWorkoutPlan: false },
