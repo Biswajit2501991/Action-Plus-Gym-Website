@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Pause, Play, RotateCcw, X } from "lucide-react";
 import {
+  WorkoutPlanMusicButton,
+  WorkoutPlanMusicPlayer,
+} from "@/components/members/WorkoutPlanMusicPlayer";
+import {
   PortalBackButton,
   PORTAL_BACK_BUTTON_CLASS,
 } from "@/components/members/PortalBackButton";
@@ -125,6 +129,8 @@ export function WorkoutPlanPanel({
     return cached?.program?.days.find((d) => !d.restDay)?.dayId || null;
   });
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
+  const [music, setMusic] = useState<{ title: string; mp4Url: string } | null>(null);
+  const [musicOpen, setMusicOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [timerKey, setTimerKey] = useState<string | null>(null);
   const [timerName, setTimerName] = useState("");
@@ -281,6 +287,38 @@ export function WorkoutPlanPanel({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refresh, memberUuid, applyPayload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!data?.eligible) {
+      setMusic(null);
+      setMusicOpen(false);
+      return;
+    }
+    void fetch("/api/member/workout-plan-music", {
+      cache: "no-store",
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((json: { ok?: boolean; music?: { title?: string; mp4Url?: string } | null }) => {
+        if (cancelled) return;
+        const url = String(json?.music?.mp4Url || "").trim();
+        if (!json?.ok || !url) {
+          setMusic(null);
+          return;
+        }
+        setMusic({
+          title: String(json.music?.title || "Gym music").trim() || "Gym music",
+          mp4Url: url,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setMusic(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.eligible, memberUuid]);
 
   useEffect(() => {
     if (!timerOn || timerLeft <= 0) return;
@@ -476,6 +514,26 @@ export function WorkoutPlanPanel({
           </button>
         ) : null}
       </div>
+      {showProgram && music ? (
+        <div className="flex justify-start">
+          <WorkoutPlanMusicButton
+            disabled={busy}
+            onClick={() => {
+              // Close exercise video popup so only one media overlay is active.
+              if (video) {
+                const el = videoRef.current;
+                if (el) {
+                  el.pause();
+                  el.removeAttribute("src");
+                  el.load();
+                }
+                setVideo(null);
+              }
+              setMusicOpen(true);
+            }}
+          />
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.18em] text-gold/80">Training</p>
@@ -1010,6 +1068,13 @@ export function WorkoutPlanPanel({
         </div>
       ) : null}
 
+      {music ? (
+        <WorkoutPlanMusicPlayer
+          music={music}
+          open={musicOpen}
+          onClose={() => setMusicOpen(false)}
+        />
+      ) : null}
     </section>
   );
 }
