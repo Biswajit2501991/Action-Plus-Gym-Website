@@ -57,10 +57,14 @@ export async function GET() {
     ),
     withTimeout(
       (async () => {
+        const empty = {
+          sections: { ...DEFAULT_PORTAL_SECTIONS },
+          music: null as { title: string; mp4Url: string } | null,
+        };
         const svc = createServiceRoleClient();
-        if (!svc.ok) return DEFAULT_PORTAL_SECTIONS;
+        if (!svc.ok) return empty;
         const gymId = portalGymId();
-        if (!gymId) return DEFAULT_PORTAL_SECTIONS;
+        if (!gymId) return empty;
         const [{ data }, exerciseTypes] = await Promise.all([
           svc.client
             .from("member_portal_settings")
@@ -88,12 +92,23 @@ export async function GET() {
         const { loadMemberWorkoutPlanContext } = await import(
           "@/lib/member-portal/workout-plan-settings"
         );
+        const { loadActiveWorkoutPlanMusic } = await import(
+          "@/lib/member-portal/workout-plan-music"
+        );
         const ctx = await loadMemberWorkoutPlanContext(member.member_uuid);
         const visible = ctx.ok && ctx.gate.visible;
-        return { ...sections, homeWorkoutPlan: visible };
-
+        const music = visible
+          ? await loadActiveWorkoutPlanMusic(svc.client, gymId)
+          : null;
+        return {
+          sections: { ...sections, homeWorkoutPlan: visible },
+          music,
+        };
       })(),
-      { ...DEFAULT_PORTAL_SECTIONS, homeWorkoutPlan: false },
+      {
+        sections: { ...DEFAULT_PORTAL_SECTIONS, homeWorkoutPlan: false },
+        music: null as { title: string; mp4Url: string } | null,
+      },
     ),
   ]);
 
@@ -106,6 +121,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     member: safeMemberPayload(member, branch, photoUrl),
-    portalSections,
+    portalSections: portalSections.sections,
+    workoutPlanMusic: portalSections.music,
   });
 }

@@ -245,6 +245,10 @@ export function MemberPortalApp() {
   const [portalSections, setPortalSections] = useState<PortalSections>(
     () => ({ ...DEFAULT_PORTAL_SECTIONS }),
   );
+  const [workoutPlanMusic, setWorkoutPlanMusic] = useState<{
+    title: string;
+    mp4Url: string;
+  } | null>(null);
   /** Post-login welcome modal — once per browser session until logout. */
   const [welcomeKind, setWelcomeKind] = useState<null | "returning" | "first">(null);
   const [welcomeQuote, setWelcomeQuote] = useState("");
@@ -601,6 +605,7 @@ export function MemberPortalApp() {
       ok: true;
       member: MemberMe;
       portalSections?: PortalSections;
+      workoutPlanMusic?: { title?: string; mp4Url?: string } | null;
     }>("/api/member/me");
     setMember((prev) => {
       const next = data.member;
@@ -612,6 +617,20 @@ export function MemberPortalApp() {
         const next = { ...DEFAULT_PORTAL_SECTIONS, ...data.portalSections };
         if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
         return next;
+      });
+    }
+    const musicUrl = String(data.workoutPlanMusic?.mp4Url || "").trim();
+    const nextMusic = musicUrl
+      ? {
+          title: String(data.workoutPlanMusic?.title || "Gym music").trim() || "Gym music",
+          mp4Url: musicUrl,
+        }
+      : null;
+    setWorkoutPlanMusic(nextMusic);
+    const uuid = String(data.member?.memberUuid || "").trim();
+    if (uuid) {
+      void import("@/lib/member-portal/panel-cache").then(({ writeWorkoutMusicCache }) => {
+        writeWorkoutMusicCache(uuid, nextMusic);
       });
     }
     setLiveTick((t) => t + 1);
@@ -759,6 +778,7 @@ export function MemberPortalApp() {
       /* ignore */
     }
     setMember(null);
+    setWorkoutPlanMusic(null);
     setCard(null);
     setDevices([]);
     const known = readKnownDeviceProfile(deviceId || getOrCreateDeviceId());
@@ -1094,6 +1114,7 @@ export function MemberPortalApp() {
     setWelcomeKind(null);
     setWelcomeQuote("");
     setMember(null);
+    setWorkoutPlanMusic(null);
     setCard(null);
     setPin("");
     // Keep known-device hint so next visit is PIN-only, not full registration.
@@ -1975,6 +1996,7 @@ export function MemberPortalApp() {
             <WorkoutPlanPanel
               onBack={() => setStep("home")}
               memberUuid={member.memberUuid}
+              initialMusic={workoutPlanMusic}
             />
           ) : null}
           {step === "bookings" ? (

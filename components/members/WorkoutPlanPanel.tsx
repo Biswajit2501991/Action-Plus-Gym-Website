@@ -12,9 +12,13 @@ import {
 } from "@/components/members/PortalBackButton";
 import { restSecondsFromLabel } from "@/lib/member-portal/workout-programs";
 import {
+  peekWorkoutMusicCache,
   peekWorkoutPlanCache,
+  readWorkoutMusicCache,
   readWorkoutPlanCache,
+  WORKOUT_MUSIC_SOFT_TTL_MS,
   WORKOUT_PLAN_SOFT_TTL_MS,
+  writeWorkoutMusicCache,
   writeWorkoutPlanCache,
 } from "@/lib/member-portal/panel-cache";
 import {
@@ -112,9 +116,11 @@ async function callApi(init?: RequestInit): Promise<Payload> {
 export function WorkoutPlanPanel({
   onBack,
   memberUuid = "",
+  initialMusic = null,
 }: {
   onBack: () => void;
   memberUuid?: string;
+  initialMusic?: { title: string; mp4Url: string } | null;
 }) {
   const [data, setData] = useState<Payload | null>(() => {
     const cached = readWorkoutPlanCache<Payload>(memberUuid);
@@ -126,7 +132,10 @@ export function WorkoutPlanPanel({
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
-  const [music, setMusic] = useState<{ title: string; mp4Url: string } | null>(null);
+  const [music, setMusic] = useState<{ title: string; mp4Url: string } | null>(() => {
+    if (initialMusic?.mp4Url) return initialMusic;
+    return readWorkoutMusicCache<{ title: string; mp4Url: string } | null>(memberUuid);
+  });
   const [musicOpen, setMusicOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [timerKey, setTimerKey] = useState<string | null>(null);
@@ -284,10 +293,29 @@ export function WorkoutPlanPanel({
   }, [refresh, memberUuid, applyPayload]);
 
   useEffect(() => {
+    if (initialMusic?.mp4Url) {
+      setMusic(initialMusic);
+      writeWorkoutMusicCache(memberUuid, initialMusic);
+      return;
+    }
+    const cached = readWorkoutMusicCache<{ title: string; mp4Url: string } | null>(memberUuid);
+    if (cached?.mp4Url) setMusic(cached);
+  }, [initialMusic, memberUuid]);
+
+  useEffect(() => {
     let cancelled = false;
     if (!data?.eligible) {
-      setMusic(null);
-      setMusicOpen(false);
+      if (!initialMusic?.mp4Url) {
+        setMusic(null);
+        setMusicOpen(false);
+        writeWorkoutMusicCache(memberUuid, null);
+      }
+      return;
+    }
+    const peek = peekWorkoutMusicCache<{ title: string; mp4Url: string } | null>(memberUuid);
+    // Soft TTL: skip network if login/me already warmed a fresh cache.
+    if (peek?.data?.mp4Url && peek.ageMs < WORKOUT_MUSIC_SOFT_TTL_MS) {
+      setMusic(peek.data);
       return;
     }
     void fetch("/api/member/workout-plan-music", {
@@ -298,22 +326,22 @@ export function WorkoutPlanPanel({
       .then((json: { ok?: boolean; music?: { title?: string; mp4Url?: string } | null }) => {
         if (cancelled) return;
         const url = String(json?.music?.mp4Url || "").trim();
-        if (!json?.ok || !url) {
-          setMusic(null);
-          return;
-        }
-        setMusic({
-          title: String(json.music?.title || "Gym music").trim() || "Gym music",
-          mp4Url: url,
-        });
+        const next = url
+          ? {
+              title: String(json.music?.title || "Gym music").trim() || "Gym music",
+              mp4Url: url,
+            }
+          : null;
+        setMusic(next);
+        writeWorkoutMusicCache(memberUuid, next);
       })
       .catch(() => {
-        if (!cancelled) setMusic(null);
+        /* keep cached /me music if network fails */
       });
     return () => {
       cancelled = true;
     };
-  }, [data?.eligible, memberUuid]);
+  }, [data?.eligible, memberUuid, initialMusic?.mp4Url]);
 
   useEffect(() => {
     if (!timerOn || timerLeft <= 0) return;
