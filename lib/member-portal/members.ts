@@ -6,7 +6,7 @@ import type { MemberRow } from "@/lib/member-portal/session";
 import { randomToken } from "@/lib/member-portal/crypto";
 
 const MEMBER_SELECT =
-  "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, qr_token, pin_hash, portal_activated_at, last_portal_login_at, updated_at, deleted_at";
+  "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, portal_workout_plan_enabled, qr_token, pin_hash, portal_activated_at, last_portal_login_at, updated_at, deleted_at";
 
 /** Prefer Active/Hold portal-ready rows when the same mobile exists on multiple memberships (e.g. after branch move). */
 function pickBestMemberByMobile(rows: MemberRow[]): MemberRow | undefined {

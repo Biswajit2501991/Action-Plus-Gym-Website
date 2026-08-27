@@ -94,7 +94,7 @@ export async function GET() {
           gymTileOn: sections.homeWorkoutPlan !== false,
           byStatus: normalizeWorkoutPlanByStatus(row?.workout_plan_by_status),
           testerNames: normalizeWorkoutPlanTesterNames(row?.workout_plan_tester_names),
-          memberSwitchOn: true,
+          memberSwitchOn: member.portal_workout_plan_enabled === true,
           status: member.status,
           planName: member.plan_name,
           fullName: member.full_name,

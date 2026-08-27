@@ -99,7 +99,7 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
     gymTileOn: settings.portalSections.homeWorkoutPlan !== false,
     byStatus: settings.byStatus,
     testerNames: settings.testerNames,
-    memberSwitchOn: member.portal_workout_plan_enabled !== false,
+    memberSwitchOn: member.portal_workout_plan_enabled === true,
     status: member.status,
     planName: member.plan_name,
     fullName: member.full_name,

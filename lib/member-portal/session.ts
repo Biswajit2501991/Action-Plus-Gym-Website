@@ -39,6 +39,7 @@ export type MemberRow = {
   medical_answers_json: Record<string, unknown> | null;
   portal_enabled: boolean;
   portal_status: string;
+  portal_workout_plan_enabled?: boolean | null;
   qr_token: string;
   pin_hash: string | null;
   portal_activated_at: string | null;
@@ -437,7 +438,7 @@ export async function requireMemberSession(): Promise<
   const { data: member } = await svc.client
     .from("members")
     .select(
-      "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at",
+      "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, portal_workout_plan_enabled, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at",
     )
     .eq("member_uuid", claims.mid)
     .eq("gym_id", portalGymId())
@@ -472,7 +473,7 @@ async function requireMemberSessionAfterRefresh() {
   const { data: member } = await svc.client
     .from("members")
     .select(
-      "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at",
+      "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, portal_workout_plan_enabled, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at",
     )
     .eq("member_uuid", claims.mid)
     .eq("gym_id", portalGymId())
@@ -536,7 +537,7 @@ async function refreshFromCookies(): Promise<
   const { data: member } = await svc.client
     .from("members")
     .select(
-      "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at",
+      "id, gym_id, member_uuid, member_code, full_name, mobile, email, dob, status, plan_name, amount, joining_date, billing_date, next_payment_date, payment_by, assigned_gym_code_id, photo_url, photo_path, parent_guardian_name, medical_answers_json, portal_enabled, portal_status, portal_workout_plan_enabled, qr_token, pin_hash, portal_activated_at, last_portal_login_at, deleted_at",
     )
     .eq("member_uuid", session.member_uuid)
     .eq("gym_id", portalGymId())

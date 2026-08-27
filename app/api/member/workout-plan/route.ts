@@ -11,6 +11,10 @@ import {
   mergeProgramDayExtras,
 } from "@/lib/member-portal/workout-plan-day-extras";
 import {
+  applyWorkoutExerciseLabels,
+  loadWorkoutExerciseLabels,
+} from "@/lib/member-portal/workout-plan-labels";
+import {
   getWorkoutProgram,
   SHARED_PROGRESSION,
   TRAINER_NOTE,
@@ -92,7 +96,10 @@ export async function GET() {
     rawProgram && svc.ok
       ? await loadWorkoutDayExtras(svc.client, ctx.gymId, level as string)
       : [];
-  const mergedProgram = rawProgram ? mergeProgramDayExtras(rawProgram, extras) : null;
+  const labels = svc.ok ? await loadWorkoutExerciseLabels(svc.client, ctx.gymId) : {};
+  const mergedProgram = rawProgram
+    ? applyWorkoutExerciseLabels(mergeProgramDayExtras(rawProgram, extras), labels)
+    : null;
   const mediaByKey = await loadWorkoutExerciseMediaMap(
     svc.ok ? svc.client : null,
     ctx.gymId,
@@ -184,7 +191,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "unknown-program" }, { status: 400 });
   }
   const extras = await loadWorkoutDayExtras(svc.client, ctx.gymId, level);
-  const program = mergeProgramDayExtras(programBase, extras);
+  const programMerged = mergeProgramDayExtras(programBase, extras);
+  const labels = await loadWorkoutExerciseLabels(svc.client, ctx.gymId);
+  const program = applyWorkoutExerciseLabels(programMerged, labels);
 
   if (action === "progress") {
     const date = String(body.date || todayIst()).slice(0, 10);

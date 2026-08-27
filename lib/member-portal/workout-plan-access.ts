@@ -85,15 +85,21 @@ export function evaluateWorkoutPlanVisibility(input: {
   if (!statusKey || input.byStatus[statusKey] !== true) {
     return { visible: false, reason: "status" };
   }
-  if (input.memberSwitchOn === false) return { visible: false, reason: "member_off" };
+
   const testerOk = memberMatchesWorkoutPlanTesters(
     { fullName: input.fullName, memberCode: input.memberCode },
     input.testerNames,
   );
-  if (!testerOk) return { visible: false, reason: "tester_only" };
-  // Testers can still open the tile on a PT plan so QA is not blocked.
-  // After the tester list is cleared, PT members stay hidden.
-  if (input.testerNames.length > 0) return { visible: true, reason: null };
+
+  // Non-empty tester list = QA rollout. Matching testers (e.g. Bis Test) see the tile
+  // even when the per-member switch is still OFF.
+  if (input.testerNames.length > 0) {
+    if (!testerOk) return { visible: false, reason: "tester_only" };
+    return { visible: true, reason: null };
+  }
+
+  // Full rollout: require explicit per-member ON (default is OFF).
+  if (input.memberSwitchOn !== true) return { visible: false, reason: "member_off" };
   if (isPtPlanName(input.planName)) return { visible: false, reason: "pt_plan" };
   return { visible: true, reason: null };
 }
