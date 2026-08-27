@@ -271,7 +271,7 @@ export function WorkoutPlanMusicButton({
       aria-label="Play gym music"
       title="Music"
       className={[
-        "group relative inline-flex h-12 w-12 items-center justify-center rounded-full",
+        "group relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
         "border border-white/35 bg-white/10 text-gold",
         "shadow-[0_8px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-8px_18px_rgba(212,175,55,0.12)]",
         "backdrop-blur-xl backdrop-saturate-150",

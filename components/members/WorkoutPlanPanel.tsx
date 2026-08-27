@@ -505,45 +505,49 @@ export function WorkoutPlanPanel({
           </button>
         ) : null}
       </div>
-      {showProgram && music ? (
-        <div className="flex justify-end pr-0.5">
-          <WorkoutPlanMusicButton
-            disabled={busy}
-            playing={musicOpen}
-            onClick={() => {
-              // Close exercise video popup so only one media overlay is active.
-              if (video) {
-                const el = videoRef.current;
-                if (el) {
-                  el.pause();
-                  el.removeAttribute("src");
-                  el.load();
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <p className="shrink-0 text-[11px] uppercase tracking-[0.18em] text-gold/80">
+              Training
+            </p>
+            <h2 className="font-display text-xl text-white sm:text-2xl">Workout Plan</h2>
+          </div>
+          {showProgram && music ? (
+            <WorkoutPlanMusicButton
+              disabled={busy}
+              playing={musicOpen}
+              onClick={() => {
+                // Close exercise video popup so only one media overlay is active.
+                if (video) {
+                  const el = videoRef.current;
+                  if (el) {
+                    el.pause();
+                    el.removeAttribute("src");
+                    el.load();
+                  }
+                  setVideo(null);
                 }
-                setVideo(null);
-              }
-              setMusicOpen(true);
-            }}
-          />
+                setMusicOpen(true);
+              }}
+            />
+          ) : null}
         </div>
-      ) : null}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-gold/80">Training</p>
-          <h2 className="font-display text-2xl text-white">Workout Plan</h2>
-          <p className="mt-1 text-xs text-muted">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <p className="min-w-0 text-xs text-muted">
             Member: {data?.member?.name || "—"} · Trainer: {data?.member?.trainerLabel || "Self"}
             {activeLevelId && showProgram
               ? ` · ${data?.program?.title || activeLevelId}`
               : null}
           </p>
+          {showProgram &&
+          weekMeta.motivation &&
+          weekMeta.motivation !== weekMeta.thisWeekAim ? (
+            <p className="max-w-sm rounded-2xl border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-gold/95 sm:text-right">
+              {weekMeta.motivation}
+            </p>
+          ) : null}
         </div>
-        {showProgram &&
-        weekMeta.motivation &&
-        weekMeta.motivation !== weekMeta.thisWeekAim ? (
-          <p className="max-w-sm rounded-2xl border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-gold/95 sm:text-right">
-            {weekMeta.motivation}
-          </p>
-        ) : null}
       </div>
 
       {error ? (
