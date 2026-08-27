@@ -96,14 +96,11 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
 
   const settings = await loadWorkoutPlanSettings();
   const gate = evaluateWorkoutPlanVisibility({
-    gymTileOn: settings.portalSections.homeWorkoutPlan !== false,
+    autoRolloutOn: settings.portalSections.homeWorkoutPlan !== false,
     byStatus: settings.byStatus,
-    testerNames: settings.testerNames,
     memberSwitchOn: member.portal_workout_plan_enabled === true,
     status: member.status,
     planName: member.plan_name,
-    fullName: member.full_name,
-    memberCode: member.member_code,
   });
 
   return {

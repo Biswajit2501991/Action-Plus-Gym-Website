@@ -88,17 +88,13 @@ export async function GET() {
         const {
           evaluateWorkoutPlanVisibility,
           normalizeWorkoutPlanByStatus,
-          normalizeWorkoutPlanTesterNames,
         } = await import("@/lib/member-portal/workout-plan-access");
         const gate = evaluateWorkoutPlanVisibility({
-          gymTileOn: sections.homeWorkoutPlan !== false,
+          autoRolloutOn: sections.homeWorkoutPlan !== false,
           byStatus: normalizeWorkoutPlanByStatus(row?.workout_plan_by_status),
-          testerNames: normalizeWorkoutPlanTesterNames(row?.workout_plan_tester_names),
           memberSwitchOn: member.portal_workout_plan_enabled === true,
           status: member.status,
           planName: member.plan_name,
-          fullName: member.full_name,
-          memberCode: member.member_code,
         });
         return { ...sections, homeWorkoutPlan: gate.visible };
 

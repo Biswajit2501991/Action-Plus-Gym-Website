@@ -5,7 +5,7 @@ import {
 
 export type WorkoutPlanByStatus = Record<PortalAccessStatusKey, boolean>;
 
-/** While this list is non-empty, only these members see Workout Plan. Empty array = all eligible members. */
+/** Legacy QA list — no longer used for tile visibility (kept for settings API compat). */
 export const DEFAULT_WORKOUT_PLAN_TESTER_NAMES = ["Bis Test"];
 
 export const DEFAULT_WORKOUT_PLAN_BY_STATUS: WorkoutPlanByStatus = {
@@ -33,11 +33,7 @@ export function normalizeWorkoutPlanByStatus(input: unknown): WorkoutPlanByStatu
   return out;
 }
 
-/**
- * null/undefined → tester-only default (Bis Test).
- * [] → rollout to every member who passes the other gates.
- * ["Name"] → only matching names/codes.
- */
+/** Legacy — stored in settings but not used for visibility gating. */
 export function normalizeWorkoutPlanTesterNames(input: unknown): string[] {
   if (input == null) return [...DEFAULT_WORKOUT_PLAN_TESTER_NAMES];
   if (!Array.isArray(input)) {
@@ -57,6 +53,7 @@ function foldIdentity(value: unknown) {
     .replace(/\s+/g, " ");
 }
 
+/** Legacy helper — not used by evaluateWorkoutPlanVisibility. */
 export function memberMatchesWorkoutPlanTesters(
   member: { fullName?: string | null; memberCode?: string | null },
   testerNames: string[],
@@ -70,36 +67,33 @@ export function memberMatchesWorkoutPlanTesters(
   });
 }
 
+/**
+ * Home tiles → Workout Plan controls rollout mode:
+ * - OFF (manual): default hidden; staff enable member-by-member via portal_workout_plan_enabled.
+ * - ON (auto): show for members whose status is ON in Workout Plan by status (non-PT).
+ */
 export function evaluateWorkoutPlanVisibility(input: {
-  gymTileOn: boolean;
+  /** Settings → Home tiles → Workout Plan (true = auto by status). */
+  autoRolloutOn: boolean;
   byStatus: WorkoutPlanByStatus;
-  testerNames: string[];
   memberSwitchOn: boolean;
   status: unknown;
   planName: string | null | undefined;
-  fullName?: string | null;
-  memberCode?: string | null;
 }): { visible: boolean; reason: string | null } {
-  if (!input.gymTileOn) return { visible: false, reason: "gym_off" };
   const statusKey = canonicalMemberStatus(input.status);
   if (!statusKey || input.byStatus[statusKey] !== true) {
     return { visible: false, reason: "status" };
   }
+  if (isPtPlanName(input.planName)) {
+    return { visible: false, reason: "pt_plan" };
+  }
 
-  const testerOk = memberMatchesWorkoutPlanTesters(
-    { fullName: input.fullName, memberCode: input.memberCode },
-    input.testerNames,
-  );
-
-  // Non-empty tester list = QA rollout. Matching testers (e.g. Bis Test) see the tile
-  // even when the per-member switch is still OFF.
-  if (input.testerNames.length > 0) {
-    if (!testerOk) return { visible: false, reason: "tester_only" };
+  if (input.autoRolloutOn) {
     return { visible: true, reason: null };
   }
 
-  // Full rollout: require explicit per-member ON (default is OFF).
-  if (input.memberSwitchOn !== true) return { visible: false, reason: "member_off" };
-  if (isPtPlanName(input.planName)) return { visible: false, reason: "pt_plan" };
+  if (input.memberSwitchOn !== true) {
+    return { visible: false, reason: "member_off" };
+  }
   return { visible: true, reason: null };
 }
