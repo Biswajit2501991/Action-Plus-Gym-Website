@@ -69,17 +69,22 @@ export function memberMatchesWorkoutPlanTesters(
 
 /**
  * Home tiles → Workout Plan controls rollout mode:
- * - OFF (manual): default hidden; staff enable member-by-member via portal_workout_plan_enabled.
- * - ON (auto): show for members whose status is ON in Workout Plan by status (non-PT).
+ * - OFF (manual): show only when staff set portal_workout_plan_enabled = true (and not hidden).
+ * - ON (auto): show by Workout Plan by status unless portal_workout_plan_hidden = true.
  */
 export function evaluateWorkoutPlanVisibility(input: {
   /** Settings → Home tiles → Workout Plan (true = auto by status). */
   autoRolloutOn: boolean;
   byStatus: WorkoutPlanByStatus;
   memberSwitchOn: boolean;
+  /** Staff explicitly hid this member (overrides auto rollout). */
+  memberHidden: boolean;
   status: unknown;
   planName: string | null | undefined;
 }): { visible: boolean; reason: string | null } {
+  if (input.memberHidden) {
+    return { visible: false, reason: "member_off" };
+  }
   const statusKey = canonicalMemberStatus(input.status);
   if (!statusKey || input.byStatus[statusKey] !== true) {
     return { visible: false, reason: "status" };
