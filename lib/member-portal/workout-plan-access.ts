@@ -71,6 +71,7 @@ export function memberMatchesWorkoutPlanTesters(
  * Home tiles → Workout Plan controls rollout mode:
  * - OFF (manual): show only when staff set portal_workout_plan_enabled = true (and not hidden).
  * - ON (auto): show by Workout Plan by status unless portal_workout_plan_hidden = true.
+ * PT plans stay hidden by default; staff can opt a PT member in via portal_workout_plan_enabled.
  */
 export function evaluateWorkoutPlanVisibility(input: {
   /** Settings → Home tiles → Workout Plan (true = auto by status). */
@@ -89,7 +90,8 @@ export function evaluateWorkoutPlanVisibility(input: {
   if (!statusKey || input.byStatus[statusKey] !== true) {
     return { visible: false, reason: "status" };
   }
-  if (isPtPlanName(input.planName)) {
+  // PT: default off. Explicit per-member ON opts them into Workout Plan (Training unchanged).
+  if (isPtPlanName(input.planName) && input.memberSwitchOn !== true) {
     return { visible: false, reason: "pt_plan" };
   }
 
