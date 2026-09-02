@@ -66,7 +66,9 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
   const gymId = portalGymId();
   const { data, error } = await svc.client
     .from("members")
-    .select("full_name, member_code, status, plan_name, portal_workout_plan_enabled, portal_workout_plan_hidden")
+    .select(
+      "full_name, member_code, status, plan_name, portal_workout_plan_enabled, portal_workout_plan_hidden, portal_workout_plan_enabled_from, portal_workout_plan_enabled_until",
+    )
     .eq("gym_id", gymId)
     .eq("member_uuid", memberUuid)
     .maybeSingle();
@@ -82,6 +84,8 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
     plan_name?: string | null;
     portal_workout_plan_enabled?: boolean | null;
     portal_workout_plan_hidden?: boolean | null;
+    portal_workout_plan_enabled_from?: string | null;
+    portal_workout_plan_enabled_until?: string | null;
   } | null;
 
   if (!member) return { ok: false as const, error: "member-not-found" };
@@ -94,6 +98,8 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
     memberHidden: member.portal_workout_plan_hidden === true,
     status: member.status,
     planName: member.plan_name,
+    enabledFrom: member.portal_workout_plan_enabled_from,
+    enabledUntil: member.portal_workout_plan_enabled_until,
   });
 
   return {

@@ -3,6 +3,9 @@ import {
   type PortalAccessStatusKey,
 } from "@/lib/member-portal/portal-access-by-status";
 
+const IST = "Asia/Kolkata";
+const YMD = /^(\d{4}-\d{2}-\d{2})$/;
+
 export type WorkoutPlanByStatus = Record<PortalAccessStatusKey, boolean>;
 
 /** Legacy QA list — no longer used for tile visibility (kept for settings API compat). */
@@ -67,11 +70,59 @@ export function memberMatchesWorkoutPlanTesters(
   });
 }
 
+export function normalizePortalWorkoutPlanDate(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const raw = String(value).trim();
+  const m = YMD.exec(raw.slice(0, 10));
+  return m ? m[1] : null;
+}
+
+export function formatIstYmd(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/** Optional per-member date window — both null means no schedule constraint. */
+export function evaluateWorkoutPlanScheduleWindow(input: {
+  enabledFrom?: string | null;
+  enabledUntil?: string | null;
+  todayYmd?: string;
+}): { ok: boolean; reason: string | null } {
+  const from = normalizePortalWorkoutPlanDate(input.enabledFrom);
+  const until = normalizePortalWorkoutPlanDate(input.enabledUntil);
+  if (!from && !until) return { ok: true, reason: null };
+
+  const today =
+    normalizePortalWorkoutPlanDate(input.todayYmd) || formatIstYmd(new Date());
+  if (from && today < from) return { ok: false, reason: "date_not_started" };
+  if (until && today > until) return { ok: false, reason: "date_expired" };
+  return { ok: true, reason: null };
+}
+
+function applyScheduleGate(
+  result: { visible: boolean; reason: string | null },
+  schedule: {
+    enabledFrom?: string | null;
+    enabledUntil?: string | null;
+    todayYmd?: string;
+  },
+): { visible: boolean; reason: string | null } {
+  if (!result.visible) return result;
+  const win = evaluateWorkoutPlanScheduleWindow(schedule);
+  if (!win.ok) return { visible: false, reason: win.reason };
+  return result;
+}
+
 /**
  * Home tiles → Workout Plan controls rollout mode:
  * - OFF (manual): show only when staff set portal_workout_plan_enabled = true (and not hidden).
  * - ON (auto): show by Workout Plan by status unless portal_workout_plan_hidden = true.
  * PT plans stay hidden by default; staff can opt a PT member in via portal_workout_plan_enabled.
+ * Optional enabledFrom / enabledUntil (IST calendar days) auto-hide outside the window.
  */
 export function evaluateWorkoutPlanVisibility(input: {
   /** Settings → Home tiles → Workout Plan (true = auto by status). */
@@ -82,7 +133,16 @@ export function evaluateWorkoutPlanVisibility(input: {
   memberHidden: boolean;
   status: unknown;
   planName: string | null | undefined;
+  enabledFrom?: string | null;
+  enabledUntil?: string | null;
+  todayYmd?: string;
 }): { visible: boolean; reason: string | null } {
+  const schedule = {
+    enabledFrom: input.enabledFrom,
+    enabledUntil: input.enabledUntil,
+    todayYmd: input.todayYmd,
+  };
+
   if (input.memberHidden) {
     return { visible: false, reason: "member_off" };
   }
@@ -96,11 +156,11 @@ export function evaluateWorkoutPlanVisibility(input: {
   }
 
   if (input.autoRolloutOn) {
-    return { visible: true, reason: null };
+    return applyScheduleGate({ visible: true, reason: null }, schedule);
   }
 
   if (input.memberSwitchOn !== true) {
     return { visible: false, reason: "member_off" };
   }
-  return { visible: true, reason: null };
+  return applyScheduleGate({ visible: true, reason: null }, schedule);
 }
