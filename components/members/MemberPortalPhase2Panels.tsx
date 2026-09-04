@@ -42,6 +42,7 @@ import {
   writeTrainingCache,
   writeWeightCache,
 } from "@/lib/member-portal/panel-cache";
+import { enableBillingPush } from "@/lib/member-portal/enable-billing-push";
 import { detectWebPushSupport, detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
@@ -930,66 +931,17 @@ export function NotificationsPanel({
     setHint(null);
     setStatus(null);
     try {
-      const check = detectWebPushSupport();
-      setSupport(check);
-      if (!check.ok) {
-        setError(check.message);
-        if (check.hint) setHint(check.hint);
+      const result = await enableBillingPush();
+      setSupport(result.support);
+      if (!result.ok) {
+        setError(result.error);
+        if (result.hint) setHint(result.hint);
         return;
       }
-
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        throw new Error("Notification permission denied. Allow notifications for this site in Settings, then try again.");
-      }
-
-      const reg = await navigator.serviceWorker.register("/sw-member-portal.js", {
-        scope: "/members",
-      });
-      await navigator.serviceWorker.ready;
-
-      const vapid = await api<{ ok: true; publicKey: string; message?: string }>(
-        "/api/member/push/vapid",
-      );
-      if (!vapid?.publicKey) {
-        throw new Error(
-          (vapid as { message?: string })?.message ||
-            "Push is not configured on the server yet. Ask the gym to enable WEB_PUSH_VAPID keys.",
-        );
-      }
-
-      const existing = await reg.pushManager.getSubscription();
-      const sub =
-        existing ||
-        (await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapid.publicKey),
-        }));
-      const json = sub.toJSON();
-      if (!json.endpoint || !json.keys) {
-        throw new Error("Could not create a push subscription. Try again from the Home Screen app.");
-      }
-      await api("/api/member/push/subscribe", {
-        method: "POST",
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: json.keys,
-          userAgent: navigator.userAgent,
-          confirm: true,
-        }),
-      });
       setPushEnabled(true);
       setStatus(
         "Billing-day reminders are on. A confirmation notification was sent — close the app and check your lock screen if you want to verify.",
       );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not enable push";
-      setError(msg);
-      if (/not supported|PushManager|service worker/i.test(msg)) {
-        setHint(
-          "On iPhone: Safari → Share → Add to Home Screen, then open Action Plus from the icon and tap Enable again. On Android: use Chrome (not WhatsApp’s in-app browser).",
-        );
-      }
     } finally {
       setBusy(false);
     }
@@ -1123,15 +1075,6 @@ function BillingAlertCard({ alert }: { alert: BillingAlert }) {
       </dl>
     </article>
   );
-}
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
-  return out;
 }
 
 export function ChatPanel({

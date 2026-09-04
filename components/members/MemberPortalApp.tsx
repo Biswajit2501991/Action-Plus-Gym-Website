@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -33,6 +33,8 @@ import {
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { WorkoutPlanPanel } from "@/components/members/WorkoutPlanPanel";
+import { PushEnableReminderModal } from "@/components/members/PushEnableReminderModal";
+import { detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
   hasUnreadBillingAlert,
@@ -252,6 +254,10 @@ export function MemberPortalApp() {
   /** Post-login welcome modal — once per browser session until logout. */
   const [welcomeKind, setWelcomeKind] = useState<null | "returning" | "first">(null);
   const [welcomeQuote, setWelcomeQuote] = useState("");
+  /** Soft push enable reminder after login (queued behind welcome when needed). */
+  const [pushReminderOpen, setPushReminderOpen] = useState(false);
+  const [pushReminderTick, setPushReminderTick] = useState(0);
+  const pushReminderQueuedRef = useRef(false);
 
   const [liveTick, setLiveTick] = useState(0);
 
@@ -650,15 +656,43 @@ export function MemberPortalApp() {
   const enterHomeAfterAuth = useCallback(
     async (kind: "returning" | "first") => {
       await loadMe();
-      if (readWelcomeShownThisSession()) return;
-      const quote = pickRandomWelcomeQuote();
-      rememberLastWelcomeQuote(quote);
-      setWelcomeQuote(quote);
-      setWelcomeKind(kind);
-      markWelcomeShownThisSession();
+
+      // Soft push reminder for this login only (not cold session restore).
+      pushReminderQueuedRef.current = false;
+      setPushReminderOpen(false);
+
+      const showWelcome = !readWelcomeShownThisSession();
+      if (showWelcome) {
+        const quote = pickRandomWelcomeQuote();
+        rememberLastWelcomeQuote(quote);
+        setWelcomeQuote(quote);
+        setWelcomeKind(kind);
+        markWelcomeShownThisSession();
+      }
+
+      void (async () => {
+        try {
+          const enabled = await detectExistingBillingPushSubscription();
+          if (enabled) return;
+          pushReminderQueuedRef.current = true;
+          // Effect opens after welcome closes (or immediately when welcome is skipped).
+          setPushReminderTick((n) => n + 1);
+        } catch {
+          /* never block login on push check */
+        }
+      })();
     },
     [loadMe],
   );
+
+  // After welcome dismiss (or if welcome skipped), show push reminder once per login.
+  useEffect(() => {
+    if (welcomeKind) return;
+    if (!member || step !== "home") return;
+    if (!pushReminderQueuedRef.current) return;
+    pushReminderQueuedRef.current = false;
+    setPushReminderOpen(true);
+  }, [welcomeKind, member, step, pushReminderTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1113,6 +1147,8 @@ export function MemberPortalApp() {
     // Keep last quote in sessionStorage so the next login avoids repeating it.
     setWelcomeKind(null);
     setWelcomeQuote("");
+    pushReminderQueuedRef.current = false;
+    setPushReminderOpen(false);
     setMember(null);
     setWorkoutPlanMusic(null);
     setCard(null);
@@ -2079,6 +2115,14 @@ export function MemberPortalApp() {
           </div>
         </div>
       ) : null}
+
+      <PushEnableReminderModal
+        open={Boolean(pushReminderOpen && member && !welcomeKind)}
+        onClose={() => {
+          pushReminderQueuedRef.current = false;
+          setPushReminderOpen(false);
+        }}
+      />
     </div>
   );
 }
