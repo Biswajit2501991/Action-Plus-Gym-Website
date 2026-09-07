@@ -124,6 +124,11 @@ export async function assertPortalEligible(
       status: 403,
     };
   }
+  const { assertBranchPortalAllowed } = await import(
+    "@/lib/member-portal/branch-portal-access"
+  );
+  const branchGate = await assertBranchPortalAllowed(member.assigned_gym_code_id);
+  if (!branchGate.ok) return branchGate;
   return { ok: true };
 }
 

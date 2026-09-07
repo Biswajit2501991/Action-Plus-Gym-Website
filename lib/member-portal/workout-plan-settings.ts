@@ -3,9 +3,9 @@ import { portalGymId } from "@/lib/member-portal/config";
 import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 import {
   DEFAULT_PORTAL_SECTIONS,
-  portalSectionsFromSettings,
   type PortalSections,
 } from "@/lib/member-portal/portal-ui-config";
+import { loadEffectivePortalSectionsForMember } from "@/lib/member-portal/branch-portal-access";
 import {
   evaluateWorkoutPlanVisibility,
   normalizeWorkoutPlanByStatus,
@@ -19,7 +19,9 @@ export type WorkoutPlanSettings = {
   testerNames: string[];
 };
 
-export async function loadWorkoutPlanSettings(): Promise<WorkoutPlanSettings> {
+export async function loadWorkoutPlanSettings(
+  assignedGymCodeId?: string | null,
+): Promise<WorkoutPlanSettings> {
   const fallback: WorkoutPlanSettings = {
     portalSections: { ...DEFAULT_PORTAL_SECTIONS },
     byStatus: normalizeWorkoutPlanByStatus(null),
@@ -49,12 +51,15 @@ export async function loadWorkoutPlanSettings(): Promise<WorkoutPlanSettings> {
     row = (basic.data as Record<string, unknown> | null) || null;
   }
 
+  const portalSections = await loadEffectivePortalSectionsForMember({
+    assignedGymCodeId,
+    portal_sections: row?.portal_sections,
+    basic_workout_options: row?.basic_workout_options,
+    exerciseTypes,
+  });
+
   return {
-    portalSections: portalSectionsFromSettings({
-      portal_sections: row?.portal_sections,
-      basic_workout_options: row?.basic_workout_options,
-      exerciseTypes,
-    }),
+    portalSections,
     byStatus: normalizeWorkoutPlanByStatus(row?.workout_plan_by_status),
     testerNames: normalizeWorkoutPlanTesterNames(row?.workout_plan_tester_names),
   };
@@ -67,7 +72,7 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
   const { data, error } = await svc.client
     .from("members")
     .select(
-      "full_name, member_code, status, plan_name, portal_workout_plan_enabled, portal_workout_plan_hidden, portal_workout_plan_enabled_from, portal_workout_plan_enabled_until",
+      "full_name, member_code, status, plan_name, assigned_gym_code_id, portal_workout_plan_enabled, portal_workout_plan_hidden, portal_workout_plan_enabled_from, portal_workout_plan_enabled_until",
     )
     .eq("gym_id", gymId)
     .eq("member_uuid", memberUuid)
@@ -82,6 +87,7 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
     member_code?: string | null;
     status?: string | null;
     plan_name?: string | null;
+    assigned_gym_code_id?: string | null;
     portal_workout_plan_enabled?: boolean | null;
     portal_workout_plan_hidden?: boolean | null;
     portal_workout_plan_enabled_from?: string | null;
@@ -90,7 +96,7 @@ export async function loadMemberWorkoutPlanContext(memberUuid: string) {
 
   if (!member) return { ok: false as const, error: "member-not-found" };
 
-  const settings = await loadWorkoutPlanSettings();
+  const settings = await loadWorkoutPlanSettings(member.assigned_gym_code_id);
   const gate = evaluateWorkoutPlanVisibility({
     autoRolloutOn: settings.portalSections.homeWorkoutPlan !== false,
     byStatus: settings.byStatus,

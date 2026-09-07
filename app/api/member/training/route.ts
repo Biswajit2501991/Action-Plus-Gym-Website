@@ -3,11 +3,10 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
 import {
-  normalizePortalSections,
-  portalSectionsFromSettings,
   visibleBasicWorkoutLabels,
   type PortalSections,
 } from "@/lib/member-portal/portal-ui-config";
+import { loadEffectivePortalSectionsForMember } from "@/lib/member-portal/branch-portal-access";
 import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 
 type DietAttachment = {
@@ -152,7 +151,8 @@ export async function GET() {
     fetchExerciseTypeLookupValues(svc.client),
   ]);
 
-  const portalSections: PortalSections = portalSectionsFromSettings({
+  const portalSections: PortalSections = await loadEffectivePortalSectionsForMember({
+    assignedGymCodeId: session.member.assigned_gym_code_id,
     portal_sections: portalSettingsRow?.portal_sections,
     basic_workout_options: portalSettingsRow?.basic_workout_options,
     exerciseTypes: exerciseTypesLookup,
@@ -586,9 +586,11 @@ export async function POST(req: Request) {
     .select("basic_workout_options, portal_sections")
     .eq("gym_id", gymId)
     .maybeSingle();
-  const portalSections = normalizePortalSections(
-    portalSettingsRow?.portal_sections,
-  );
+  const portalSections = await loadEffectivePortalSectionsForMember({
+    assignedGymCodeId: session.member.assigned_gym_code_id,
+    portal_sections: portalSettingsRow?.portal_sections,
+    basic_workout_options: portalSettingsRow?.basic_workout_options,
+  });
   const allowedBasic = visibleBasicWorkoutLabels(
     portalSettingsRow?.basic_workout_options,
   );

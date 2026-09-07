@@ -112,6 +112,28 @@ export function normalizePortalSections(input: unknown): PortalSections {
   return out;
 }
 
+/**
+ * Apply saved/partial sections onto a fallback.
+ * Keys missing from `saved` keep the fallback value.
+ */
+export function mergePortalSections(
+  saved: unknown,
+  fallback: unknown,
+): PortalSections {
+  const base = normalizePortalSections(
+    fallback && typeof fallback === "object" ? fallback : DEFAULT_PORTAL_SECTIONS,
+  );
+  const src =
+    saved && typeof saved === "object" && !Array.isArray(saved)
+      ? (saved as Record<string, unknown>)
+      : null;
+  if (!src) return base;
+  for (const key of Object.keys(DEFAULT_PORTAL_SECTIONS) as (keyof PortalSections)[]) {
+    if (key in src) base[key] = Boolean(src[key]);
+  }
+  return base;
+}
+
 export function visibleBasicWorkoutLabels(options: unknown): string[] {
   return normalizeBasicWorkoutOptions(options)
     .filter((o) => o.visible)

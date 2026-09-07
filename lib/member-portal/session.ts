@@ -133,6 +133,13 @@ async function evaluatePortalMemberAccess(
       status: 401,
     };
   }
+  const { assertBranchPortalAllowed } = await import(
+    "@/lib/member-portal/branch-portal-access"
+  );
+  const branchGate = await assertBranchPortalAllowed(member.assigned_gym_code_id);
+  if (!branchGate.ok) {
+    return { ok: false, error: branchGate.error, status: branchGate.status };
+  }
   return { ok: true, member };
 }
 
@@ -456,6 +463,17 @@ export async function requireMemberSession(): Promise<
       error: "Access revoked. Please verify via WhatsApp again.",
       status: 401,
     };
+  }
+
+  const { assertBranchPortalAllowed } = await import(
+    "@/lib/member-portal/branch-portal-access"
+  );
+  const branchGate = await assertBranchPortalAllowed(
+    (member as MemberRow).assigned_gym_code_id,
+  );
+  if (!branchGate.ok) {
+    await revokeSessionAndClearCookies(svc.client, session.id);
+    return { ok: false, error: branchGate.error, status: branchGate.status };
   }
 
   return { ok: true, claims, member: member as MemberRow };

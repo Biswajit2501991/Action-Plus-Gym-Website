@@ -11,8 +11,8 @@ import {
 import { portalGymId } from "@/lib/member-portal/config";
 import {
   DEFAULT_PORTAL_SECTIONS,
-  portalSectionsFromSettings,
 } from "@/lib/member-portal/portal-ui-config";
+import { loadEffectivePortalSectionsForMember } from "@/lib/member-portal/branch-portal-access";
 import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 
 export async function GET() {
@@ -84,7 +84,8 @@ export async function GET() {
             .maybeSingle();
           row = (fallback.data as Record<string, unknown> | null) || null;
         }
-        const sections = portalSectionsFromSettings({
+        const sections = await loadEffectivePortalSectionsForMember({
+          assignedGymCodeId: member.assigned_gym_code_id,
           portal_sections: row?.portal_sections,
           basic_workout_options: row?.basic_workout_options,
           exerciseTypes,

@@ -5,11 +5,13 @@ import { portalGymId } from "@/lib/member-portal/config";
 import { randomToken } from "@/lib/member-portal/crypto";
 import {
   DEFAULT_PORTAL_SECTIONS,
-  portalSectionsFromSettings,
 } from "@/lib/member-portal/portal-ui-config";
+import { loadEffectivePortalSectionsForMember } from "@/lib/member-portal/branch-portal-access";
 import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 
-async function isRequestLockerEnabled(): Promise<boolean> {
+async function isRequestLockerEnabled(
+  assignedGymCodeId?: string | null,
+): Promise<boolean> {
   const svc = createServiceRoleClient();
   if (!svc.ok) return DEFAULT_PORTAL_SECTIONS.perksRequestLocker !== false;
   const gymId = portalGymId();
@@ -22,7 +24,8 @@ async function isRequestLockerEnabled(): Promise<boolean> {
       .maybeSingle(),
     fetchExerciseTypeLookupValues(svc.client),
   ]);
-  const sections = portalSectionsFromSettings({
+  const sections = await loadEffectivePortalSectionsForMember({
+    assignedGymCodeId,
     portal_sections: data?.portal_sections,
     basic_workout_options: data?.basic_workout_options,
     exerciseTypes,
@@ -131,7 +134,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!(await isRequestLockerEnabled())) {
+  if (!(await isRequestLockerEnabled(session.member.assigned_gym_code_id))) {
     return NextResponse.json(
       { ok: false, error: "Locker requests are currently disabled." },
       { status: 403 },
