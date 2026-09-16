@@ -9,8 +9,8 @@ const querySchema = z.object({
 });
 
 /**
- * Returning-device lookup: if this device fingerprint is already trusted and
- * the member has a PIN, the portal can skip name/DOB registration UI.
+ * Returning-device lookup: trusted device + PIN / Face ID flags so the portal
+ * can show unlock options instead of first-time registration UI.
  * Does not create or modify devices/sessions.
  */
 export async function GET(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     });
     if (!parsed.success) {
       return NextResponse.json(
-        { ok: true, registered: false, hasPin: false },
+        { ok: true, registered: false, hasPin: false, hasWebauthn: false },
         { status: 200 },
       );
     }
@@ -45,14 +45,14 @@ export async function GET(req: NextRequest) {
     if (deviceErr) {
       console.error("device-status", deviceErr);
       return NextResponse.json(
-        { ok: true, registered: false, hasPin: false },
+        { ok: true, registered: false, hasPin: false, hasWebauthn: false },
         { status: 200 },
       );
     }
 
     if (!device?.member_uuid) {
       return NextResponse.json(
-        { ok: true, registered: false, hasPin: false },
+        { ok: true, registered: false, hasPin: false, hasWebauthn: false },
         { status: 200 },
       );
     }
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
 
     if (memberErr || !member) {
       return NextResponse.json(
-        { ok: true, registered: true, hasPin: false },
+        { ok: true, registered: true, hasPin: false, hasWebauthn: false },
         { status: 200 },
       );
     }
@@ -82,6 +82,7 @@ export async function GET(req: NextRequest) {
         ok: true,
         registered: true,
         hasPin: false,
+        hasWebauthn: false,
         blocked: true,
         reason:
           portalStatus === "revoked"
@@ -93,17 +94,31 @@ export async function GET(req: NextRequest) {
     const mobile = normalizeMobile(String(member.mobile || ""));
     const hasPin = Boolean(member.pin_hash);
 
+    let hasWebauthn = false;
+    try {
+      const { count, error: credErr } = await svc.client
+        .from("member_portal_webauthn_credentials")
+        .select("id", { count: "exact", head: true })
+        .eq("gym_id", gymId)
+        .eq("member_uuid", member.member_uuid);
+      if (!credErr) hasWebauthn = (count || 0) > 0;
+    } catch {
+      hasWebauthn = false;
+    }
+
     return NextResponse.json({
       ok: true,
       registered: true,
       hasPin,
-      mobile: hasPin && mobile.length >= 10 ? mobile : null,
+      hasWebauthn,
+      mobile:
+        (hasPin || hasWebauthn) && mobile.length >= 10 ? mobile : null,
       maskedMobile: mobile.length >= 4 ? `******${mobile.slice(-4)}` : null,
     });
   } catch (error) {
     console.error("device-status", error);
     return NextResponse.json(
-      { ok: true, registered: false, hasPin: false },
+      { ok: true, registered: false, hasPin: false, hasWebauthn: false },
       { status: 200 },
     );
   }

@@ -4,6 +4,8 @@ export type KnownDeviceProfile = {
   deviceId: string;
   mobile: string;
   hasPin: boolean;
+  /** Face ID / fingerprint already registered for this member (hint only). */
+  hasWebauthn?: boolean;
   savedAt: number;
 };
 

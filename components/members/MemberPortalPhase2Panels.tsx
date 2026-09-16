@@ -2778,11 +2778,14 @@ export function BiometricPanel({
   mobile,
   deviceId,
   onLoggedIn,
+  allowRegister = false,
 }: {
   onBack: () => void;
   mobile: string;
   deviceId: string;
   onLoggedIn: () => void;
+  /** Register requires an active session — only true from Home → Biometric. */
+  allowRegister?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -2867,28 +2870,34 @@ export function BiometricPanel({
       <PortalBackButton onClick={onBack} />
       <h2 className="font-display text-2xl text-white">Face ID / fingerprint</h2>
       <p className="text-sm text-muted">
-        Works on iPhone (Safari) and Android (Chrome) with screen lock biometrics.
-        On Android use Chrome (not WhatsApp/Instagram). Register while signed in, then
-        use Login with biometric next time.
+        {allowRegister
+          ? "Register while signed in, then use Face ID / fingerprint next time you open the portal."
+          : "Unlock with Face ID or fingerprint if you already set it up. To register a new one, sign in with PIN first, then open Biometric on Home."}
       </p>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {status ? <p className="text-sm text-gold">{status}</p> : null}
       <button
         type="button"
-        disabled={busy}
-        onClick={() => void registerPasskey()}
+        disabled={busy || mobile.replace(/\D/g, "").length < 10}
+        onClick={() => void loginPasskey()}
         className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
       >
-        Register biometric
+        {busy ? "Waiting…" : "Unlock with Face ID / fingerprint"}
       </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void loginPasskey()}
-        className="w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white disabled:opacity-50"
-      >
-        Login with biometric
-      </button>
+      {allowRegister ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void registerPasskey()}
+          className="w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white disabled:opacity-50"
+        >
+          Register biometric on this device
+        </button>
+      ) : (
+        <p className="text-center text-xs text-muted">
+          Need PIN instead? Go back and choose Login with PIN.
+        </p>
+      )}
     </section>
   );
 }

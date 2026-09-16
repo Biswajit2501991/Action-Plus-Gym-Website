@@ -231,6 +231,8 @@ export function MemberPortalApp() {
   const [booting, setBooting] = useState(true);
   const [waitNote, setWaitNote] = useState("Waiting for gym staff to approve…");
   const [needsReauth, setNeedsReauth] = useState(false);
+  /** Distinguishes revoke vs “set up this phone” so we never scare members after idle logout. */
+  const [reauthKind, setReauthKind] = useState<"none" | "revoked" | "setup">("none");
   const [authMethod, setAuthMethod] = useState<"whatsapp_staff" | "auto_identity">(
     "whatsapp_staff",
   );
@@ -243,6 +245,10 @@ export function MemberPortalApp() {
   const [alertsUnread, setAlertsUnread] = useState(false);
   const [paymentsUnread, setPaymentsUnread] = useState(false);
   const [knownDevice, setKnownDevice] = useState(false);
+  const [deviceHasPin, setDeviceHasPin] = useState(false);
+  const [deviceHasWebauthn, setDeviceHasWebauthn] = useState(false);
+  const [maskedMobile, setMaskedMobile] = useState<string | null>(null);
+  const [biometricSupported, setBiometricSupported] = useState(false);
   /** Home tile with coloured liquid-glass edges (others stay neutral). */
   const [activeHomeAccent, setActiveHomeAccent] = useState<string | null>(null);
   const [portalSections, setPortalSections] = useState<PortalSections>(
@@ -299,7 +305,7 @@ export function MemberPortalApp() {
   );
 
   const rememberThisDevice = useCallback(
-    (mobileValue: string, id: string, hasPin = true) => {
+    (mobileValue: string, id: string, hasPin = true, hasWebauthn = false) => {
       const normalized = String(mobileValue || "").replace(/\D/g, "");
       const did = String(id || deviceId || "").trim();
       if (normalized.length < 10 || !did) return;
@@ -307,9 +313,13 @@ export function MemberPortalApp() {
         deviceId: did,
         mobile: normalized.slice(-10),
         hasPin,
+        hasWebauthn,
         savedAt: Date.now(),
       });
       setKnownDevice(true);
+      setDeviceHasPin(hasPin);
+      if (hasWebauthn) setDeviceHasWebauthn(true);
+      setMaskedMobile(`******${normalized.slice(-4)}`);
     },
     [deviceId],
   );
@@ -317,12 +327,17 @@ export function MemberPortalApp() {
   const switchToFullRegistration = useCallback(() => {
     clearKnownDeviceProfile(deviceId);
     setKnownDevice(false);
+    setDeviceHasPin(false);
+    setDeviceHasWebauthn(false);
+    setMaskedMobile(null);
     setFullName("");
     setDob("");
     setEmail("");
     setPin("");
     setConfirmPin("");
     setError(null);
+    setReauthKind("none");
+    setNeedsReauth(false);
     setStep("mobile");
   }, [deviceId]);
 
@@ -339,6 +354,36 @@ export function MemberPortalApp() {
       .catch(() => {
         /* keep default WhatsApp */
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Soft capability probe — hide Face ID unlock when the browser cannot do it.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { browserSupportsWebAuthn } = await import("@simplewebauthn/browser");
+        if (!browserSupportsWebAuthn()) {
+          if (!cancelled) setBiometricSupported(false);
+          return;
+        }
+        if (
+          typeof window !== "undefined" &&
+          window.PublicKeyCredential &&
+          "isUserVerifyingPlatformAuthenticatorAvailable" in PublicKeyCredential
+        ) {
+          const ok =
+            await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          if (!cancelled) setBiometricSupported(Boolean(ok));
+          return;
+        }
+        if (!cancelled) setBiometricSupported(true);
+      } catch {
+        if (!cancelled) setBiometricSupported(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -647,11 +692,18 @@ export function MemberPortalApp() {
   const loadMe = useCallback(async () => {
     const m = await refreshMember();
     if (m?.mobile) {
-      rememberThisDevice(String(m.mobile), getOrCreateDeviceId(), true);
+      const id = getOrCreateDeviceId();
+      const prev = readKnownDeviceProfile(id);
+      rememberThisDevice(
+        String(m.mobile),
+        id,
+        true,
+        Boolean(prev?.hasWebauthn || deviceHasWebauthn),
+      );
     }
     setStep("home");
     return m;
-  }, [refreshMember, rememberThisDevice]);
+  }, [refreshMember, rememberThisDevice, deviceHasWebauthn]);
 
   /** After a real login (not session restore). New random quote each login; once until logout. */
   const enterHomeAfterAuth = useCallback(
@@ -733,10 +785,12 @@ export function MemberPortalApp() {
           if (cancelled) return;
           const msg = e instanceof Error ? e.message : "";
           if (/revoked|expired|Unauthorized|Session|inactivity/i.test(msg)) {
-            setNeedsReauth(/revoked/i.test(msg));
-            // Session expiry / idle logout → silent login. Keep only revoke messaging.
+            const revoked = /revoked/i.test(msg);
+            setNeedsReauth(revoked);
+            setReauthKind(revoked ? "revoked" : "none");
+            // Session expiry / idle logout → silent unlock. Keep only revoke messaging.
             setError(
-              /revoked/i.test(msg)
+              revoked
                 ? "Access was revoked by the gym. Verify again to continue."
                 : null,
             );
@@ -745,7 +799,9 @@ export function MemberPortalApp() {
           let status: {
             registered?: boolean;
             hasPin?: boolean;
+            hasWebauthn?: boolean;
             mobile?: string | null;
+            maskedMobile?: string | null;
             blocked?: boolean;
             reason?: string;
           } | null = null;
@@ -755,7 +811,9 @@ export function MemberPortalApp() {
                 ok: true;
                 registered: boolean;
                 hasPin: boolean;
+                hasWebauthn?: boolean;
                 mobile?: string | null;
+                maskedMobile?: string | null;
                 blocked?: boolean;
                 reason?: string;
               }>(`/api/member/auth/device-status?deviceId=${encodeURIComponent(id)}`),
@@ -770,23 +828,29 @@ export function MemberPortalApp() {
           if (status?.blocked) {
             clearKnownDeviceProfile(id);
             setKnownDevice(false);
+            setDeviceHasPin(false);
+            setDeviceHasWebauthn(false);
             setNeedsReauth(true);
+            setReauthKind("revoked");
             setError(status.reason || "Portal access is not available.");
             setStep("mobile");
             return;
           }
 
           const local = readKnownDeviceProfile(id);
-          if (status?.hasPin && status.mobile) {
-            rememberThisDevice(status.mobile, id, true);
-            setMobile(status.mobile);
-            setStep("pinLogin");
-            return;
-          }
+          const hasPin = Boolean(status?.hasPin || local?.hasPin);
+          const hasWebauthn = Boolean(status?.hasWebauthn || local?.hasWebauthn);
+          const unlockMobile =
+            String(status?.mobile || local?.mobile || "")
+              .replace(/\D/g, "")
+              .slice(-10) || "";
 
-          if (local?.hasPin && local.mobile) {
-            setKnownDevice(true);
-            setMobile(String(local.mobile).slice(-10));
+          if ((hasPin || hasWebauthn) && unlockMobile.length >= 10) {
+            rememberThisDevice(unlockMobile, id, hasPin, hasWebauthn);
+            setMobile(unlockMobile);
+            setDeviceHasPin(hasPin);
+            setDeviceHasWebauthn(hasWebauthn);
+            if (status?.maskedMobile) setMaskedMobile(status.maskedMobile);
             setStep("pinLogin");
             return;
           }
@@ -817,15 +881,20 @@ export function MemberPortalApp() {
     setCard(null);
     setDevices([]);
     const known = readKnownDeviceProfile(deviceId || getOrCreateDeviceId());
-    if (known?.hasPin && known.mobile) {
+    if ((known?.hasPin || known?.hasWebauthn) && known.mobile) {
       setMobile(known.mobile);
       setKnownDevice(true);
+      setDeviceHasPin(Boolean(known.hasPin));
+      setDeviceHasWebauthn(Boolean(known.hasWebauthn));
+      setMaskedMobile(`******${String(known.mobile).slice(-4)}`);
       setStep("pinLogin");
     } else {
       setStep("mobile");
     }
-    // Idle logout is intentional — show login quietly (no error banner).
+    // Idle logout is intentional — show unlock quietly (no error banner).
     setError(null);
+    setReauthKind("none");
+    setNeedsReauth(false);
   }, [deviceId]);
 
   // Track activity and auto-logout after 2 hours idle while signed in.
@@ -951,7 +1020,7 @@ export function MemberPortalApp() {
           );
           if (done.needsPin) setStep("setPin");
           else {
-            rememberThisDevice(mobile, deviceId, true);
+            rememberThisDevice(mobile, deviceId, true, deviceHasWebauthn);
             await enterHomeAfterAuth("returning");
           }
           return;
@@ -1065,12 +1134,13 @@ export function MemberPortalApp() {
       setChallengeId(data.challengeId);
       setDeviceId(data.deviceId || deviceId);
       setNeedsReauth(false);
+      setReauthKind("none");
       setPin("");
       setConfirmPin("");
       if (data.needsPin || !data.hasPin) {
         setStep("setPin");
       } else {
-        rememberThisDevice(mobile, data.deviceId || deviceId, true);
+        rememberThisDevice(mobile, data.deviceId || deviceId, true, deviceHasWebauthn);
         setStep("pinLogin");
       }
     } catch (e) {
@@ -1096,7 +1166,7 @@ export function MemberPortalApp() {
         method: "POST",
         body: JSON.stringify({ mobile, pin, challengeId, deviceId }),
       });
-      rememberThisDevice(mobile, deviceId, true);
+      rememberThisDevice(mobile, deviceId, true, deviceHasWebauthn);
       setConfirmPin("");
       await enterHomeAfterAuth("first");
     } catch (e) {
@@ -1114,7 +1184,7 @@ export function MemberPortalApp() {
         method: "POST",
         body: JSON.stringify({ mobile, pin, deviceId }),
       });
-      rememberThisDevice(mobile, deviceId, true);
+      rememberThisDevice(mobile, deviceId, true, deviceHasWebauthn);
       await enterHomeAfterAuth("returning");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "PIN login failed";
@@ -1123,10 +1193,13 @@ export function MemberPortalApp() {
           msg,
         );
       if (needsSetup) {
-        // Quietly send member to verify/setup — do not show the old PIN/revoked banner.
         clearKnownDeviceProfile(deviceId);
         setKnownDevice(false);
+        setDeviceHasPin(false);
+        setDeviceHasWebauthn(false);
+        const revoked = /revoked/i.test(msg);
         setNeedsReauth(true);
+        setReauthKind(revoked ? "revoked" : "setup");
         setError(null);
         setStep("mobile");
       } else {
@@ -1154,11 +1227,14 @@ export function MemberPortalApp() {
     setWorkoutPlanMusic(null);
     setCard(null);
     setPin("");
-    // Keep known-device hint so next visit is PIN-only, not full registration.
+    // Keep known-device hint so next visit is unlock-only, not full registration.
     const known = readKnownDeviceProfile(deviceId);
-    if (known?.hasPin && known.mobile) {
+    if ((known?.hasPin || known?.hasWebauthn) && known.mobile) {
       setMobile(known.mobile);
       setKnownDevice(true);
+      setDeviceHasPin(Boolean(known.hasPin));
+      setDeviceHasWebauthn(Boolean(known.hasWebauthn));
+      setMaskedMobile(`******${String(known.mobile).slice(-4)}`);
       setStep("pinLogin");
     } else {
       setStep("mobile");
@@ -1237,21 +1313,26 @@ export function MemberPortalApp() {
           </h1>
           <p className="mt-2 text-sm text-muted">
             {step === "pinLogin" || knownDevice
-              ? "This phone is already registered. Enter your mobile and 6-digit PIN."
+              ? maskedMobile
+                ? `Number ending ${maskedMobile.replace(/^\*+/, "••••")}. Unlock with Face ID or PIN — you do not need to register again.`
+                : "This phone is already set up. Unlock with Face ID or PIN — you do not need to register again."
               : authMethod === "auto_identity"
                 ? "First time on this phone: enter mobile, name, and DOB or Gmail. Then set a 6-digit PIN for next visits."
                 : "First time: gym staff verifies your number on WhatsApp. Then you set a 6-digit PIN for next visits."}
           </p>
-          {needsReauth ? (
+          {reauthKind === "revoked" ? (
             <p className="mt-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
-              Your portal access was revoked.{" "}
-              {authMethod === "auto_identity" ? (
-                <>Verify your details again to re-authenticate.</>
-              ) : (
-                <>
-                  Tap <strong>Verify via gym WhatsApp</strong> to re-authenticate.
-                </>
-              )}
+              {error && /revok|disabled/i.test(error)
+                ? error
+                : authMethod === "auto_identity"
+                  ? "Your portal access was revoked. Verify your details again to continue."
+                  : "Your portal access was revoked. Tap Re-verify via WhatsApp to continue."}
+            </p>
+          ) : null}
+          {reauthKind === "setup" ? (
+            <p className="mt-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/80">
+              This phone needs a quick setup. If you already have a PIN, use{" "}
+              <strong className="text-gold">Login with PIN</strong> below. Otherwise verify once.
             </p>
           ) : null}
 
@@ -1371,23 +1452,25 @@ export function MemberPortalApp() {
                 disabled={busy || mobile.replace(/\D/g, "").length < 10}
                 onClick={() => {
                   setError(null);
-                  setStep("biometric");
-                }}
-                className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
-              >
-                Face ID / fingerprint
-              </button>
-              <button
-                type="button"
-                disabled={busy || mobile.replace(/\D/g, "").length < 10}
-                onClick={() => {
-                  setError(null);
                   setStep("pinLogin");
                 }}
                 className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
               >
-                Login with PIN
+                Already set up? Login with PIN
               </button>
+              {biometricSupported ? (
+                <button
+                  type="button"
+                  disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                  onClick={() => {
+                    setError(null);
+                    setStep("biometric");
+                  }}
+                  className="rounded-full border border-white/15 px-5 py-3 text-sm text-white/85 hover:border-gold/40"
+                >
+                  Unlock with Face ID / fingerprint
+                </button>
+              ) : null}
             </div>
           ) : null}
 
@@ -1498,25 +1581,63 @@ export function MemberPortalApp() {
 
           {step === "pinLogin" ? (
             <div className="mt-6 space-y-4">
-              <label className="block text-sm text-white/80">
-                6-digit PIN
-                <input
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
-                  inputMode="numeric"
-                  maxLength={6}
-                  type="password"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={busy || pin.length !== 6}
-                onClick={pinLogin}
-                className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
-              >
-                {busy ? "Signing in…" : "Sign in"}
-              </button>
+              {deviceHasWebauthn && biometricSupported ? (
+                <button
+                  type="button"
+                  disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                  onClick={() => {
+                    setError(null);
+                    setStep("biometric");
+                  }}
+                  className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  Unlock with Face ID / fingerprint
+                </button>
+              ) : null}
+
+              {deviceHasPin || !deviceHasWebauthn ? (
+                <>
+                  {deviceHasWebauthn && biometricSupported ? (
+                    <p className="text-center text-xs text-muted">or use your PIN</p>
+                  ) : null}
+                  <label className="block text-sm text-white/80">
+                    6-digit PIN
+                    <input
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white outline-none focus:border-gold/50"
+                      inputMode="numeric"
+                      maxLength={6}
+                      type="password"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={busy || pin.length !== 6}
+                    onClick={pinLogin}
+                    className={
+                      deviceHasWebauthn && biometricSupported
+                        ? "w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white/90 disabled:opacity-50"
+                        : "w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+                    }
+                  >
+                    {busy ? "Signing in…" : "Login with PIN"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy || mobile.replace(/\D/g, "").length < 10}
+                  onClick={() => {
+                    setError(null);
+                    setDeviceHasPin(true);
+                  }}
+                  className="w-full text-sm text-muted hover:text-gold"
+                >
+                  Use PIN instead
+                </button>
+              )}
+
               <button
                 type="button"
                 className="w-full text-sm text-muted hover:text-gold"
@@ -1526,7 +1647,7 @@ export function MemberPortalApp() {
                 }}
               >
                 {knownDevice
-                  ? "Not you? First-time setup / different number"
+                  ? "Not you? Different number / first-time setup"
                   : authMethod === "auto_identity"
                     ? "Verify with details instead"
                     : "Verify via gym WhatsApp instead"}
@@ -1538,10 +1659,17 @@ export function MemberPortalApp() {
 
       {!member && step === "biometric" ? (
         <BiometricPanel
-          onBack={() => setStep("mobile")}
+          onBack={() => setStep(knownDevice || deviceHasPin || deviceHasWebauthn ? "pinLogin" : "mobile")}
           mobile={mobile}
           deviceId={deviceId}
-          onLoggedIn={() => void enterHomeAfterAuth("returning")}
+          onLoggedIn={() => {
+            setDeviceHasWebauthn(true);
+            if (mobile.replace(/\D/g, "").length >= 10) {
+              rememberThisDevice(mobile, deviceId, deviceHasPin || true, true);
+            }
+            void enterHomeAfterAuth("returning");
+          }}
+          allowRegister={false}
         />
       ) : null}
 
@@ -2059,7 +2187,11 @@ export function MemberPortalApp() {
               onBack={() => setStep("home")}
               mobile={mobile || member.mobile}
               deviceId={deviceId}
-              onLoggedIn={() => void loadMe()}
+              onLoggedIn={() => {
+                setDeviceHasWebauthn(true);
+                void loadMe();
+              }}
+              allowRegister
             />
           ) : null}
         </div>
