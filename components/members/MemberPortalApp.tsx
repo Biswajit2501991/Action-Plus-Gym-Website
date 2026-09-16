@@ -34,6 +34,7 @@ import {
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { WorkoutPlanPanel } from "@/components/members/WorkoutPlanPanel";
 import { PushEnableReminderModal } from "@/components/members/PushEnableReminderModal";
+import { MemberPortalInboxBell } from "@/components/members/MemberPortalInboxBell";
 import { detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
@@ -1568,14 +1569,17 @@ export function MemberPortalApp() {
               <h1 className="mt-1 font-display text-3xl text-white">{greeting}</h1>
               <p className="mt-1 text-sm text-muted">{member.memberCode}</p>
             </div>
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded-full border border-white/15 p-2.5 text-white/70 hover:border-gold/40 hover:text-gold"
-              aria-label="Log out"
-            >
-              <LogOut size={18} />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <MemberPortalInboxBell memberUuid={member.memberUuid} />
+              <button
+                type="button"
+                onClick={logout}
+                className="rounded-full border border-white/15 p-2.5 text-white/70 hover:border-gold/40 hover:text-gold"
+                aria-label="Log out"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
 
           {step === "home" ? (

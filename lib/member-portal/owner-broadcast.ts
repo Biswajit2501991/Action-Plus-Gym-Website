@@ -5,6 +5,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { configureWebPush, sendPushToMemberSubscriptions } from "@/lib/member-portal/billing-push";
+import {
+  INBOX_DEFAULT_URL,
+  insertBroadcastInboxRows,
+} from "@/lib/member-portal/notification-inbox";
 
 export const OWNER_BROADCAST_KIND = "owner_broadcast";
 export const OWNER_BROADCAST_COOLDOWN_MS = 5 * 60 * 1000;
@@ -108,6 +112,7 @@ export async function runOwnerBroadcast(
     title: string;
     body: string;
     url?: string;
+    sourceJobId?: string | null;
   },
 ): Promise<{
   recipients: number;
@@ -115,6 +120,7 @@ export async function runOwnerBroadcast(
   membersFailed: number;
   pushSent: number;
   pushFailed: number;
+  inboxInserted: number;
 }> {
   const vapid = configureWebPush();
   if (!vapid.ok) {
@@ -142,6 +148,24 @@ export async function runOwnerBroadcast(
   }
 
   const recipients = await listBroadcastRecipientUuids(svc, opts.gymId);
+  const deepLink = String(opts.url || INBOX_DEFAULT_URL).trim() || INBOX_DEFAULT_URL;
+
+  // In-app inbox first (additive). Push failures must not block inbox.
+  let inboxInserted = 0;
+  try {
+    inboxInserted = await insertBroadcastInboxRows(svc, {
+      gymId: opts.gymId,
+      memberUuids: recipients,
+      title,
+      body,
+      url: deepLink,
+      sourceJobId: opts.sourceJobId || null,
+      kind: OWNER_BROADCAST_KIND,
+    });
+  } catch (err) {
+    console.warn("[broadcast] inbox insert failed:", err instanceof Error ? err.message : err);
+  }
+
   let membersSent = 0;
   let membersFailed = 0;
   let pushSent = 0;
@@ -153,7 +177,7 @@ export async function runOwnerBroadcast(
       memberUuid,
       title,
       body,
-      url: opts.url || "/members",
+      url: deepLink,
       kind: OWNER_BROADCAST_KIND,
       tag: OWNER_BROADCAST_KIND,
       log: true,
@@ -170,5 +194,6 @@ export async function runOwnerBroadcast(
     membersFailed,
     pushSent,
     pushFailed,
+    inboxInserted,
   };
 }

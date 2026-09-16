@@ -92,7 +92,7 @@ export async function POST(req: Request) {
       gymId,
       title,
       body: message,
-      url: typeof body.url === "string" ? body.url : "/members",
+      url: typeof body.url === "string" ? body.url : "/members?inbox=1",
     });
     return NextResponse.json({ ok: true, ...result, title, body: message });
   } catch (err) {

@@ -38,7 +38,7 @@ export function jobToApi(row: BroadcastJobRow) {
     id: String(row.id),
     title: String(row.title || ""),
     body: String(row.body || ""),
-    url: String(row.url || "/members"),
+    url: String(row.url || "/members?inbox=1"),
     scheduledAt: row.scheduled_at,
     status: String(row.status || ""),
     createdBy: row.created_by,
@@ -104,7 +104,7 @@ export async function createBroadcastJob(
     gym_id: opts.gymId,
     title,
     body,
-    url: String(opts.url || "/members").trim().slice(0, 200) || "/members",
+    url: String(opts.url || "/members?inbox=1").trim().slice(0, 200) || "/members?inbox=1",
     scheduled_at: scheduled.toISOString(),
     status: "pending",
     created_by: opts.createdBy ? String(opts.createdBy).slice(0, 120) : null,
@@ -249,7 +249,8 @@ export async function processDueBroadcastJobs(
         gymId,
         title: row.title,
         body: row.body,
-        url: row.url || "/members",
+        url: row.url || "/members?inbox=1",
+        sourceJobId: row.id,
       });
       const finished = new Date().toISOString();
       const { data: done } = await svc

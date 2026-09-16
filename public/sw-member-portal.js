@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
   let data = {
     title: "Action Plus Gym",
     body: "You have a new notification.",
-    url: "/members",
+    url: "/members?inbox=1",
     tag: "member-portal",
   };
   try {
@@ -33,7 +33,7 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: "/apg-icon-v3-192.png",
     badge: "/apg-icon-v3-192.png",
-    data: { url: data.url || "/members" },
+    data: { url: data.url || "/members?inbox=1" },
     tag: data.tag || "member-portal",
     renotify: true,
     // Helps Safari surface the alert when the Home Screen app is not open.
@@ -45,7 +45,7 @@ self.addEventListener("push", (event) => {
       // Never leave a push unhandled — Apple drops the subscription if we fail silently.
       return self.registration.showNotification("Action Plus Gym", {
         body: "Open Member Portal for details.",
-        data: { url: "/members" },
+        data: { url: "/members?inbox=1" },
         tag: "member-portal-fallback",
       });
     }),
@@ -54,11 +54,20 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/members";
+  const url = (event.notification.data && event.notification.data.url) || "/members?inbox=1";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if ("focus" in client && String(client.url || "").includes("/members")) {
+          // Tell an already-open portal tab to open the inbox (URL alone is not applied on focus).
+          try {
+            client.postMessage({ type: "apg-open-inbox", url });
+          } catch {
+            /* ignore */
+          }
+          if (typeof client.navigate === "function") {
+            return client.navigate(url).then(() => client.focus()).catch(() => client.focus());
+          }
           return client.focus();
         }
       }
