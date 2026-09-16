@@ -167,6 +167,49 @@ export async function cancelBroadcastJob(
 }
 
 /**
+ * Hard-delete a scheduled broadcast job row.
+ * Blocks only while status is `running` (mid-send). Safe: does not touch
+ * inbox rows, send_log, members, or payments.
+ */
+export async function deleteBroadcastJob(
+  svc: SupabaseClient,
+  gymId: string,
+  jobId: string,
+): Promise<{ id: string; status: string }> {
+  const id = String(jobId || "").trim();
+  if (!id) {
+    throw Object.assign(new Error("job-id-required"), { status: 400, code: "job-id-required" });
+  }
+
+  const { data: existing, error: findErr } = await svc
+    .from(BROADCAST_JOBS_TABLE)
+    .select("id, status")
+    .eq("gym_id", gymId)
+    .eq("id", id)
+    .maybeSingle();
+  if (findErr) throw new Error(findErr.message);
+  if (!existing) {
+    throw Object.assign(new Error("Job not found."), { status: 404, code: "job-not-found" });
+  }
+  const status = String((existing as { status?: string }).status || "");
+  if (status === "running") {
+    throw Object.assign(new Error("Cannot delete a broadcast that is currently sending."), {
+      status: 409,
+      code: "job-running",
+    });
+  }
+
+  const { error } = await svc
+    .from(BROADCAST_JOBS_TABLE)
+    .delete()
+    .eq("gym_id", gymId)
+    .eq("id", id)
+    .neq("status", "running");
+  if (error) throw new Error(error.message);
+  return { id, status };
+}
+
+/**
  * Claim and send due jobs for one gym. Cooldown → requeue as pending.
  */
 export async function processDueBroadcastJobs(
