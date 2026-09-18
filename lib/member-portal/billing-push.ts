@@ -5,7 +5,7 @@ const INDIA_TZ = "Asia/Kolkata";
 
 export const DEFAULT_BILLING_PUSH_TITLE = "Billing date reminder";
 export const DEFAULT_BILLING_PUSH_BODY =
-  "Today is your billing date. Please clear your payment within one week to avoid a fine.";
+  "Hi {name},\nThis is a friendly reminder that today is your billing date.\nPlease clear the payment within one week or a fine may be added.\nAction Plus Gym";
 export const DEFAULT_OVERDUE_PUSH_TITLE = "Late payment notice";
 export const DEFAULT_OVERDUE_PUSH_BODY =
   "A fine has been added to your plan. Please clear within 1 week to avoid deactivation or membership cancellation, or reach out to the gym if there is any issue.";
