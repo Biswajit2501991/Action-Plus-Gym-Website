@@ -1185,6 +1185,7 @@ export function MemberPortalApp() {
         body: JSON.stringify({ mobile, pin, deviceId }),
       });
       rememberThisDevice(mobile, deviceId, true, deviceHasWebauthn);
+      setStep("home");
       await enterHomeAfterAuth("returning");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "PIN login failed";
@@ -1204,6 +1205,7 @@ export function MemberPortalApp() {
         setStep("mobile");
       } else {
         setError(msg);
+        setStep("pinLogin");
       }
     } finally {
       setBusy(false);
@@ -1298,6 +1300,15 @@ export function MemberPortalApp() {
         <p className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
         </p>
+      ) : null}
+
+      {!member && step === "home" ? (
+        <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+            Member Portal
+          </p>
+          <h1 className="mt-2 font-display text-3xl text-white">Opening your portal…</h1>
+        </div>
       ) : null}
 
       {step === "mobile" ||
@@ -1667,7 +1678,11 @@ export function MemberPortalApp() {
             if (mobile.replace(/\D/g, "").length >= 10) {
               rememberThisDevice(mobile, deviceId, deviceHasPin || true, true);
             }
-            void enterHomeAfterAuth("returning");
+            setStep("home");
+            void enterHomeAfterAuth("returning").catch(() => {
+              setError("Could not open your portal. Unlock again.");
+              setStep("pinLogin");
+            });
           }}
           allowRegister={false}
         />

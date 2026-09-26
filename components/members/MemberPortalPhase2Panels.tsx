@@ -2857,10 +2857,10 @@ export function BiometricPanel({
           deviceId,
         }),
       });
+      setStatus("Opening your portal…");
       onLoggedIn();
     } catch (e) {
       setError(webAuthnErrorMessage(e));
-    } finally {
       setBusy(false);
     }
   }
@@ -2882,7 +2882,7 @@ export function BiometricPanel({
         onClick={() => void loginPasskey()}
         className="w-full rounded-full gold-gradient px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
       >
-        {busy ? "Waiting…" : "Unlock with Face ID / fingerprint"}
+        {busy ? (status === "Opening your portal…" ? "Opening…" : "Waiting…") : "Unlock with Face ID / fingerprint"}
       </button>
       {allowRegister ? (
         <button
