@@ -20,9 +20,58 @@ import {
   TRAINER_NOTE,
   WORKOUT_LEVELS,
   type WorkoutLevel,
+  type WorkoutProgram,
 } from "@/lib/member-portal/workout-programs";
+import {
+  parseWorkoutGoals,
+  personalizeWorkoutProgram,
+  pickLeastUsedWorkoutVariant,
+  WORKOUT_GOAL_OPTIONS,
+  workoutGoalNote,
+  workoutVariantIndex,
+  type WorkoutGoalId,
+} from "@/lib/member-portal/workout-goals";
 
 const PROGRESS_TABLE = "member_workout_program_progress";
+const GOAL_TABLE = "member_workout_goal_plan";
+
+type GoalRow = {
+  level?: string | null;
+  goals?: unknown;
+  variant_id?: string | null;
+  skipped?: boolean | null;
+};
+
+type GoalMeta = {
+  goals: WorkoutGoalId[];
+  goalStatus: "unset" | "skipped" | "set";
+  goalNote: string | null;
+  goalOptions: typeof WORKOUT_GOAL_OPTIONS;
+};
+
+function goalMeta(level: WorkoutLevel | null, row: GoalRow | null): GoalMeta & { programGoals: WorkoutGoalId[]; variantIndex: number } {
+  const same = Boolean(level && row && String(row.level || "") === level);
+  const goals = same ? parseWorkoutGoals(row?.goals) : [];
+  const skipped = Boolean(same && row?.skipped);
+  const goalStatus: GoalMeta["goalStatus"] = !same || !row ? "unset" : skipped || goals.length === 0 ? "skipped" : "set";
+  return {
+    goals: goalStatus === "set" ? goals : [],
+    goalStatus,
+    goalNote: goalStatus === "set" ? workoutGoalNote(goals) : null,
+    goalOptions: WORKOUT_GOAL_OPTIONS,
+    programGoals: goalStatus === "set" ? goals : [],
+    variantIndex: goalStatus === "set" ? workoutVariantIndex(row?.variant_id) : 0,
+  };
+}
+
+function applyGoalVariant(program: WorkoutProgram, meta: ReturnType<typeof goalMeta>) {
+  if (!meta.programGoals.length) return program;
+  return personalizeWorkoutProgram(program, meta.programGoals, meta.variantIndex);
+}
+
+function goalStorageMissing(message: string) {
+  return /does not exist|schema cache|member_workout_goal_plan/i.test(message);
+}
 
 function todayIst() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -66,6 +115,44 @@ async function loadProgress(
   } | null;
 }
 
+async function loadGoal(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: { from: (t: string) => any },
+  gymId: string,
+  memberUuid: string,
+): Promise<GoalRow | null> {
+  const { data, error } = await client
+    .from(GOAL_TABLE)
+    .select("level, goals, variant_id, skipped")
+    .eq("gym_id", gymId)
+    .eq("member_uuid", memberUuid)
+    .maybeSingle();
+  if (error) return null;
+  return data as GoalRow;
+}
+
+async function countVariants(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: { from: (t: string) => any },
+  gymId: string,
+  level: WorkoutLevel,
+) {
+  const counts: Record<string, number> = {};
+  const { data, error } = await client
+    .from(GOAL_TABLE)
+    .select("variant_id")
+    .eq("gym_id", gymId)
+    .eq("level", level)
+    .eq("skipped", false);
+  if (error || !Array.isArray(data)) return counts;
+  for (const row of data as Array<{ variant_id?: string | null }>) {
+    const id = String(row.variant_id || "");
+    if (!id) continue;
+    counts[id] = (counts[id] || 0) + 1;
+  }
+  return counts;
+}
+
 export async function GET() {
   const session = await requireMemberSession();
   if (!session.ok) {
@@ -91,7 +178,10 @@ export async function GET() {
     ? await loadProgress(svc.client, ctx.gymId, session.member.member_uuid)
     : null;
   const level = parseLevel(progress?.level);
-  const rawProgram = level ? getWorkoutProgram(level) : null;
+  const goal = svc.ok ? await loadGoal(svc.client, ctx.gymId, session.member.member_uuid) : null;
+  const meta = goalMeta(level, goal);
+  const baseProgram = level ? getWorkoutProgram(level) : null;
+  const rawProgram = baseProgram ? applyGoalVariant(baseProgram, meta) : null;
   const extras =
     rawProgram && svc.ok
       ? await loadWorkoutDayExtras(svc.client, ctx.gymId, level as string)
@@ -116,8 +206,16 @@ export async function GET() {
       activeLevel: level,
       videos: mediaByKey,
       program: program
-        ? { ...program, progression: SHARED_PROGRESSION, trainerNote: TRAINER_NOTE }
+        ? {
+            ...program,
+            progression: SHARED_PROGRESSION,
+            trainerNote: meta.goalNote ? `${TRAINER_NOTE}\n\n${meta.goalNote}` : TRAINER_NOTE,
+          }
         : null,
+      goals: meta.goals,
+      goalStatus: meta.goalStatus,
+      goalNote: meta.goalNote,
+      goalOptions: meta.goalOptions,
       progress: {
         startedAt: progress?.started_at || null,
         currentWeek: Number(progress?.current_week) || 1,
@@ -130,6 +228,78 @@ export async function GET() {
     },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+function sameGoalList(a: WorkoutGoalId[], b: WorkoutGoalId[]) {
+  return [...a].sort().join("|") === [...b].sort().join("|");
+}
+
+async function saveGoalChoice(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: { from: (t: string) => any },
+  input: {
+    gymId: string;
+    memberUuid: string;
+    level: WorkoutLevel;
+    existing: GoalRow | null;
+    goals: unknown;
+    skip: boolean;
+    confirm: boolean;
+  },
+): Promise<
+  | { needsConfirm: true }
+  | { error: string; message?: string; status: number }
+  | { row: GoalRow }
+> {
+  const requested = Array.isArray(input.goals) ? input.goals : [];
+  const nextGoals = input.skip ? [] : parseWorkoutGoals(requested);
+  if (!input.skip && requested.length > 0 && nextGoals.length === 0) {
+    return { error: "invalid-goals", status: 400 };
+  }
+  const skip = input.skip || nextGoals.length === 0;
+  const sameLevel = Boolean(input.existing && String(input.existing.level || "") === input.level);
+  const prevGoals = sameLevel ? parseWorkoutGoals(input.existing?.goals) : [];
+  const prevSet = Boolean(sameLevel && input.existing && !input.existing.skipped && prevGoals.length > 0);
+  const changed = prevSet && (skip || !sameGoalList(prevGoals, nextGoals));
+  if (changed && !input.confirm) return { needsConfirm: true };
+
+  let variantId: string | null = null;
+  if (!skip) {
+    const keep =
+      sameLevel &&
+      input.existing &&
+      !input.existing.skipped &&
+      sameGoalList(prevGoals, nextGoals) &&
+      input.existing.variant_id;
+    variantId = keep
+      ? String(input.existing?.variant_id)
+      : pickLeastUsedWorkoutVariant(
+          input.level,
+          nextGoals,
+          await countVariants(client, input.gymId, input.level),
+        );
+  }
+
+  const row = {
+    gym_id: input.gymId,
+    member_uuid: input.memberUuid,
+    level: input.level,
+    goals: nextGoals,
+    variant_id: variantId,
+    skipped: skip,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client.from(GOAL_TABLE).upsert(row, { onConflict: "gym_id,member_uuid" });
+  if (error) {
+    const message = String(error.message || "");
+    if (goalStorageMissing(message)) {
+      return { error: "goal-storage-not-ready", message, status: 503 };
+    }
+    return { error: "save-failed", message, status: 500 };
+  }
+  return {
+    row: { level: input.level, goals: nextGoals, variant_id: variantId, skipped: skip },
+  };
 }
 
 export async function POST(req: Request) {
@@ -156,6 +326,9 @@ export async function POST(req: Request) {
     exerciseKey?: string;
     date?: string;
     dayComplete?: boolean;
+    goals?: unknown;
+    skip?: boolean;
+    confirm?: boolean;
   } = {};
   try {
     body = (await req.json()) as typeof body;
@@ -186,12 +359,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "level-required" }, { status: 400 });
   }
 
+  let goal = await loadGoal(svc.client, ctx.gymId, session.member.member_uuid);
+  if (action === "goals") {
+    const saved = await saveGoalChoice(svc.client, {
+      gymId: ctx.gymId,
+      memberUuid: session.member.member_uuid,
+      level,
+      existing: goal,
+      goals: body.goals,
+      skip: body.skip === true,
+      confirm: body.confirm === true,
+    });
+    if ("needsConfirm" in saved) {
+      return NextResponse.json(
+        { ok: true, needsConfirm: true, activeLevel: level },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    if ("error" in saved) {
+      return NextResponse.json(
+        { ok: false, error: saved.error, message: saved.message },
+        { status: saved.status },
+      );
+    }
+    goal = saved.row;
+  }
+
+  const meta = goalMeta(level, goal);
   const programBase = getWorkoutProgram(level);
   if (!programBase) {
     return NextResponse.json({ ok: false, error: "unknown-program" }, { status: 400 });
   }
+  const shaped = applyGoalVariant(programBase, meta);
   const extras = await loadWorkoutDayExtras(svc.client, ctx.gymId, level);
-  const programMerged = mergeProgramDayExtras(programBase, extras);
+  const programMerged = mergeProgramDayExtras(shaped, extras);
   const labels = await loadWorkoutExerciseLabels(svc.client, ctx.gymId);
   const program = applyWorkoutExerciseLabels(programMerged, labels);
 
@@ -276,8 +477,12 @@ export async function POST(req: Request) {
       program: {
         ...attachWorkoutVideos(program, mediaByKey),
         progression: SHARED_PROGRESSION,
-        trainerNote: TRAINER_NOTE,
+        trainerNote: meta.goalNote ? `${TRAINER_NOTE}\n\n${meta.goalNote}` : TRAINER_NOTE,
       },
+      goals: meta.goals,
+      goalStatus: meta.goalStatus,
+      goalNote: meta.goalNote,
+      goalOptions: meta.goalOptions,
       progress: progressPayload,
       today: todayIst(),
     },

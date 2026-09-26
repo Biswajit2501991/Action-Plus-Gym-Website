@@ -12,6 +12,10 @@ import {
 } from "@/components/members/PortalBackButton";
 import { restSecondsFromLabel } from "@/lib/member-portal/workout-programs";
 import {
+  WORKOUT_GOAL_OPTIONS,
+  type WorkoutGoalId,
+} from "@/lib/member-portal/workout-goals";
+import {
   peekWorkoutMusicCache,
   peekWorkoutPlanCache,
   readWorkoutMusicCache,
@@ -81,6 +85,11 @@ type Payload = {
   progress?: { startedAt?: string | null; currentWeek?: number; completions?: Completions };
   today?: string;
   action?: string;
+  goals?: WorkoutGoalId[];
+  goalStatus?: "unset" | "skipped" | "set";
+  goalNote?: string | null;
+  goalOptions?: Array<{ id: WorkoutGoalId; label: string }>;
+  needsConfirm?: boolean;
 };
 
 function resolveExerciseVideoUrl(
@@ -129,6 +138,8 @@ export function WorkoutPlanPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(() => !readWorkoutPlanCache<Payload>(memberUuid));
   const [pickingLevel, setPickingLevel] = useState(false);
+  const [askingGoals, setAskingGoals] = useState(false);
+  const [pickedGoals, setPickedGoals] = useState<WorkoutGoalId[]>([]);
   const [tab, setTab] = useState<"workout" | "progression" | "note">("workout");
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [video, setVideo] = useState<{ name: string; url: string | null } | null>(null);
@@ -398,6 +409,10 @@ export function WorkoutPlanPanel({
       videos: next.videos ?? data?.videos,
       member: next.member ?? data?.member,
       levels: next.levels ?? data?.levels,
+      goals: next.goals ?? data?.goals,
+      goalStatus: next.goalStatus ?? data?.goalStatus,
+      goalNote: next.goalNote ?? data?.goalNote,
+      goalOptions: next.goalOptions ?? data?.goalOptions,
     };
     applyPayload(merged);
     return merged;
@@ -492,9 +507,42 @@ export function WorkoutPlanPanel({
       setOpenDay(null);
       setTab("workout");
       setPickingLevel(false);
+      setPickedGoals([]);
+      setAskingGoals(true);
       closeVideo();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change program");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const goalOptions = data?.goalOptions?.length ? data.goalOptions : [...WORKOUT_GOAL_OPTIONS];
+
+  const submitGoals = async (skip: boolean) => {
+    if (!skip && pickedGoals.length === 0) {
+      setError("Choose at least one goal, or skip to keep this program.");
+      return;
+    }
+    if (data?.goalStatus === "set") {
+      const ok = window.confirm(
+        "Update your exercise list for these goals?\n\nYour current week stays. Saved ticks are kept.",
+      );
+      if (!ok) return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await save({
+        action: "goals",
+        goals: skip ? [] : pickedGoals,
+        skip,
+        confirm: data?.goalStatus === "set",
+      });
+      if (next.needsConfirm) return;
+      setAskingGoals(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save goals");
     } finally {
       setBusy(false);
     }
@@ -515,6 +563,10 @@ export function WorkoutPlanPanel({
       <div className="flex items-center justify-between gap-2">
         <PortalBackButton
           onClick={() => {
+            if (askingGoals) {
+              setAskingGoals(false);
+              return;
+            }
             if (pickingLevel && data?.program) {
               setPickingLevel(false);
               return;
@@ -527,7 +579,10 @@ export function WorkoutPlanPanel({
             type="button"
             className={PORTAL_BACK_BUTTON_CLASS}
             disabled={busy}
-            onClick={() => setPickingLevel(true)}
+            onClick={() => {
+              setAskingGoals(false);
+              setPickingLevel(true);
+            }}
           >
             Change program
           </button>
@@ -646,6 +701,138 @@ export function WorkoutPlanPanel({
 
       {showProgram && data?.program ? (
         <>
+          {data.goalStatus === "set" && (data.goals || []).length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {(data.goals || []).map((id) => {
+                const label = goalOptions.find((g) => g.id === id)?.label || id;
+                return (
+                  <span
+                    key={id}
+                    className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] text-gold"
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+              <button
+                type="button"
+                className="text-xs text-white/70 underline"
+                disabled={busy}
+                onClick={() => {
+                  setPickedGoals([...(data.goals || [])]);
+                  setAskingGoals(true);
+                }}
+              >
+                Change goals
+              </button>
+              {data.goalNote ? (
+                <p className="w-full text-xs leading-relaxed text-muted">{data.goalNote}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {data.goalStatus === "skipped" && !askingGoals ? (
+            <button
+              type="button"
+              className="text-left text-xs text-white/70 underline"
+              disabled={busy}
+              onClick={() => {
+                setPickedGoals([]);
+                setAskingGoals(true);
+              }}
+            >
+              Choose goals
+            </button>
+          ) : null}
+
+          {data.goalStatus === "unset" && !askingGoals ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <p className="text-sm text-white">What is your goal?</p>
+              <p className="mt-1 text-xs text-muted">
+                Optional. You can pick more than one. Skip keeps this exact program.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-full bg-gold px-4 py-2 text-xs font-semibold text-black"
+                  onClick={() => {
+                    setPickedGoals([]);
+                    setAskingGoals(true);
+                  }}
+                >
+                  Choose goals
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-full border border-white/15 px-4 py-2 text-xs text-white/80"
+                  onClick={() => {
+                    void submitGoals(true);
+                  }}
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {askingGoals ? (
+            <div className="space-y-3 rounded-2xl border border-gold/30 bg-black/30 px-4 py-4">
+              <p className="text-sm text-white">What is your goal?</p>
+              <p className="text-xs text-muted">
+                Pick any that fit. Your week stays the same. Only the exercise list can change.
+              </p>
+              <div className="space-y-2">
+                {goalOptions.map((goal) => {
+                  const on = pickedGoals.includes(goal.id);
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        setPickedGoals((prev) =>
+                          prev.includes(goal.id)
+                            ? prev.filter((id) => id !== goal.id)
+                            : [...prev, goal.id],
+                        )
+                      }
+                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left text-sm ${
+                        on ? "border-gold/50 bg-gold/15 text-white" : "border-white/10 bg-white/5 text-white/85"
+                      }`}
+                    >
+                      {goal.label}
+                      {on ? <Check className="h-4 w-4 text-gold" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-full bg-gold px-4 py-2 text-xs font-semibold text-black"
+                  onClick={() => {
+                    void submitGoals(false);
+                  }}
+                >
+                  Use these goals
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-full border border-white/15 px-4 py-2 text-xs text-white/80"
+                  onClick={() => {
+                    void submitGoals(true);
+                  }}
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 text-xs">
             {(
               [
