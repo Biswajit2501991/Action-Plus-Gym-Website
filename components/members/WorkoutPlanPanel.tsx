@@ -12,6 +12,13 @@ import {
 } from "@/components/members/PortalBackButton";
 import { restSecondsFromLabel } from "@/lib/member-portal/workout-programs";
 import {
+  playRestTimerDone,
+  primeRestTimerAudio,
+  readRestTimerSoundOn,
+  stopRestTimerAlert,
+  writeRestTimerSoundOn,
+} from "@/lib/member-portal/rest-timer-alert";
+import {
   WORKOUT_GOAL_OPTIONS,
   type WorkoutGoalId,
 } from "@/lib/member-portal/workout-goals";
@@ -154,13 +161,28 @@ export function WorkoutPlanPanel({
   const [timerTotal, setTimerTotal] = useState(60);
   const [timerLeft, setTimerLeft] = useState(0);
   const [timerOn, setTimerOn] = useState(false);
+  const [timerEndsAt, setTimerEndsAt] = useState<number | null>(null);
+  const [timerSound, setTimerSound] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const timerRun = useRef(0);
+  const timerEndsAtRef = useRef<number | null>(null);
+  const timerLeftRef = useRef(0);
+  const timerTotalRef = useRef(60);
+  const timerSoundRef = useRef(true);
+  timerEndsAtRef.current = timerEndsAt;
+  timerLeftRef.current = timerLeft;
+  timerTotalRef.current = timerTotal;
+  timerSoundRef.current = timerSound;
 
   const closeTimer = useCallback(() => {
+    timerRun.current += 1;
+    timerEndsAtRef.current = null;
+    stopRestTimerAlert();
     setTimerOn(false);
     setTimerOpen(false);
     setTimerKey(null);
     setTimerLeft(0);
+    setTimerEndsAt(null);
   }, []);
 
   const closeVideo = useCallback(() => {
@@ -172,21 +194,61 @@ export function WorkoutPlanPanel({
     }
     setVideo(null);
     // Closing the main video popup also stops the timer (combined session).
+    timerRun.current += 1;
+    timerEndsAtRef.current = null;
+    stopRestTimerAlert();
     setTimerOn(false);
     setTimerOpen(false);
     setTimerKey(null);
     setTimerLeft(0);
+    setTimerEndsAt(null);
   }, []);
 
-  const startTimerForExercise = useCallback((ex: Exercise) => {
-    const total = restSecondsFromLabel(ex.rest);
-    setTimerKey(ex.exerciseKey);
-    setTimerName(ex.name);
-    setTimerTotal(total);
+  const startCountdown = useCallback((seconds: number) => {
+    primeRestTimerAudio();
+    const total = Math.max(1, Math.round(seconds));
+    const ends = Date.now() + total * 1000;
+    timerRun.current += 1;
+    timerEndsAtRef.current = ends;
     setTimerLeft(total);
+    setTimerEndsAt(ends);
     setTimerOn(true);
     setTimerOpen(true);
   }, []);
+
+  const startTimerForExercise = useCallback(
+    (ex: Exercise) => {
+      const total = restSecondsFromLabel(ex.rest);
+      setTimerKey(ex.exerciseKey);
+      setTimerName(ex.name);
+      setTimerTotal(total);
+      startCountdown(total);
+    },
+    [startCountdown],
+  );
+
+  const pauseTimer = useCallback(() => {
+    const ends = timerEndsAtRef.current;
+    timerRun.current += 1;
+    if (ends != null) {
+      setTimerLeft(Math.max(0, Math.ceil((ends - Date.now()) / 1000)));
+    }
+    timerEndsAtRef.current = null;
+    setTimerEndsAt(null);
+    setTimerOn(false);
+  }, []);
+
+  const resumeTimer = useCallback(() => {
+    const left =
+      timerLeftRef.current <= 0
+        ? Math.max(1, timerTotalRef.current || 60)
+        : timerLeftRef.current;
+    startCountdown(left);
+  }, [startCountdown]);
+
+  const restartTimer = useCallback(() => {
+    startCountdown(Math.max(1, timerTotalRef.current || 60));
+  }, [startCountdown]);
 
   /** Timer alone — closes any open video so only the timer popup shows. */
   const openTimer = useCallback(
@@ -355,18 +417,43 @@ export function WorkoutPlanPanel({
   }, [data?.eligible, memberUuid, initialMusic?.mp4Url]);
 
   useEffect(() => {
-    if (!timerOn || timerLeft <= 0) return;
-    const id = window.setInterval(() => {
-      setTimerLeft((s) => {
-        if (s <= 1) {
-          setTimerOn(false);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [timerOn, timerLeft]);
+    const on = readRestTimerSoundOn();
+    timerSoundRef.current = on;
+    setTimerSound(on);
+  }, []);
+
+  useEffect(() => {
+    if (!timerOn || timerEndsAt == null) return;
+    const token = timerRun.current;
+    const endsAt = timerEndsAt;
+    const tick = () => {
+      if (timerRun.current !== token) return;
+      const msLeft = endsAt - Date.now();
+      if (msLeft <= 0) {
+        timerRun.current += 1;
+        timerEndsAtRef.current = null;
+        setTimerLeft(0);
+        setTimerOn(false);
+        setTimerEndsAt(null);
+        if (timerSoundRef.current) playRestTimerDone();
+        return;
+      }
+      const next = Math.ceil(msLeft / 1000);
+      setTimerLeft((prev) => (prev === next ? prev : next));
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    const wake = () => tick();
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", wake);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", wake);
+    };
+  }, [timerOn, timerEndsAt]);
 
   const today = data?.today || "";
   const completions = data?.progress?.completions || {};
@@ -546,6 +633,14 @@ export function WorkoutPlanPanel({
     } finally {
       setBusy(false);
     }
+  };
+
+  const toggleTimerSound = () => {
+    const next = !timerSoundRef.current;
+    timerSoundRef.current = next;
+    setTimerSound(next);
+    writeRestTimerSoundOn(next);
+    if (!next) stopRestTimerAlert();
   };
 
   const clock = useMemo(() => {
@@ -1095,12 +1190,19 @@ export function WorkoutPlanPanel({
                   Target {Math.floor(timerTotal / 60)}:
                   {String(timerTotal % 60).padStart(2, "0")}
                 </p>
+                <button
+                  type="button"
+                  className="mx-auto mt-2 block rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/80"
+                  onClick={toggleTimerSound}
+                >
+                  {timerSound ? "Sound on" : "Sound off"}
+                </button>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {timerOn ? (
                     <button
                       type="button"
                       className="inline-flex items-center justify-center gap-1 rounded-full border border-white/20 bg-white/5 px-2 py-2 text-xs font-medium text-white"
-                      onClick={() => setTimerOn(false)}
+                      onClick={pauseTimer}
                     >
                       <Pause size={14} /> Pause
                     </button>
@@ -1108,10 +1210,7 @@ export function WorkoutPlanPanel({
                     <button
                       type="button"
                       className="inline-flex items-center justify-center gap-1 rounded-full border border-gold/45 bg-gold/15 px-2 py-2 text-xs font-medium text-gold"
-                      onClick={() => {
-                        if (timerLeft <= 0) setTimerLeft(timerTotal);
-                        setTimerOn(true);
-                      }}
+                      onClick={resumeTimer}
                     >
                       <Play size={14} /> Continue
                     </button>
@@ -1119,10 +1218,7 @@ export function WorkoutPlanPanel({
                   <button
                     type="button"
                     className="inline-flex items-center justify-center gap-1 rounded-full border border-white/20 bg-white/5 px-2 py-2 text-xs font-medium text-white"
-                    onClick={() => {
-                      setTimerLeft(timerTotal);
-                      setTimerOn(true);
-                    }}
+                    onClick={restartTimer}
                   >
                     <RotateCcw size={14} /> Restart
                   </button>
@@ -1141,12 +1237,11 @@ export function WorkoutPlanPanel({
                   type="button"
                   className="rounded-full border border-gold/40 px-3 py-1 text-[11px] font-semibold text-gold"
                   onClick={() => {
-                    if (timerLeft <= 0) setTimerLeft(timerTotal || 60);
                     if (!timerKey && video) {
                       setTimerName(video.name);
                     }
-                    setTimerOn(true);
-                    setTimerOpen(true);
+                    if (timerLeft <= 0) restartTimer();
+                    else resumeTimer();
                   }}
                 >
                   Show timer
@@ -1231,6 +1326,13 @@ export function WorkoutPlanPanel({
                 Target {Math.floor(timerTotal / 60)}:
                 {String(timerTotal % 60).padStart(2, "0")}
               </p>
+              <button
+                type="button"
+                className="mt-3 rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/80"
+                onClick={toggleTimerSound}
+              >
+                {timerSound ? "Sound on" : "Sound off"}
+              </button>
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
@@ -1238,7 +1340,7 @@ export function WorkoutPlanPanel({
                 <button
                   type="button"
                   className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-3 text-sm font-medium text-white"
-                  onClick={() => setTimerOn(false)}
+                  onClick={pauseTimer}
                 >
                   <Pause size={16} /> Pause
                 </button>
@@ -1246,12 +1348,7 @@ export function WorkoutPlanPanel({
                 <button
                   type="button"
                   className="inline-flex items-center justify-center gap-1.5 rounded-full border border-gold/45 bg-gold/15 px-3 py-3 text-sm font-medium text-gold"
-                  onClick={() => {
-                    if (timerLeft <= 0) {
-                      setTimerLeft(timerTotal);
-                    }
-                    setTimerOn(true);
-                  }}
+                  onClick={resumeTimer}
                   disabled={!timerKey}
                 >
                   <Play size={16} /> Continue
@@ -1260,10 +1357,7 @@ export function WorkoutPlanPanel({
               <button
                 type="button"
                 className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-3 text-sm font-medium text-white"
-                onClick={() => {
-                  setTimerLeft(timerTotal);
-                  setTimerOn(true);
-                }}
+                onClick={restartTimer}
               >
                 <RotateCcw size={16} /> Restart
               </button>
