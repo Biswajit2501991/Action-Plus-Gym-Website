@@ -104,7 +104,7 @@ export function Reviews({ reviews }: { reviews: ReviewCache }) {
                       “{current.text}”
                     </p>
                   </div>
-                  <div className="mt-8 flex items-end justify-between gap-4">
+                  <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-white">
                         {current.author}
@@ -115,9 +115,14 @@ export function Reviews({ reviews }: { reviews: ReviewCache }) {
                         </p>
                       ) : null}
                     </div>
-                    <span className="text-xs uppercase tracking-[0.2em] text-gold/80">
-                      Google
-                    </span>
+                    <a
+                      href={googleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center justify-center rounded-full gold-gradient px-4 py-2 text-xs font-semibold text-black shadow-[0_8px_24px_rgba(201,162,39,0.22)] transition hover:brightness-110"
+                    >
+                      Check Google Reviews
+                    </a>
                   </div>
                 </motion.article>
               ) : null}
