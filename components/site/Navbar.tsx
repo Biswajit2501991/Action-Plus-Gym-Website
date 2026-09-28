@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -22,9 +22,21 @@ export function Navbar({
   /** Keep light nav text over a dark full-bleed hero (homepage). */
   darkHero?: boolean;
 }) {
+  const headerRef = useRef<HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [menuTop, setMenuTop] = useState(72);
   const [returning, setReturning] = useState(false);
+
+  function toggleMenu() {
+    setOpen((current) => {
+      const next = !current;
+      if (next && headerRef.current) {
+        setMenuTop(headerRef.current.getBoundingClientRect().bottom);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     try {
@@ -41,10 +53,20 @@ export function Navbar({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   const overHero = darkHero && !scrolled;
 
   return (
     <header
+      ref={headerRef}
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-300",
         scrolled ? "glass py-3 shadow-lg shadow-black/30" : "bg-transparent py-5",
@@ -83,8 +105,9 @@ export function Navbar({
           <button
             type="button"
             className="rounded-full border border-white/15 p-2 text-white"
-            onClick={() => setOpen((v) => !v)}
-            aria-label="Toggle menu"
+            onClick={toggleMenu}
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
           >
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -101,25 +124,30 @@ export function Navbar({
       ) : null}
 
       {open ? (
-        <div className="glass mt-3 border-t border-white/10 px-5 py-4 lg:hidden">
-          <div className="flex flex-col gap-3">
+        <div
+          className="site-mobile-nav fixed inset-x-0 bottom-0 z-40 flex flex-col overflow-y-auto px-5 pb-8 pt-4 lg:hidden"
+          style={{ top: menuTop }}
+        >
+          <div className="flex flex-col">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="text-sm text-white/85"
+                className="site-mobile-link"
                 onClick={() => setOpen(false)}
               >
                 {l.label}
               </Link>
             ))}
-            <Button href="/members" onClick={() => setOpen(false)}>
+          </div>
+          <div className="mt-5 flex flex-col gap-3">
+            <Button href="/members" className="w-full" onClick={() => setOpen(false)}>
               Member Portal
             </Button>
-            <Button href="/contact" onClick={() => setOpen(false)}>
+            <Button href="/contact" className="w-full" onClick={() => setOpen(false)}>
               Contact
             </Button>
-            <Button href="#join" onClick={() => setOpen(false)}>
+            <Button href="#join" className="w-full" onClick={() => setOpen(false)}>
               Join Now
             </Button>
           </div>

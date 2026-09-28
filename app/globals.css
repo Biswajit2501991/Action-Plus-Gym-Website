@@ -122,6 +122,26 @@ h3,
   border: 1px solid var(--border);
 }
 
+/* Mobile menu stays a dark club panel in day and night so links stay readable. */
+.site-mobile-nav {
+  background: #0c0c0c;
+  color: #f5f5f5;
+  border-top: 1px solid rgba(201, 162, 39, 0.32);
+}
+.site-mobile-link {
+  display: flex;
+  align-items: center;
+  min-height: 3.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(245, 245, 245, 0.92);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+.site-mobile-link:hover,
+.site-mobile-link:active {
+  color: #e0c15a;
+}
+
 .gold-gradient {
   background: linear-gradient(135deg, #e0c15a 0%, #c9a227 45%, #8a7018 100%);
 }

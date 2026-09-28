@@ -40,13 +40,14 @@ export function Button({
           className={styles}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={onClick}
         >
           {children}
         </a>
       );
     }
     return (
-      <Link href={href} className={styles}>
+      <Link href={href} className={styles} onClick={onClick}>
         {children}
       </Link>
     );
