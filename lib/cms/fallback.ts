@@ -414,7 +414,7 @@ export const fallbackContent: SiteContent = {
     overall_rating: 4.8,
     total_reviews: 138,
     google_url:
-      "https://www.google.com/search?q=Action+Plus+Gym+and+Fitness+Club+Reviews",
+      "https://www.google.com/search?q=Action%20Plus%20Gym%20and%20Fitness%20Club%20adra%20Reviews",
     reviews: [
       {
         author: "ABHIJIT HAZRA",

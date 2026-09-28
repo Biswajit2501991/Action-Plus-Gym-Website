@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { submitNewsletter } from "@/lib/actions/leads";
 import type { OpeningHour, WebsiteSettings } from "@/lib/types";
 import { getTodayDayOfWeek } from "@/lib/hours";
+import { DEFAULT_GOOGLE_REVIEWS_URL } from "@/lib/reviews/google-places";
 import { DAY_NAMES, formatTime } from "@/lib/utils";
 
 export function Footer({
@@ -84,16 +85,14 @@ export function Footer({
               );
             })}
           </ul>
-          {settings.google_reviews_url ? (
-            <a
-              href={settings.google_reviews_url}
-              className="mt-4 inline-block text-sm text-gold hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Google Reviews
-            </a>
-          ) : null}
+          <a
+            href={DEFAULT_GOOGLE_REVIEWS_URL}
+            className="mt-4 inline-block text-sm text-gold hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google Reviews
+          </a>
         </div>
 
         <div>

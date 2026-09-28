@@ -6,9 +6,10 @@ const DEFAULT_QUERY =
   process.env.GOOGLE_PLACE_QUERY ||
   "Action Plus Gym and Fitness Club Adra West Bengal";
 
+/** Public “Check Google Reviews” destination. A Google search, not a Maps pin. */
 export const DEFAULT_GOOGLE_REVIEWS_URL =
-  process.env.NEXT_PUBLIC_GOOGLE_REVIEWS_URL ||
-  "https://www.google.com/search?q=Action+Plus+Gym+and+Fitness+Club+Reviews";
+  "https://www.google.com/search?q=" +
+  encodeURIComponent("Action Plus Gym and Fitness Club adra Reviews");
 
 type PlacesReview = {
   rating?: number;
@@ -105,7 +106,7 @@ export async function fetchGooglePlaceReviews(): Promise<ReviewCache | null> {
   return {
     overall_rating: Number(place.rating?.toFixed?.(1) ?? place.rating ?? 0),
     total_reviews: place.userRatingCount || reviews.length,
-    google_url: place.googleMapsUri || DEFAULT_GOOGLE_REVIEWS_URL,
+    google_url: DEFAULT_GOOGLE_REVIEWS_URL,
     reviews,
   };
 }

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
+import { DEFAULT_GOOGLE_REVIEWS_URL } from "@/lib/reviews/google-places";
 import type { ReviewCache } from "@/lib/types";
 
 const AUTO_MS = 5200;
@@ -27,9 +28,7 @@ export function Reviews({ reviews }: { reviews: ReviewCache }) {
     return () => window.clearInterval(id);
   }, [paused, total]);
 
-  const googleUrl =
-    reviews.google_url ||
-    "https://www.google.com/search?q=Action+Plus+Gym+and+Fitness+Club+Reviews";
+  const googleUrl = DEFAULT_GOOGLE_REVIEWS_URL;
 
   const isCta = index >= slides.length;
   const current = !isCta ? slides[index] : null;
