@@ -34,7 +34,8 @@ export const THEME_BOOT_SCRIPT = `(() => {
   try {
     var path = location.pathname || "";
     var key = path.indexOf("/admin") === 0 ? "apg-theme-admin" : "apg-theme-site";
-    var pref = localStorage.getItem(key) || "auto";
+    var stored = localStorage.getItem(key);
+    var pref = stored || (key === "apg-theme-site" ? "night" : "auto");
     if (pref !== "day" && pref !== "night" && pref !== "auto") pref = "auto";
     var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     var resolved = pref === "day" ? "day" : pref === "night" ? "night" : dark ? "night" : "day";

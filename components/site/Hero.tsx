@@ -9,9 +9,13 @@ import type { HeroSlide, WebsiteSettings } from "@/lib/types";
 export function Hero({
   settings,
   slides,
+  rating,
+  reviewCount,
 }: {
   settings: WebsiteSettings;
   slides: HeroSlide[];
+  rating?: number | null;
+  reviewCount?: number | null;
 }) {
   const safeSlides = slides.filter((s) => Boolean(s?.image_url));
   const [index, setIndex] = useState(0);
@@ -74,6 +78,18 @@ export function Hero({
             {settings.hero_headline}
           </motion.h1>
 
+          {rating ? (
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.7 }}
+              className="mt-3 text-sm tracking-wide text-gold/90"
+            >
+              {Number(rating).toFixed(1)} from Google
+              {reviewCount ? ` · ${reviewCount}+ reviews` : ""}
+            </motion.p>
+          ) : null}
+
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -89,12 +105,9 @@ export function Hero({
             transition={{ delay: 0.6, duration: 0.7 }}
             className="mt-8 flex flex-wrap gap-3"
           >
-            <Button href="#join">Join Now</Button>
+            <Button href="#join">Book a Free Trial</Button>
             <Button href="#join" variant="secondary">
-              Book a Free Trial
-            </Button>
-            <Button href="/contact" variant="ghost">
-              Contact Us
+              Join
             </Button>
           </motion.div>
         </div>

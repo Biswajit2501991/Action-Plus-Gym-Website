@@ -9,6 +9,19 @@ import { Button } from "@/components/ui/Button";
 
 const KEY = "apg_popup_dismissed";
 
+function offerAlreadyClosed() {
+  try {
+    if (localStorage.getItem(KEY) === "1") return true;
+    if (sessionStorage.getItem(KEY) === "1") {
+      localStorage.setItem(KEY, "1");
+      return true;
+    }
+  } catch {
+    return true;
+  }
+  return false;
+}
+
 export function PopupOffer({ popup }: { popup: PopupType | null }) {
   const [open, setOpen] = useState(false);
 
@@ -16,13 +29,35 @@ export function PopupOffer({ popup }: { popup: PopupType | null }) {
     if (!popup?.enabled) return;
     if (popup.expires_at && new Date(popup.expires_at) < new Date()) return;
     if (typeof window === "undefined") return;
-    if (sessionStorage.getItem(KEY)) return;
-    const t = setTimeout(() => setOpen(true), 800);
-    return () => clearTimeout(t);
+    if (offerAlreadyClosed()) return;
+
+    let opened = false;
+    let timer = 0;
+    const show = () => {
+      if (opened) return;
+      opened = true;
+      setOpen(true);
+      window.clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    };
+    const onScroll = () => {
+      if (window.scrollY > window.innerHeight * 0.35) show();
+    };
+    timer = window.setTimeout(show, 10_000);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, [popup]);
 
   function dismiss() {
-    sessionStorage.setItem(KEY, "1");
+    try {
+      localStorage.setItem(KEY, "1");
+      sessionStorage.setItem(KEY, "1");
+    } catch {
+      /* private mode */
+    }
     setOpen(false);
   }
 

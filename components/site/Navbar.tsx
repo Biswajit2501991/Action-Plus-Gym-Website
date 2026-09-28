@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -25,6 +24,15 @@ export function Navbar({
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [returning, setReturning] = useState(false);
+
+  useEffect(() => {
+    try {
+      setReturning(localStorage.getItem("apg_popup_dismissed") === "1");
+    } catch {
+      setReturning(false);
+    }
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -59,7 +67,6 @@ export function Navbar({
             </Link>
           ))}
           <div className="flex items-center gap-2">
-            <ThemeToggle compact />
             <Button href="/members" className="!py-2.5 !text-xs">
               Member Portal
             </Button>
@@ -73,7 +80,6 @@ export function Navbar({
         </nav>
 
         <div className="flex items-center gap-2 lg:hidden">
-          <ThemeToggle compact />
           <button
             type="button"
             className="rounded-full border border-white/15 p-2 text-white"
@@ -84,6 +90,15 @@ export function Navbar({
           </button>
         </div>
       </div>
+
+      {returning ? (
+        <Link
+          href="/#join"
+          className="block border-t border-gold/20 bg-black/50 px-5 py-1.5 text-center text-xs tracking-wide text-gold"
+        >
+          Welcome back — book a visit
+        </Link>
+      ) : null}
 
       {open ? (
         <div className="glass mt-3 border-t border-white/10 px-5 py-4 lg:hidden">

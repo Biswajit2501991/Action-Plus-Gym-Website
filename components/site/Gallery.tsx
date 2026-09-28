@@ -30,7 +30,7 @@ export function Gallery({ images }: { images: GalleryImage[] }) {
                 src={img.image_url}
                 alt={img.alt_text || "Action Plus Gym"}
                 fill
-                className="object-cover transition duration-700 hover:scale-105"
+                className="object-cover"
                 sizes="(max-width:768px) 100vw, 33vw"
               />
             </motion.div>

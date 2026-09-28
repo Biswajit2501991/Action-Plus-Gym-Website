@@ -70,14 +70,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     () => true,
   );
 
-  const [preference, setPreferenceState] = useState<ThemePreference>("auto");
+  const [preference, setPreferenceState] = useState<ThemePreference>(
+    scope === "admin" ? "auto" : "night",
+  );
 
   // Load preference for current scope (site vs admin stored separately).
   useEffect(() => {
     try {
-      const stored = parseThemePreference(
-        localStorage.getItem(themeStorageKey(scope)),
-      );
+      const raw = localStorage.getItem(themeStorageKey(scope));
+      const stored = raw
+        ? parseThemePreference(raw)
+        : scope === "site"
+          ? "night"
+          : "auto";
       setPreferenceState(stored);
     } catch {
       setPreferenceState("auto");

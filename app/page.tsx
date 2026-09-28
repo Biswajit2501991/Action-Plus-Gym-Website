@@ -64,7 +64,12 @@ export default async function HomePage() {
       />
       <Navbar brand={settings.site_name} darkHero />
       {sections.hero !== false ? (
-        <Hero settings={settings} slides={content.heroSlides} />
+        <Hero
+          settings={settings}
+          slides={content.heroSlides}
+          rating={content.reviews?.overall_rating}
+          reviewCount={content.reviews?.total_reviews}
+        />
       ) : null}
       {sections.stats !== false ? <Stats stats={content.stats} /> : null}
       {sections.services !== false ? (
