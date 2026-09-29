@@ -6,17 +6,64 @@ import {
 const IST = "Asia/Kolkata";
 const YMD = /^(\d{4}-\d{2}-\d{2})$/;
 
-export type WorkoutPlanByStatus = Record<PortalAccessStatusKey, boolean>;
+export type WorkoutPlanStatusWindow = { from: string | null; until: string | null };
+
+export type WorkoutPlanStatusWindows = Record<PortalAccessStatusKey, WorkoutPlanStatusWindow>;
+
+export type WorkoutPlanByStatus = Record<PortalAccessStatusKey, boolean> & {
+  windows: WorkoutPlanStatusWindows;
+};
+
+const WORKOUT_PLAN_STATUS_KEYS: PortalAccessStatusKey[] = [
+  "Active",
+  "Hold",
+  "Deactivated",
+  "Cancelled",
+];
 
 /** Legacy QA list — no longer used for tile visibility (kept for settings API compat). */
 export const DEFAULT_WORKOUT_PLAN_TESTER_NAMES = ["Bis Test"];
+
+function emptyWorkoutPlanStatusWindows(): WorkoutPlanStatusWindows {
+  return {
+    Active: { from: null, until: null },
+    Hold: { from: null, until: null },
+    Deactivated: { from: null, until: null },
+    Cancelled: { from: null, until: null },
+  };
+}
 
 export const DEFAULT_WORKOUT_PLAN_BY_STATUS: WorkoutPlanByStatus = {
   Active: true,
   Hold: false,
   Deactivated: false,
   Cancelled: false,
+  windows: emptyWorkoutPlanStatusWindows(),
 };
+
+export function normalizeWorkoutPlanStatusWindows(input: unknown): WorkoutPlanStatusWindows {
+  const root =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+  const bag =
+    root.windows && typeof root.windows === "object" && !Array.isArray(root.windows)
+      ? (root.windows as Record<string, unknown>)
+      : {};
+  const out = emptyWorkoutPlanStatusWindows();
+  for (const key of WORKOUT_PLAN_STATUS_KEYS) {
+    const raw = bag[key] ?? bag[key.toLowerCase()];
+    const row =
+      raw && typeof raw === "object" && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)
+        : {};
+    out[key] = {
+      from: normalizePortalWorkoutPlanDate(row.from),
+      until: normalizePortalWorkoutPlanDate(row.until),
+    };
+  }
+  return out;
+}
 
 export function isPtPlanName(planName: string | null | undefined) {
   return /\bpt\b/i.test(String(planName || "").trim());
@@ -27,12 +74,19 @@ export function normalizeWorkoutPlanByStatus(input: unknown): WorkoutPlanByStatu
     input && typeof input === "object" && !Array.isArray(input)
       ? (input as Record<string, unknown>)
       : {};
-  const out: WorkoutPlanByStatus = { ...DEFAULT_WORKOUT_PLAN_BY_STATUS };
-  for (const key of Object.keys(DEFAULT_WORKOUT_PLAN_BY_STATUS) as PortalAccessStatusKey[]) {
+  const out: WorkoutPlanByStatus = {
+    Active: DEFAULT_WORKOUT_PLAN_BY_STATUS.Active,
+    Hold: DEFAULT_WORKOUT_PLAN_BY_STATUS.Hold,
+    Deactivated: DEFAULT_WORKOUT_PLAN_BY_STATUS.Deactivated,
+    Cancelled: DEFAULT_WORKOUT_PLAN_BY_STATUS.Cancelled,
+    windows: emptyWorkoutPlanStatusWindows(),
+  };
+  for (const key of WORKOUT_PLAN_STATUS_KEYS) {
     const lower = key.toLowerCase();
     if (key in src) out[key] = Boolean(src[key]);
     else if (lower in src) out[key] = Boolean(src[lower]);
   }
+  out.windows = normalizeWorkoutPlanStatusWindows(src);
   return out;
 }
 
@@ -103,6 +157,26 @@ export function evaluateWorkoutPlanScheduleWindow(input: {
   return { ok: true, reason: null };
 }
 
+/** Status-group window. A reversed range is ignored so a bad save does not hide the tile. */
+export function evaluateWorkoutPlanStatusWindow(input: {
+  from?: string | null;
+  until?: string | null;
+  todayYmd?: string;
+}): { ok: boolean; reason: string | null } {
+  const from = normalizePortalWorkoutPlanDate(input.from);
+  const until = normalizePortalWorkoutPlanDate(input.until);
+  if (from && until && from > until) return { ok: true, reason: null };
+  const win = evaluateWorkoutPlanScheduleWindow({
+    enabledFrom: from,
+    enabledUntil: until,
+    todayYmd: input.todayYmd,
+  });
+  if (win.ok) return win;
+  if (win.reason === "date_not_started") return { ok: false, reason: "status_date_not_started" };
+  if (win.reason === "date_expired") return { ok: false, reason: "status_date_expired" };
+  return win;
+}
+
 function applyScheduleGate(
   result: { visible: boolean; reason: string | null },
   schedule: {
@@ -123,6 +197,8 @@ function applyScheduleGate(
  * - ON (auto): show by Workout Plan by status unless portal_workout_plan_hidden = true.
  * PT plans stay hidden by default; staff can opt a PT member in via portal_workout_plan_enabled.
  * Optional enabledFrom / enabledUntil (IST calendar days) auto-hide outside the window.
+ * When auto rollout is on, an optional per-status window applies to every member in that status.
+ * Manual mode ignores the status window. Blank status dates mean no group limit.
  */
 export function evaluateWorkoutPlanVisibility(input: {
   /** Settings → Home tiles → Workout Plan (true = auto by status). */
@@ -156,6 +232,12 @@ export function evaluateWorkoutPlanVisibility(input: {
   }
 
   if (input.autoRolloutOn) {
+    const statusWindow = evaluateWorkoutPlanStatusWindow({
+      from: input.byStatus.windows?.[statusKey]?.from,
+      until: input.byStatus.windows?.[statusKey]?.until,
+      todayYmd: input.todayYmd,
+    });
+    if (!statusWindow.ok) return { visible: false, reason: statusWindow.reason };
     return applyScheduleGate({ visible: true, reason: null }, schedule);
   }
 
