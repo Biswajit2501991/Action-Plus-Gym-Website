@@ -552,6 +552,14 @@ export function MemberPortalApp() {
     liveTick,
   ]);
 
+  /** Start the T-shirt read while the member is still on home, so the tile opens with a size. */
+  useEffect(() => {
+    if (!member?.memberUuid || !tileEnabled("homeTshirt")) return;
+    void import("@/lib/member-portal/tshirt-size-client").then(({ fetchTshirtState }) =>
+      fetchTshirtState(member.memberUuid),
+    );
+  }, [member?.memberUuid, tileEnabled]);
+
   /** Warm panel caches on home so cards open instantly (fresh fetch still runs in background). */
   useEffect(() => {
     if (step !== "home" || !member?.memberUuid) return;
@@ -2193,7 +2201,9 @@ export function MemberPortalApp() {
               memberUuid={member.memberUuid}
             />
           ) : null}
-          {step === "tshirt" ? <TshirtSizePanel onBack={() => setStep("home")} /> : null}
+          {step === "tshirt" ? (
+            <TshirtSizePanel memberUuid={member.memberUuid} onBack={() => setStep("home")} />
+          ) : null}
           {step === "workoutPlan" ? (
             <WorkoutPlanPanel
               onBack={() => setStep("home")}

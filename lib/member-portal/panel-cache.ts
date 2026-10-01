@@ -12,6 +12,7 @@ const WORKOUT_MUSIC_PREFIX = "apg_portal_workout_music_v1_";
 const PERKS_PREFIX = "apg_portal_perks_v1_";
 const WEIGHT_PREFIX = "apg_portal_weight_v1_";
 const BOOKINGS_PREFIX = "apg_portal_bookings_v1_";
+const TSHIRT_PREFIX = "apg_portal_tshirt_v1_";
 
 type Envelope<T> = { savedAt: number; data: T };
 
@@ -216,4 +217,18 @@ export function readBookingsCache<T>(memberUuid: string): T | null {
 
 export function writeBookingsCache<T>(memberUuid: string, data: T) {
   writeKeyedCache(BOOKINGS_PREFIX, memberUuid, data);
+}
+
+export function peekTshirtCache<T>(
+  memberUuid: string,
+): { data: T; savedAt: number; ageMs: number } | null {
+  return peekKeyedCache<T>(TSHIRT_PREFIX, memberUuid);
+}
+
+export function readTshirtCache<T>(memberUuid: string): T | null {
+  return peekTshirtCache<T>(memberUuid)?.data ?? null;
+}
+
+export function writeTshirtCache<T>(memberUuid: string, data: T) {
+  writeKeyedCache(TSHIRT_PREFIX, memberUuid, data);
 }

@@ -2,44 +2,45 @@
 
 import { useEffect, useState } from "react";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
+import { readTshirtCache, writeTshirtCache } from "@/lib/member-portal/panel-cache";
 import {
   TSHIRT_SIZE_SAVE_LIMIT,
   TSHIRT_SIZES,
   tshirtSizeChoiceLabel,
-  type TshirtSizeId,
 } from "@/lib/member-portal/tshirt-size";
+import { fetchTshirtState, type TshirtPanelState } from "@/lib/member-portal/tshirt-size-client";
 
-type TshirtState = {
-  size: TshirtSizeId | null;
-  updates: number;
-  locked: boolean;
-};
-
-export function TshirtSizePanel({ onBack }: { onBack: () => void }) {
-  const [state, setState] = useState<TshirtState | null>(null);
-  const [choice, setChoice] = useState("");
+export function TshirtSizePanel({
+  memberUuid,
+  onBack,
+}: {
+  memberUuid: string;
+  onBack: () => void;
+}) {
+  const cached = readTshirtCache<TshirtPanelState>(memberUuid);
+  const [state, setState] = useState<TshirtPanelState | null>(cached);
+  const [choice, setChoice] = useState(cached?.size || "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const res = await fetch("/api/member/tshirt-size", { credentials: "same-origin" });
-      const data = (await res.json().catch(() => null)) as
-        | (TshirtState & { ok?: boolean; error?: string })
-        | null;
+      const next = await fetchTshirtState(memberUuid);
       if (cancelled) return;
-      if (!res.ok || !data?.ok) {
-        setMessage("T-shirt size is not available yet. Try again in a moment.");
+      if (!next) {
+        if (!readTshirtCache(memberUuid)) {
+          setMessage("T-shirt size is not available yet. Try again in a moment.");
+        }
         return;
       }
-      setState({ size: data.size, updates: data.updates, locked: data.locked });
-      setChoice(data.size || "");
+      setState(next);
+      setChoice((prev) => prev || next.size || "");
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [memberUuid]);
 
   const remaining = state ? Math.max(0, TSHIRT_SIZE_SAVE_LIMIT - state.updates) : TSHIRT_SIZE_SAVE_LIMIT;
 
@@ -55,10 +56,16 @@ export function TshirtSizePanel({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ size: choice }),
       });
       const data = (await res.json().catch(() => null)) as
-        | (TshirtState & { ok?: boolean; error?: string })
+        | (TshirtPanelState & { ok?: boolean; error?: string })
         | null;
       if (res.status === 409 || data?.error === "locked") {
-        setState((prev) => (prev ? { ...prev, locked: true, updates: TSHIRT_SIZE_SAVE_LIMIT } : prev));
+        const locked = {
+          size: data?.size ?? state.size,
+          updates: TSHIRT_SIZE_SAVE_LIMIT,
+          locked: true,
+        };
+        setState(locked);
+        writeTshirtCache(memberUuid, locked);
         setMessage("This size is locked. Ask the gym if it needs to be changed.");
         return;
       }
@@ -66,7 +73,9 @@ export function TshirtSizePanel({ onBack }: { onBack: () => void }) {
         setMessage("Could not save that size. Try again.");
         return;
       }
-      setState({ size: data.size, updates: data.updates, locked: data.locked });
+      const next = { size: data.size, updates: data.updates, locked: data.locked };
+      setState(next);
+      writeTshirtCache(memberUuid, next);
       setChoice(data.size || choice);
       setMessage(
         data.locked
@@ -103,9 +112,11 @@ export function TshirtSizePanel({ onBack }: { onBack: () => void }) {
         </select>
       </label>
       <p className="mt-3 text-xs text-muted">
-        {state?.locked
-          ? "Locked. Ask the gym if this size needs to change."
-          : `${remaining} change${remaining === 1 ? "" : "s"} left.`}
+        {!state
+          ? "Loading your size…"
+          : state.locked
+            ? "Locked. Ask the gym if this size needs to change."
+            : `${remaining} change${remaining === 1 ? "" : "s"} left.`}
       </p>
       <button
         type="button"

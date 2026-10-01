@@ -3,29 +3,44 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
-import { loadEffectivePortalSectionsForMember } from "@/lib/member-portal/branch-portal-access";
+import {
+  effectivePortalSections,
+  loadBranchPortalSettingsRow,
+} from "@/lib/member-portal/branch-portal-access";
 import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
+import { portalSectionsFromSettings } from "@/lib/member-portal/portal-ui-config";
 import {
   TSHIRT_SIZE_SAVE_LIMIT,
   TSHIRT_SIZES,
   normalizeTshirtSize,
 } from "@/lib/member-portal/tshirt-size";
 
+const tileEnabledCache = new Map<string, { at: number; enabled: boolean }>();
+const TILE_ENABLED_TTL_MS = 20_000;
+
 async function tshirtTileEnabled(client: SupabaseClient, assignedGymCodeId: string | null) {
+  const key = `${portalGymId()}:${assignedGymCodeId || ""}`;
+  const hit = tileEnabledCache.get(key);
+  if (hit && Date.now() - hit.at < TILE_ENABLED_TTL_MS) return hit.enabled;
   try {
-    const exerciseTypes = await fetchExerciseTypeLookupValues(client).catch(() => [] as string[]);
-    const { data } = await client
-      .from("member_portal_settings")
-      .select("portal_sections, basic_workout_options")
-      .eq("gym_id", portalGymId())
-      .maybeSingle();
-    const sections = await loadEffectivePortalSectionsForMember({
-      assignedGymCodeId,
-      portal_sections: data?.portal_sections,
-      basic_workout_options: data?.basic_workout_options,
+    const gymId = portalGymId();
+    const [exerciseTypes, settingsRes, branchRow] = await Promise.all([
+      fetchExerciseTypeLookupValues(client).catch(() => [] as string[]),
+      client
+        .from("member_portal_settings")
+        .select("portal_sections, basic_workout_options")
+        .eq("gym_id", gymId)
+        .maybeSingle(),
+      loadBranchPortalSettingsRow(assignedGymCodeId),
+    ]);
+    const gymWide = portalSectionsFromSettings({
+      portal_sections: settingsRes.data?.portal_sections,
+      basic_workout_options: settingsRes.data?.basic_workout_options,
       exerciseTypes,
     });
-    return sections.homeTshirt !== false;
+    const enabled = effectivePortalSections(gymWide, branchRow).homeTshirt !== false;
+    tileEnabledCache.set(key, { at: Date.now(), enabled });
+    return enabled;
   } catch {
     return true;
   }
@@ -55,16 +70,20 @@ export async function GET() {
   }
   const svc = createServiceRoleClient();
   if (!svc.ok) return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
-  if (!(await tshirtTileEnabled(svc.client, session.member.assigned_gym_code_id))) {
+  const [enabled, memberRow] = await Promise.all([
+    tshirtTileEnabled(svc.client, session.member.assigned_gym_code_id),
+    svc.client
+      .from("members")
+      .select("tshirt_size, tshirt_size_updates")
+      .eq("gym_id", portalGymId())
+      .eq("member_uuid", session.member.member_uuid)
+      .maybeSingle(),
+  ]);
+  if (!enabled) {
     return NextResponse.json({ ok: false, error: "tshirt-hidden" }, { status: 403 });
   }
 
-  const { data, error } = await svc.client
-    .from("members")
-    .select("tshirt_size, tshirt_size_updates")
-    .eq("gym_id", portalGymId())
-    .eq("member_uuid", session.member.member_uuid)
-    .maybeSingle();
+  const { data, error } = memberRow;
 
   if (error) {
     const message = error.message || "tshirt-load-failed";
@@ -90,18 +109,20 @@ export async function POST(request: Request) {
 
   const svc = createServiceRoleClient();
   if (!svc.ok) return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
-  if (!(await tshirtTileEnabled(svc.client, session.member.assigned_gym_code_id))) {
-    return NextResponse.json({ ok: false, error: "tshirt-hidden" }, { status: 403 });
-  }
   const gymId = portalGymId();
   const uuid = session.member.member_uuid;
-
-  const current = await svc.client
-    .from("members")
-    .select("tshirt_size, tshirt_size_updates")
-    .eq("gym_id", gymId)
-    .eq("member_uuid", uuid)
-    .maybeSingle();
+  const [enabled, current] = await Promise.all([
+    tshirtTileEnabled(svc.client, session.member.assigned_gym_code_id),
+    svc.client
+      .from("members")
+      .select("tshirt_size, tshirt_size_updates")
+      .eq("gym_id", gymId)
+      .eq("member_uuid", uuid)
+      .maybeSingle(),
+  ]);
+  if (!enabled) {
+    return NextResponse.json({ ok: false, error: "tshirt-hidden" }, { status: 403 });
+  }
 
   if (current.error) {
     const message = current.error.message || "tshirt-load-failed";
