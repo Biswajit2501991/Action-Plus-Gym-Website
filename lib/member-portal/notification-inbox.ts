@@ -111,7 +111,8 @@ export async function listMemberInbox(
   gymId: string,
   memberUuid: string,
 ): Promise<{ items: InboxItem[]; unreadCount: number }> {
-  await purgeExpiredInbox(svc, gymId, memberUuid);
+  // Expired rows are already hidden by the query below. Do not wait on the delete.
+  void purgeExpiredInbox(svc, gymId, memberUuid);
 
   const now = new Date().toISOString();
   const { data, error } = await svc

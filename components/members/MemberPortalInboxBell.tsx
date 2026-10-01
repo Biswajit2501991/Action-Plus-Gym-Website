@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
+import { peekInboxCache, readInboxCache, writeInboxCache } from "@/lib/member-portal/panel-cache";
 
 export type PortalInboxItem = {
   id: string;
@@ -23,6 +24,51 @@ type ListResponse = {
 };
 
 const INBOX_CHANGED = "apg-inbox-changed";
+/** Home already loaded this list. Re-open paints it at once, like Payments. */
+const INBOX_SOFT_TTL_MS = 20_000;
+
+type InboxSnapshot = { items: PortalInboxItem[]; unreadCount: number };
+
+let inboxInflight: { memberUuid: string; promise: Promise<InboxSnapshot> } | null = null;
+
+function snapshotUnread(items: PortalInboxItem[]) {
+  return items.filter((item) => !item.readAt).length;
+}
+
+function rememberInbox(memberUuid: string, snapshot: InboxSnapshot) {
+  writeInboxCache(memberUuid, snapshot);
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(INBOX_CHANGED, { detail: snapshot }));
+}
+
+function freshInbox(memberUuid: string): InboxSnapshot | null {
+  const peek = peekInboxCache<InboxSnapshot>(memberUuid);
+  if (!peek || peek.ageMs >= INBOX_SOFT_TTL_MS || !Array.isArray(peek.data?.items)) return null;
+  return peek.data;
+}
+
+async function loadInbox(memberUuid: string, force = false): Promise<InboxSnapshot> {
+  if (!force) {
+    const cached = freshInbox(memberUuid);
+    if (cached) return cached;
+  }
+  if (inboxInflight && inboxInflight.memberUuid === memberUuid) return inboxInflight.promise;
+  const promise = inboxFetch<ListResponse>("/api/member/notifications/inbox")
+    .then((data) => {
+      const items = Array.isArray(data.items) ? data.items : [];
+      const snapshot = {
+        items,
+        unreadCount: Math.max(0, Number(data.unreadCount) || snapshotUnread(items)),
+      };
+      rememberInbox(memberUuid, snapshot);
+      return snapshot;
+    })
+    .finally(() => {
+      if (inboxInflight?.promise === promise) inboxInflight = null;
+    });
+  inboxInflight = { memberUuid, promise };
+  return promise;
+}
 
 function formatWhen(value: string | null | undefined) {
   if (!value) return "";
@@ -78,11 +124,6 @@ function clearInboxQueryParam() {
   }
 }
 
-function notifyInboxChanged() {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(INBOX_CHANGED));
-}
-
 /**
  * Header bell. Opens the full Notifications screen. Separate from the Alerts tile.
  */
@@ -98,25 +139,34 @@ export function MemberPortalInboxBell({
   const refresh = useCallback(async () => {
     if (!memberUuid) return;
     try {
-      const data = await inboxFetch<ListResponse>("/api/member/notifications/inbox");
-      setUnreadCount(Math.max(0, Number(data.unreadCount) || 0));
+      const snapshot = await loadInbox(memberUuid);
+      setUnreadCount(snapshot.unreadCount);
     } catch {
       /* badge can stay; the screen shows the load error */
     }
   }, [memberUuid]);
 
   useEffect(() => {
+    const cached = readInboxCache<InboxSnapshot>(memberUuid);
+    if (cached) setUnreadCount(Math.max(0, Number(cached.unreadCount) || 0));
     void refresh();
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
     }, 20_000);
-    const onChange = () => void refresh();
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent<InboxSnapshot>).detail;
+      if (detail && Array.isArray(detail.items)) {
+        setUnreadCount(Math.max(0, Number(detail.unreadCount) || 0));
+        return;
+      }
+      void refresh();
+    };
     window.addEventListener(INBOX_CHANGED, onChange);
     return () => {
       window.clearInterval(id);
       window.removeEventListener(INBOX_CHANGED, onChange);
     };
-  }, [refresh]);
+  }, [memberUuid, refresh]);
 
   useEffect(() => {
     if (!memberUuid) return;
@@ -171,22 +221,35 @@ export function MemberPortalInboxScreen({
   memberUuid: string;
   onBack: () => void;
 }) {
-  const [items, setItems] = useState<PortalInboxItem[]>([]);
+  const cached = readInboxCache<InboxSnapshot>(memberUuid);
+  const [items, setItems] = useState<PortalInboxItem[]>(() =>
+    Array.isArray(cached?.items) ? cached.items : [],
+  );
   const [selected, setSelected] = useState<PortalInboxItem | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !Array.isArray(cached?.items));
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!memberUuid) return;
+    const ready = freshInbox(memberUuid);
+    if (ready) {
+      setItems(ready.items);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     try {
-      const data = await inboxFetch<ListResponse>("/api/member/notifications/inbox");
-      const next = Array.isArray(data.items) ? data.items : [];
-      setItems(next);
-      setSelected((cur) => (cur ? next.find((row) => row.id === cur.id) || null : null));
+      const snapshot = await loadInbox(memberUuid, true);
+      setItems(snapshot.items);
+      setSelected((cur) =>
+        cur ? snapshot.items.find((row) => row.id === cur.id) || null : null,
+      );
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load notifications");
+      if (!readInboxCache<InboxSnapshot>(memberUuid)) {
+        setError(err instanceof Error ? err.message : "Could not load notifications");
+      }
     } finally {
       setLoading(false);
     }
@@ -205,13 +268,16 @@ export function MemberPortalInboxScreen({
         body: JSON.stringify({ id: item.id }),
       });
       const readAt = new Date().toISOString();
-      setItems((prev) =>
-        prev.map((row) => (row.id === item.id ? { ...row, readAt: row.readAt || readAt } : row)),
-      );
+      setItems((prev) => {
+        const next = prev.map((row) =>
+          row.id === item.id ? { ...row, readAt: row.readAt || readAt } : row,
+        );
+        rememberInbox(memberUuid, { items: next, unreadCount: snapshotUnread(next) });
+        return next;
+      });
       setSelected((cur) =>
         cur && cur.id === item.id ? { ...cur, readAt: cur.readAt || readAt } : cur,
       );
-      notifyInboxChanged();
     } catch {
       /* keep unread; the message is still open */
     }
@@ -226,7 +292,7 @@ export function MemberPortalInboxScreen({
       setItems([]);
       setSelected(null);
       setError(null);
-      notifyInboxChanged();
+      rememberInbox(memberUuid, { items: [], unreadCount: 0 });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Clear failed");
     } finally {
