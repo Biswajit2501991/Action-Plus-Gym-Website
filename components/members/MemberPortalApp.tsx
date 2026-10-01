@@ -2007,16 +2007,18 @@ export function MemberPortalApp() {
                     }}
                   />
                 ) : null}
-                <NavTile
-                  accent="profile"
-                  active={activeHomeAccent === "tshirt"}
-                  icon={<Shirt size={15} strokeWidth={1.75} />}
-                  label="T-Shirt"
-                  onClick={() => {
-                    setActiveHomeAccent("tshirt");
-                    setStep("tshirt");
-                  }}
-                />
+                {tileEnabled("homeTshirt") ? (
+                  <NavTile
+                    accent="profile"
+                    active={activeHomeAccent === "tshirt"}
+                    icon={<Shirt size={15} strokeWidth={1.75} />}
+                    label="T-Shirt"
+                    onClick={() => {
+                      setActiveHomeAccent("tshirt");
+                      setStep("tshirt");
+                    }}
+                  />
+                ) : null}
               </div>
 
               <p className="text-center text-xs text-muted">

@@ -20,6 +20,8 @@ export type PortalSections = {
   /** Inside Perks: show/allow "Request locker" (not a home tile itself). */
   perksRequestLocker: boolean;
   homeBiometric: boolean;
+  /** Member T-shirt size picker. Off hides the portal tile; saved sizes stay. */
+  homeTshirt: boolean;
   // Training internals
   basicDailyWorkouts: boolean;
   basicNotes: boolean;
@@ -58,6 +60,7 @@ export const DEFAULT_PORTAL_SECTIONS: PortalSections = {
   homePerks: true,
   perksRequestLocker: true,
   homeBiometric: true,
+  homeTshirt: true,
   basicDailyWorkouts: true,
   basicNotes: true,
   measurements: true,
@@ -156,6 +159,7 @@ const HOME_TILE_KEYS: (keyof PortalSections)[] = [
   "homePerks",
   "homeBiometric",
   "homeWorkoutPlan",
+  "homeTshirt",
 ];
 
 /** Decode `__pht__:v1:<bits>` markers stored in settings_lookup_values.exerciseTypes. */
@@ -237,6 +241,8 @@ export function homeTileKeyForStep(
       return "homePerks";
     case "biometric":
       return "homeBiometric";
+    case "tshirt":
+      return "homeTshirt";
     default:
       return null;
   }

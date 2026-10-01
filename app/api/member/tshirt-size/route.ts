@@ -1,12 +1,35 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { requireMemberSession } from "@/lib/member-portal/session";
 import { portalGymId } from "@/lib/member-portal/config";
+import { loadEffectivePortalSectionsForMember } from "@/lib/member-portal/branch-portal-access";
+import { fetchExerciseTypeLookupValues } from "@/lib/member-portal/portal-home-tile-markers";
 import {
   TSHIRT_SIZE_SAVE_LIMIT,
   TSHIRT_SIZES,
   normalizeTshirtSize,
 } from "@/lib/member-portal/tshirt-size";
+
+async function tshirtTileEnabled(client: SupabaseClient, assignedGymCodeId: string | null) {
+  try {
+    const exerciseTypes = await fetchExerciseTypeLookupValues(client).catch(() => [] as string[]);
+    const { data } = await client
+      .from("member_portal_settings")
+      .select("portal_sections, basic_workout_options")
+      .eq("gym_id", portalGymId())
+      .maybeSingle();
+    const sections = await loadEffectivePortalSectionsForMember({
+      assignedGymCodeId,
+      portal_sections: data?.portal_sections,
+      basic_workout_options: data?.basic_workout_options,
+      exerciseTypes,
+    });
+    return sections.homeTshirt !== false;
+  } catch {
+    return true;
+  }
+}
 
 function missingColumn(message: string) {
   return /tshirt_size/i.test(message) && /column|schema cache|does not exist/i.test(message);
@@ -32,6 +55,9 @@ export async function GET() {
   }
   const svc = createServiceRoleClient();
   if (!svc.ok) return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
+  if (!(await tshirtTileEnabled(svc.client, session.member.assigned_gym_code_id))) {
+    return NextResponse.json({ ok: false, error: "tshirt-hidden" }, { status: 403 });
+  }
 
   const { data, error } = await svc.client
     .from("members")
@@ -64,6 +90,9 @@ export async function POST(request: Request) {
 
   const svc = createServiceRoleClient();
   if (!svc.ok) return NextResponse.json({ ok: false, error: svc.error }, { status: 500 });
+  if (!(await tshirtTileEnabled(svc.client, session.member.assigned_gym_code_id))) {
+    return NextResponse.json({ ok: false, error: "tshirt-hidden" }, { status: 403 });
+  }
   const gymId = portalGymId();
   const uuid = session.member.member_uuid;
 
