@@ -37,7 +37,10 @@ import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { WorkoutPlanPanel } from "@/components/members/WorkoutPlanPanel";
 import { TshirtSizePanel } from "@/components/members/TshirtSizePanel";
 import { PushEnableReminderModal } from "@/components/members/PushEnableReminderModal";
-import { MemberPortalInboxBell } from "@/components/members/MemberPortalInboxBell";
+import {
+  MemberPortalInboxBell,
+  MemberPortalInboxScreen,
+} from "@/components/members/MemberPortalInboxBell";
 import { detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
@@ -130,6 +133,7 @@ type Step =
   | "payments"
   | "attendance"
   | "notifications"
+  | "inbox"
   | "chat"
   | "training"
   | "weight"
@@ -218,6 +222,11 @@ function clearWelcomeShownThisSession() {
 
 export function MemberPortalApp() {
   const [step, setStep] = useState<Step>("mobile");
+  const [inboxNonce, setInboxNonce] = useState(0);
+  const openInbox = useCallback(() => {
+    setInboxNonce((n) => n + 1);
+    setStep("inbox");
+  }, []);
   const [mobile, setMobile] = useState("");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -1708,6 +1717,7 @@ export function MemberPortalApp() {
         step === "payments" ||
         step === "attendance" ||
         step === "notifications" ||
+        step === "inbox" ||
         step === "chat" ||
         step === "training" ||
         step === "weight" ||
@@ -1726,7 +1736,7 @@ export function MemberPortalApp() {
               <p className="mt-1 text-sm text-muted">{member.memberCode}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <MemberPortalInboxBell memberUuid={member.memberUuid} />
+              <MemberPortalInboxBell memberUuid={member.memberUuid} onOpen={openInbox} />
               <button
                 type="button"
                 onClick={logout}
@@ -2180,6 +2190,13 @@ export function MemberPortalApp() {
             <NotificationsPanel
               onBack={() => setStep("home")}
               member={member}
+            />
+          ) : null}
+          {step === "inbox" ? (
+            <MemberPortalInboxScreen
+              key={inboxNonce}
+              memberUuid={member.memberUuid}
+              onBack={() => setStep("home")}
             />
           ) : null}
           {step === "chat" ? (
