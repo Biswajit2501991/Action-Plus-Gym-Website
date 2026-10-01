@@ -17,6 +17,7 @@ import {
   MessageCircle,
   QrCode,
   Scale,
+  Shirt,
   Smartphone,
   User,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import {
 } from "@/components/members/MemberPortalPhase2Panels";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { WorkoutPlanPanel } from "@/components/members/WorkoutPlanPanel";
+import { TshirtSizePanel } from "@/components/members/TshirtSizePanel";
 import { PushEnableReminderModal } from "@/components/members/PushEnableReminderModal";
 import { MemberPortalInboxBell } from "@/components/members/MemberPortalInboxBell";
 import { detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
@@ -131,6 +133,7 @@ type Step =
   | "training"
   | "weight"
   | "workoutPlan"
+  | "tshirt"
   | "bookings"
   | "perks"
   | "biometric";
@@ -1700,6 +1703,7 @@ export function MemberPortalApp() {
         step === "training" ||
         step === "weight" ||
         step === "workoutPlan" ||
+        step === "tshirt" ||
         step === "bookings" ||
         step === "perks" ||
         step === "biometric") ? (
@@ -2003,6 +2007,16 @@ export function MemberPortalApp() {
                     }}
                   />
                 ) : null}
+                <NavTile
+                  accent="profile"
+                  active={activeHomeAccent === "tshirt"}
+                  icon={<Shirt size={15} strokeWidth={1.75} />}
+                  label="T-Shirt"
+                  onClick={() => {
+                    setActiveHomeAccent("tshirt");
+                    setStep("tshirt");
+                  }}
+                />
               </div>
 
               <p className="text-center text-xs text-muted">
@@ -2175,6 +2189,7 @@ export function MemberPortalApp() {
               memberUuid={member.memberUuid}
             />
           ) : null}
+          {step === "tshirt" ? <TshirtSizePanel onBack={() => setStep("home")} /> : null}
           {step === "workoutPlan" ? (
             <WorkoutPlanPanel
               onBack={() => setStep("home")}
