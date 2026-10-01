@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
+  ChevronRight,
   CreditCard,
   Dumbbell,
   Fingerprint,
@@ -1845,7 +1846,7 @@ export function MemberPortalApp() {
                 </div>
               </section>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {tileEnabled("homeProfile") ? (
                   <NavTile
                     accent="profile"
@@ -2010,6 +2011,7 @@ export function MemberPortalApp() {
                 {tileEnabled("homeTshirt") ? (
                   <NavTile
                     accent="profile"
+                    photo="tshirt"
                     active={activeHomeAccent === "tshirt"}
                     icon={<Shirt size={15} strokeWidth={1.75} />}
                     label="T-Shirt"
@@ -2301,6 +2303,7 @@ function NavTile({
   onClick,
   badge,
   accent = "qr",
+  photo,
   active = false,
   urgent = false,
 }: {
@@ -2311,6 +2314,8 @@ function NavTile({
   active?: boolean;
   /** Late payment / critical — neon red box (same language as Remaining overdue). */
   urgent?: boolean;
+  /** Darkened gym photo. Defaults to the accent so each tile can differ. */
+  photo?: string;
   accent?:
     | "profile"
     | "devices"
@@ -2331,6 +2336,7 @@ function NavTile({
       type="button"
       onClick={onClick}
       data-accent={accent}
+      data-photo={photo || accent}
       data-active={active ? "true" : "false"}
       data-urgent={urgent ? "true" : "false"}
       aria-pressed={active}
@@ -2345,10 +2351,13 @@ function NavTile({
       }
       className={
         urgent
-          ? "portal-shine-tile portal-shine-tile--alert-overdue relative flex touch-manipulation flex-col items-center justify-center gap-1.5 px-1.5 py-2 text-white/90"
-          : "portal-shine-tile relative flex touch-manipulation flex-col items-center justify-center gap-1.5 px-1.5 py-2 text-white/90"
+          ? "portal-shine-tile portal-shine-tile--alert-overdue relative flex touch-manipulation flex-col items-center justify-center gap-0.5 px-1 py-1.5"
+          : "portal-shine-tile relative flex touch-manipulation flex-col items-center justify-center gap-0.5 px-1 py-1.5"
       }
     >
+      <span className="portal-shine-tile__photo" aria-hidden />
+      <span className="portal-shine-tile__shade" aria-hidden />
+      <span className="portal-shine-tile__corner" aria-hidden />
       <span className="relative flex items-center justify-center">
         {badge ? (
           <span className="portal-shine-tile__badge" aria-hidden>
@@ -2363,6 +2372,7 @@ function NavTile({
         ) : null}
       </span>
       <span className="portal-shine-tile__label">{label}</span>
+      <ChevronRight className="portal-shine-tile__chevron" size={12} strokeWidth={2.5} aria-hidden />
     </button>
   );
 }

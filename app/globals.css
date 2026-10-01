@@ -499,12 +499,12 @@ html[data-theme="day"] ::selection {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  aspect-ratio: 6 / 5;
+  aspect-ratio: 4 / 5;
   width: 100%;
   min-height: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(201, 162, 39, 0.38);
+  border-radius: 12px;
+  background: #0a0a0a;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   box-shadow:
@@ -558,6 +558,70 @@ html[data-theme="day"] ::selection {
   z-index: 1;
 }
 
+.portal-shine-tile__photo,
+.portal-shine-tile__shade,
+.portal-shine-tile__corner {
+  position: absolute;
+  pointer-events: none;
+}
+
+.portal-shine-tile__photo {
+  inset: 0;
+  z-index: 0;
+  background-color: #141414;
+  background-image: var(--tile-photo);
+  background-size: cover;
+  background-position: var(--tile-pos, center);
+}
+
+.portal-shine-tile__shade {
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+.portal-shine-tile__corner {
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, transparent 50%, #c9a227 50%);
+}
+
+.portal-shine-tile[data-photo="profile"],
+.portal-shine-tile[data-photo="attendance"],
+.portal-shine-tile[data-photo="weight"],
+.portal-shine-tile[data-photo="biometric"] {
+  --tile-photo: url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=480&q=60");
+}
+.portal-shine-tile[data-photo="devices"],
+.portal-shine-tile[data-photo="alerts"],
+.portal-shine-tile[data-photo="workout"],
+.portal-shine-tile[data-photo="tshirt"] {
+  --tile-photo: url("https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=480&q=60");
+}
+.portal-shine-tile[data-photo="payments"],
+.portal-shine-tile[data-photo="training"],
+.portal-shine-tile[data-photo="perks"] {
+  --tile-photo: url("https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&w=480&q=60");
+}
+.portal-shine-tile[data-photo="qr"],
+.portal-shine-tile[data-photo="chat"],
+.portal-shine-tile[data-photo="book"] {
+  --tile-photo: url("https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=480&q=60");
+}
+.portal-shine-tile[data-photo="attendance"] { --tile-pos: 20% center; }
+.portal-shine-tile[data-photo="weight"] { --tile-pos: center 80%; }
+.portal-shine-tile[data-photo="biometric"] { --tile-pos: 80% center; }
+.portal-shine-tile[data-photo="alerts"] { --tile-pos: 70% center; }
+.portal-shine-tile[data-photo="workout"] { --tile-pos: center 30%; }
+.portal-shine-tile[data-photo="tshirt"] { --tile-pos: 30% 70%; }
+.portal-shine-tile[data-photo="training"] { --tile-pos: center 20%; }
+.portal-shine-tile[data-photo="perks"] { --tile-pos: 40% 80%; }
+.portal-shine-tile[data-photo="chat"] { --tile-pos: center 15%; }
+.portal-shine-tile[data-photo="book"] { --tile-pos: 80% 60%; }
+
 .portal-shine-tile:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.18);
@@ -569,16 +633,16 @@ html[data-theme="day"] ::selection {
 
 .portal-shine-tile__icon {
   display: flex;
-  height: 1.85rem;
-  width: 1.85rem;
+  height: 1.7rem;
+  width: 1.7rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.88);
-  background: rgba(255, 255, 255, 0.06);
+  color: #e0c15a;
+  background: rgba(0, 0, 0, 0.4);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    0 0 0 1.5px #c9a227,
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transition:
     box-shadow 0.25s ease,
     color 0.25s ease,
@@ -588,13 +652,21 @@ html[data-theme="day"] ::selection {
 .portal-shine-tile__label {
   max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding-inline: 0.2rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  padding-inline: 0.1rem;
+  color: #fff;
   font-size: 0.625rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.01em;
-  line-height: 1.2;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.portal-shine-tile__chevron {
+  color: #c9a227;
+  margin-top: -0.05rem;
 }
 
 @media (min-width: 380px) {
@@ -709,60 +781,26 @@ html[data-theme="day"] ::selection {
   --shine-glow: rgba(148, 163, 184, 0.38);
 }
 
-/* Only the clicked / current tile gets coloured liquid-glass edges */
-.portal-shine-tile[data-active="true"] {
-  border-color: color-mix(in srgb, var(--shine-accent) 45%, transparent);
-  background:
-    radial-gradient(
-      120% 120% at 0% 0%,
-      color-mix(in srgb, var(--shine-accent) 22%, transparent),
-      transparent 58%
-    ),
-    rgba(255, 255, 255, 0.08);
+/* Only the clicked / current tile gets the gold glow. Late Alerts stay red. */
+.portal-shine-tile[data-active="true"]:not(.portal-shine-tile--alert-overdue) {
+  border-color: #e0c15a;
   box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.35),
-    0 0 0 1px color-mix(in srgb, var(--shine-accent) 40%, transparent),
-    0 0 28px var(--shine-glow),
-    0 0 44px color-mix(in srgb, var(--shine-accent) 28%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    0 0 0 1px rgba(224, 193, 90, 0.95),
+    0 0 14px rgba(201, 162, 39, 0.55),
+    0 0 26px rgba(201, 162, 39, 0.28);
 }
 
-.portal-shine-tile[data-active="true"]::before {
-  opacity: 1;
-  padding: 1.5px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--shine-accent) 95%, #fff) 0%,
-    var(--shine-accent) 14%,
-    color-mix(in srgb, var(--shine-accent) 45%, transparent) 32%,
-    transparent 48%,
-    transparent 60%,
-    color-mix(in srgb, var(--shine-accent) 55%, transparent) 82%,
-    var(--shine-accent) 100%
-  );
-}
-
+.portal-shine-tile[data-active="true"]::before,
 .portal-shine-tile[data-active="true"]::after {
-  background: radial-gradient(
-    120% 120% at 0% 0%,
-    color-mix(in srgb, var(--shine-accent) 20%, transparent),
-    transparent 60%
-  );
+  content: none;
 }
 
-.portal-shine-tile[data-active="true"] .portal-shine-tile__icon {
-  color: #fff;
-  background:
-    radial-gradient(
-      circle at 35% 30%,
-      color-mix(in srgb, var(--shine-accent) 45%, transparent),
-      transparent 65%
-    ),
-    rgba(255, 255, 255, 0.06);
+.portal-shine-tile[data-active="true"]:not(.portal-shine-tile--alert-overdue) .portal-shine-tile__icon {
+  color: #e0c15a;
+  background: rgba(0, 0, 0, 0.45);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--shine-accent) 45%, transparent),
-    0 0 16px color-mix(in srgb, var(--shine-accent) 40%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 0 0 1.5px #e0c15a,
+    0 0 12px rgba(201, 162, 39, 0.55);
 }
 
 .portal-shine-card {
@@ -1048,43 +1086,37 @@ html[data-theme="day"] .portal-shine-stat__value {
 }
 
 html[data-theme="day"] .portal-shine-tile {
-  border-color: rgba(28, 34, 43, 0.1);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow:
-    0 8px 20px rgba(28, 34, 43, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  border-color: rgba(201, 162, 39, 0.4);
+  background-color: #0a0a0a;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
 }
 
 html[data-theme="day"] .portal-shine-tile__icon {
-  color: rgba(28, 34, 43, 0.72);
-  background: rgba(28, 34, 43, 0.04);
+  color: #e0c15a;
+  background: rgba(0, 0, 0, 0.45);
 }
 
-html[data-theme="day"] .portal-shine-tile[data-active="true"] {
-  border-color: color-mix(in srgb, var(--shine-accent) 40%, transparent);
-  background:
-    radial-gradient(
-      120% 120% at 0% 0%,
-      color-mix(in srgb, var(--shine-accent) 14%, transparent),
-      transparent 58%
-    ),
-    rgba(255, 255, 255, 0.9);
+html[data-theme="day"] .portal-shine-tile__label,
+html[data-theme="day"] .portal-shine-tile__chevron {
+  color: #fff;
+}
+
+html[data-theme="day"] .portal-shine-tile__chevron {
+  color: #c9a227;
+}
+
+html[data-theme="day"] .portal-shine-tile[data-active="true"]:not(.portal-shine-tile--alert-overdue) {
+  border-color: #e0c15a;
+  background-color: #0a0a0a;
   box-shadow:
-    0 10px 24px rgba(28, 34, 43, 0.08),
-    0 0 0 1px color-mix(in srgb, var(--shine-accent) 32%, transparent),
-    0 0 22px color-mix(in srgb, var(--shine-accent) 22%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    0 0 0 1px rgba(224, 193, 90, 0.95),
+    0 0 14px rgba(201, 162, 39, 0.55),
+    0 0 26px rgba(201, 162, 39, 0.28);
 }
 
-html[data-theme="day"] .portal-shine-tile[data-active="true"] .portal-shine-tile__icon {
-  color: color-mix(in srgb, var(--shine-accent) 75%, #1c222b);
-  background:
-    radial-gradient(
-      circle at 35% 30%,
-      color-mix(in srgb, var(--shine-accent) 28%, transparent),
-      transparent 65%
-    ),
-    rgba(28, 34, 43, 0.04);
+html[data-theme="day"] .portal-shine-tile[data-active="true"]:not(.portal-shine-tile--alert-overdue) .portal-shine-tile__icon {
+  color: #e0c15a;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 /*
@@ -1167,23 +1199,19 @@ html.portal-gpu-safe .portal-shine-stat__today-badge-dot {
 }
 
 html.portal-gpu-safe[data-theme="day"] .portal-shine-card,
-html.portal-gpu-safe[data-theme="day"] .portal-shine-stat,
-html.portal-gpu-safe[data-theme="day"] .portal-shine-tile {
+html.portal-gpu-safe[data-theme="day"] .portal-shine-stat {
   background-color: rgba(255, 255, 255, 0.94);
 }
 
-html.portal-gpu-safe[data-theme="day"] .portal-shine-tile[data-active="true"] {
-  background:
-    radial-gradient(
-      120% 120% at 0% 0%,
-      color-mix(in srgb, var(--shine-accent) 12%, transparent),
-      transparent 58%
-    ),
-    rgba(255, 255, 255, 0.96);
+html.portal-gpu-safe[data-theme="day"] .portal-shine-tile {
+  background-color: #0a0a0a;
+}
+
+html.portal-gpu-safe[data-theme="day"] .portal-shine-tile[data-active="true"]:not(.portal-shine-tile--alert-overdue) {
+  background-color: #0a0a0a;
   box-shadow:
-    0 8px 18px rgba(28, 34, 43, 0.08),
-    0 0 0 1px color-mix(in srgb, var(--shine-accent) 40%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    0 0 0 1px #e0c15a,
+    0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 /* Overdue Remaining: solid red alert on Android — no large bloom/mask */
@@ -1243,6 +1271,14 @@ html.portal-gpu-safe .portal-shine-stat--remaining-overdue .portal-shine-stat__v
 
 .portal-shine-tile.portal-shine-tile--alert-overdue .portal-shine-tile__label {
   color: #fff;
+}
+
+.portal-shine-tile.portal-shine-tile--alert-overdue .portal-shine-tile__chevron {
+  color: #fff;
+}
+
+.portal-shine-tile.portal-shine-tile--alert-overdue .portal-shine-tile__corner {
+  background: linear-gradient(135deg, transparent 50%, #ff2b2b 50%);
 }
 
 html[data-theme="day"] .portal-shine-tile.portal-shine-tile--alert-overdue {
