@@ -71,17 +71,31 @@ function beep(ctx: AudioContext, freq: number, start: number, dur: number) {
   osc.stop(start + dur + 0.02);
 }
 
-function playDoneBeeps() {
+async function playDoneBeeps() {
+  // Let a just-paused video release the phone's sound before the beep.
+  await new Promise((resolve) => window.setTimeout(resolve, 80));
   primeRestTimerAudio();
   if (!audioCtx) return;
-  const ctx = audioCtx;
-  const start = ctx.currentTime;
-  beep(ctx, 880, start, 0.18);
-  beep(ctx, 1174, start + 0.22, 0.28);
+  try {
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+  } catch {
+    /* the phone may still be holding sound for the video */
+  }
+  if (audioCtx.state === "closed") return;
+  const start = audioCtx.currentTime;
+  beep(audioCtx, 880, start, 0.18);
+  beep(audioCtx, 1174, start + 0.22, 0.28);
 }
 
-function speakDone(token: number) {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
+function speakDone(token: number, onDone: () => void) {
+  const finish = () => {
+    if (token !== alertToken) return;
+    onDone();
+  };
+  if (typeof window === "undefined" || !window.speechSynthesis) {
+    window.setTimeout(finish, 700);
+    return;
+  }
   window.setTimeout(() => {
     if (token !== alertToken) return;
     try {
@@ -89,10 +103,12 @@ function speakDone(token: number) {
       utter.lang = "en-US";
       utter.rate = 1;
       utter.volume = 1;
+      utter.onend = finish;
+      utter.onerror = finish;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utter);
     } catch {
-      /* ignore */
+      finish();
     }
   }, 420);
 }
@@ -120,11 +136,26 @@ function notifyIfAllowed() {
   }
 }
 
-/** Beep, spoken “Done”, Android vibration, and a local banner if notifications are already allowed. */
-export function playRestTimerDone() {
+/**
+ * Beep, spoken “Done”, Android vibration, and a local banner if notifications are already allowed.
+ * Resolves when the voice finishes, or after a short cap so a paused video can continue.
+ */
+export function playRestTimerDone(): Promise<void> {
   const token = ++alertToken;
-  playDoneBeeps();
-  speakDone(token);
+  void playDoneBeeps();
   vibrateDone();
   notifyIfAllowed();
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const cap = window.setTimeout(done, 2200);
+    speakDone(token, () => {
+      window.clearTimeout(cap);
+      window.setTimeout(done, 150);
+    });
+  });
 }

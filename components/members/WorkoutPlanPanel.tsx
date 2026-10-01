@@ -435,7 +435,18 @@ export function WorkoutPlanPanel({
         setTimerLeft(0);
         setTimerOn(false);
         setTimerEndsAt(null);
-        if (timerSoundRef.current) playRestTimerDone();
+        if (timerSoundRef.current) {
+          const el = videoRef.current;
+          const resumeVideo = Boolean(el && !el.paused && !el.ended && el.currentSrc);
+          if (resumeVideo && el) el.pause();
+          void playRestTimerDone().finally(() => {
+            if (!resumeVideo || !el) return;
+            if (videoRef.current !== el || !el.isConnected || el.ended || !el.currentSrc) return;
+            void el.play().catch(() => {
+              /* leave the video paused if the phone blocks autoplay */
+            });
+          });
+        }
         return;
       }
       const next = Math.ceil(msLeft / 1000);
