@@ -11,6 +11,10 @@ import {
 } from "@/lib/member-portal/notification-inbox";
 
 export const OWNER_BROADCAST_KIND = "owner_broadcast";
+/** One-member test. Separate kind so it does not start the gym-wide cooldown. */
+export const OWNER_BROADCAST_TEST_KIND = "owner_broadcast_test";
+export const OWNER_BROADCAST_TEST_MEMBER_CODE = "APG-1037/26-AP01";
+export const OWNER_BROADCAST_TEST_MEMBER_NAME = "Bis Test";
 export const OWNER_BROADCAST_COOLDOWN_MS = 5 * 60 * 1000;
 export const OWNER_BROADCAST_TITLE_MAX = 120;
 export const OWNER_BROADCAST_BODY_MAX = 500;
@@ -194,6 +198,98 @@ export async function runOwnerBroadcast(
     membersFailed,
     pushSent,
     pushFailed,
+    inboxInserted,
+  };
+}
+
+/**
+ * Send the same push + inbox message to Bis Test only.
+ * Does not use the gym-wide recipient list or the 5-minute broadcast cooldown.
+ */
+export async function runOwnerBroadcastTest(
+  svc: SupabaseClient,
+  opts: { gymId: string; title: string; body: string; url?: string },
+): Promise<{
+  memberCode: string;
+  memberName: string;
+  pushSent: number;
+  pushFailed: number;
+  inboxInserted: number;
+}> {
+  const vapid = configureWebPush();
+  if (!vapid.ok) {
+    throw Object.assign(new Error(vapid.error), { status: 503, code: vapid.error });
+  }
+
+  const title = clampBroadcastTitle(opts.title);
+  const body = clampBroadcastBody(opts.body);
+  if (!title || !body) {
+    throw Object.assign(new Error("title-and-body-required"), {
+      status: 400,
+      code: "title-and-body-required",
+    });
+  }
+
+  const { data, error } = await svc
+    .from("members")
+    .select("member_uuid, full_name, member_code, status, portal_enabled, deleted_at")
+    .eq("gym_id", opts.gymId)
+    .eq("member_code", OWNER_BROADCAST_TEST_MEMBER_CODE)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as {
+    member_uuid?: string;
+    full_name?: string;
+    member_code?: string;
+    status?: string;
+    portal_enabled?: boolean;
+  } | null;
+  const memberUuid = String(row?.member_uuid || "").trim();
+  const name = String(row?.full_name || "").trim();
+  if (
+    !memberUuid ||
+    name.toLowerCase() !== OWNER_BROADCAST_TEST_MEMBER_NAME.toLowerCase() ||
+    row?.portal_enabled === false ||
+    String(row?.status || "").trim().toLowerCase() !== "active"
+  ) {
+    throw Object.assign(new Error("Bis Test is not available for a test send."), {
+      status: 404,
+      code: "test-member-unavailable",
+    });
+  }
+
+  const deepLink = String(opts.url || INBOX_DEFAULT_URL).trim() || INBOX_DEFAULT_URL;
+  let inboxInserted = 0;
+  try {
+    inboxInserted = await insertBroadcastInboxRows(svc, {
+      gymId: opts.gymId,
+      memberUuids: [memberUuid],
+      title,
+      body,
+      url: deepLink,
+      kind: OWNER_BROADCAST_TEST_KIND,
+    });
+  } catch (err) {
+    console.warn("[broadcast-test] inbox insert failed:", err instanceof Error ? err.message : err);
+  }
+
+  const result = await sendPushToMemberSubscriptions(svc, {
+    gymId: opts.gymId,
+    memberUuid,
+    title,
+    body,
+    url: deepLink,
+    kind: OWNER_BROADCAST_TEST_KIND,
+    tag: OWNER_BROADCAST_TEST_KIND,
+    log: true,
+  });
+
+  return {
+    memberCode: OWNER_BROADCAST_TEST_MEMBER_CODE,
+    memberName: name,
+    pushSent: result.sent,
+    pushFailed: result.failed,
     inboxInserted,
   };
 }
