@@ -3,6 +3,35 @@
 import { useEffect, useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { submitLead } from "@/lib/actions/leads";
+import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
+
+const SOURCE_LABEL = {
+  website: "Join Now",
+  website_trial: "Free Trial",
+  website_contact: "Contact",
+} as const;
+
+function leadWhatsAppUrl(
+  gymWhatsapp: string | undefined,
+  details: {
+    source: keyof typeof SOURCE_LABEL;
+    fullName: string;
+    mobile: string;
+    email: string;
+    message: string;
+  },
+) {
+  const digits = String(gymWhatsapp || "917047157510").replace(/\D/g, "") || "917047157510";
+  const phone = digits.length === 10 ? `91${digits}` : digits;
+  const lines = [
+    `Action Plus Gym — ${SOURCE_LABEL[details.source]}`,
+    `Name: ${details.fullName}`,
+    `Mobile: ${details.mobile}`,
+  ];
+  if (details.email) lines.push(`Email: ${details.email}`);
+  if (details.message) lines.push(`Message: ${details.message}`);
+  return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(lines.join("\n"))}`;
+}
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
@@ -14,6 +43,7 @@ export function LeadForm({
   embedded = false,
   contactPhone,
   contactEmail,
+  contactWhatsapp,
 }: {
   defaultSource?: "website" | "website_trial" | "website_contact";
   title?: string;
@@ -23,9 +53,11 @@ export function LeadForm({
   embedded?: boolean;
   contactPhone?: string;
   contactEmail?: string;
+  contactWhatsapp?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
   const [memberNote, setMemberNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState(defaultSource);
@@ -48,19 +80,42 @@ export function LeadForm({
 
   function onSubmit(formData: FormData) {
     setMessage(null);
+    setWhatsappUrl(null);
     setMemberNote(null);
     setError(null);
+    const fullName = String(formData.get("fullName") || "").trim();
+    const mobileRaw = String(formData.get("mobile") || "");
+    const email = String(formData.get("email") || "").trim();
+    const note = String(formData.get("message") || "").trim();
+    const mobileError = leadMobileError(mobileRaw);
+    if (mobileError) {
+      setError(mobileError);
+      return;
+    }
+    const mobile = normalizeMobile(mobileRaw);
     startTransition(async () => {
       const result = await submitLead({
-        fullName: String(formData.get("fullName") || ""),
-        mobile: String(formData.get("mobile") || ""),
-        email: String(formData.get("email") || ""),
-        message: String(formData.get("message") || ""),
+        fullName,
+        mobile,
+        email,
+        message: note,
         interestPlan: interestPlan || String(formData.get("interestPlan") || ""),
         source,
         website: String(formData.get("website") || ""),
       });
-      if (result.ok) {
+      if (result.ok && result.confirmWhatsApp) {
+        const url = leadWhatsAppUrl(contactWhatsapp, {
+          source,
+          fullName,
+          mobile: result.mobile || mobile,
+          email,
+          message: note,
+        });
+        setWhatsappUrl(url);
+        setMessage("Details saved. Send them on WhatsApp so we know this number is yours.");
+        (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else if (result.ok) {
         setMessage("Thank you — we will be in touch shortly.");
         (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
       } else if ("alreadyMember" in result) {
@@ -175,8 +230,12 @@ export function LeadForm({
       />
       <input
         name="mobile"
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel"
         required
-        placeholder="Mobile Number"
+        maxLength={16}
+        placeholder="10-digit mobile number"
         className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none ring-gold/40 focus:ring"
       />
       <input
@@ -207,6 +266,11 @@ export function LeadForm({
           {pending ? "Sending..." : "Submit"}
         </Button>
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+        {whatsappUrl ? (
+          <Button href={whatsappUrl} className="w-full">
+            Confirm on WhatsApp
+          </Button>
+        ) : null}
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
       </div>
     </form>

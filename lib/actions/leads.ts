@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { GYM_ID } from "@/lib/config";
 import { findMembersByMobile } from "@/lib/member-portal/members";
+import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
 const leadSchema = z.object({
@@ -42,7 +43,7 @@ function rateLimit(key: string, windowMs = 60_000) {
 }
 
 export type LeadResult =
-  | { ok: true }
+  | { ok: true; confirmWhatsApp?: boolean; mobile?: string }
   | { ok: false; error: string }
   | { ok: false; alreadyMember: true; note: string };
 
@@ -59,15 +60,22 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
     return { ok: true };
   }
 
-  const key = `${parsed.data.mobile}:${parsed.data.source}`;
+  const needsRealMobile = MEMBER_CHECK_SOURCES.has(parsed.data.source);
+  const mobile = needsRealMobile ? normalizeMobile(parsed.data.mobile) : parsed.data.mobile;
+  if (needsRealMobile) {
+    const mobileError = leadMobileError(parsed.data.mobile);
+    if (mobileError) return { ok: false, error: mobileError };
+  }
+
+  const key = `${mobile}:${parsed.data.source}`;
   if (!rateLimit(key)) {
     return { ok: false, error: "Please wait a moment before submitting again." };
   }
 
   // Existing members: show a note and do not create a website lead/visitor row.
-  if (MEMBER_CHECK_SOURCES.has(parsed.data.source)) {
+  if (needsRealMobile) {
     try {
-      const listed = await findMembersByMobile(parsed.data.mobile);
+      const listed = await findMembersByMobile(mobile);
       if (listed.ok && listed.members.length > 0) {
         return { ok: false, alreadyMember: true, note: ALREADY_MEMBER_NOTE };
       }
@@ -82,7 +90,7 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
     p_gym_id: GYM_ID,
     p_full_name: parsed.data.fullName,
     p_email: parsed.data.email || "",
-    p_mobile: parsed.data.mobile,
+    p_mobile: mobile,
     p_intake_source: parsed.data.source,
     p_notes: parsed.data.message || null,
     p_interest_plan: parsed.data.interestPlan || null,
@@ -98,7 +106,7 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
     return { ok: false, error: data.error || "Unable to submit." };
   }
 
-  return { ok: true };
+  return needsRealMobile ? { ok: true, confirmWhatsApp: true, mobile } : { ok: true };
 }
 
 export async function submitNewsletter(email: string): Promise<NewsletterResult> {

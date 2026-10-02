@@ -109,6 +109,7 @@ export default async function ContactPage() {
                   subtitle="We respond quickly during opening hours."
                   contactPhone={settings.phone}
                   contactEmail={settings.email}
+                  contactWhatsapp={settings.whatsapp}
                 />
               </div>
             </div>
