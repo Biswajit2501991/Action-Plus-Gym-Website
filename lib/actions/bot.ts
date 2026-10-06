@@ -3,6 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { GYM_ID } from "@/lib/config";
+import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
+import { LEAD_DUPLICATE_ERROR, leadFillError, leadSpamError } from "@/lib/site/lead-guard";
+import { hasRecentEnquiry } from "@/lib/site/recent-enquiry";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
 const rateMap = new Map<string, number>();
@@ -68,6 +71,7 @@ const enquirySchema = z.object({
   message: z.string().min(2, "Enter your query.").max(2000),
   publicToken: z.union([z.literal(""), z.string().uuid()]),
   website: z.string().optional(),
+  startedAt: z.number().optional(),
 });
 
 function normalizeEnquiryInput(input: Record<string, unknown>) {
@@ -82,6 +86,7 @@ function normalizeEnquiryInput(input: Record<string, unknown>) {
     // Drop stale/invalid localStorage tokens so they don't fail validation.
     publicToken: UUID_RE.test(rawToken) ? rawToken : "",
     website: String(input.website ?? ""),
+    startedAt: Number.isFinite(Number(input.startedAt)) ? Number(input.startedAt) : undefined,
   };
 }
 
@@ -97,6 +102,21 @@ export async function submitBotEnquiryAction(
     };
   }
   if (parsed.data.website) return { ok: true, publicToken: randomUUID() };
+
+  const spamError = leadSpamError([parsed.data.fullName, parsed.data.message]);
+  if (spamError) return { ok: false, error: spamError };
+
+  const isFollowUp = Boolean(parsed.data.publicToken);
+  if (!isFollowUp) {
+    const mobileError = leadMobileError(parsed.data.mobile);
+    if (mobileError) return { ok: false, error: mobileError };
+    const fillError = leadFillError(parsed.data.startedAt);
+    if (fillError) return { ok: false, error: fillError };
+    const mobile = normalizeMobile(parsed.data.mobile);
+    if (await hasRecentEnquiry(mobile, parsed.data.message)) {
+      return { ok: false, error: LEAD_DUPLICATE_ERROR };
+    }
+  }
 
   // Follow-ups on an existing chat are allowed more often than brand-new enquiries.
   // Only mark the rate limit AFTER a successful save so failed attempts can retry.

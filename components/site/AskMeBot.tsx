@@ -17,6 +17,8 @@ import {
   type BotMessage,
 } from "@/lib/actions/bot";
 import { playStaffReplyChime, previewWords } from "@/lib/bot-notify";
+import { leadMobileError } from "@/lib/member-portal/phone";
+import { leadSpamError } from "@/lib/site/lead-guard";
 
 const TOKEN_KEY = "apg_ask_me_token";
 const LAST_READ_STAFF_KEY = "apg_ask_me_last_read_staff";
@@ -77,6 +79,7 @@ export function AskMeBot() {
     website: "",
   });
   const [lookupMobile, setLookupMobile] = useState("");
+  const formStartedAt = useRef(0);
 
   const openRef = useRef(false);
   const baselineStaffIdRef = useRef<number | null>(null);
@@ -290,8 +293,19 @@ export function AskMeBot() {
       setError("Enter your full name (at least 2 characters).");
       return;
     }
-    if (mobile.replace(/[\s\-()]/g, "").length < 6) {
+    if (!token) {
+      const mobileError = leadMobileError(mobile);
+      if (mobileError) {
+        setError(mobileError);
+        return;
+      }
+    } else if (mobile.replace(/[\s\-()]/g, "").length < 6) {
       setError("Enter a valid mobile number.");
+      return;
+    }
+    const spamError = leadSpamError([fullName, message]);
+    if (spamError) {
+      setError(spamError);
       return;
     }
     if (message.length < 2) {
@@ -306,6 +320,7 @@ export function AskMeBot() {
         message,
         website: form.website,
         publicToken: token || "",
+        startedAt: token ? undefined : formStartedAt.current,
       });
       if (!result.ok) {
         setError(result.error);
@@ -504,7 +519,10 @@ export function AskMeBot() {
                   <button
                     type="button"
                     onClick={() => {
-                      setShowForm((v) => !v);
+                      setShowForm((v) => {
+                        if (!v) formStartedAt.current = Date.now();
+                        return !v;
+                      });
                       setShowLookup(false);
                     }}
                     className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${
@@ -561,7 +579,7 @@ export function AskMeBot() {
                     <input
                       value={form.mobile}
                       onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
-                      placeholder="Mobile"
+                      placeholder="10-digit mobile number"
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
                     />
                     <input

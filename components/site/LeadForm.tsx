@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { submitLead } from "@/lib/actions/leads";
 import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
+import { leadSpamError } from "@/lib/site/lead-guard";
 
 const SOURCE_LABEL = {
   website: "Join Now",
@@ -61,6 +62,15 @@ export function LeadForm({
   const [memberNote, setMemberNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState(defaultSource);
+  const [startedAt] = useState(() => Date.now());
+  const [pendingLead, setPendingLead] = useState<{
+    fullName: string;
+    mobile: string;
+    email: string;
+    message: string;
+    interestPlan: string;
+    source: keyof typeof SOURCE_LABEL;
+  } | null>(null);
 
   const gymPhone = contactPhone?.trim() || "+91 70471 57510";
   const gymEmail = contactEmail?.trim() || "gymactionplus@gmail.com";
@@ -81,6 +91,7 @@ export function LeadForm({
   function onSubmit(formData: FormData) {
     setMessage(null);
     setWhatsappUrl(null);
+    setPendingLead(null);
     setMemberNote(null);
     setError(null);
     const fullName = String(formData.get("fullName") || "").trim();
@@ -92,29 +103,35 @@ export function LeadForm({
       setError(mobileError);
       return;
     }
+    const spamError = leadSpamError([fullName, note, interestPlan]);
+    if (spamError) {
+      setError(spamError);
+      return;
+    }
     const mobile = normalizeMobile(mobileRaw);
+    const plan = interestPlan || String(formData.get("interestPlan") || "");
     startTransition(async () => {
       const result = await submitLead({
         fullName,
         mobile,
         email,
         message: note,
-        interestPlan: interestPlan || String(formData.get("interestPlan") || ""),
+        interestPlan: plan,
         source,
         website: String(formData.get("website") || ""),
+        startedAt,
+        confirm: false,
       });
       if (result.ok && result.confirmWhatsApp) {
-        const url = leadWhatsAppUrl(contactWhatsapp, {
-          source,
+        setPendingLead({
           fullName,
           mobile: result.mobile || mobile,
           email,
           message: note,
+          interestPlan: plan,
+          source,
         });
-        setWhatsappUrl(url);
-        setMessage("Details saved. Send them on WhatsApp so we know this number is yours.");
-        (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
-        window.open(url, "_blank", "noopener,noreferrer");
+        setMessage("Tap Confirm on WhatsApp. We save your details only after you confirm.");
       } else if (result.ok) {
         setMessage("Thank you — we will be in touch shortly.");
         (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
@@ -124,6 +141,34 @@ export function LeadForm({
       } else {
         setError(result.error);
       }
+    });
+  }
+
+  function confirmOnWhatsApp() {
+    if (!pendingLead) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await submitLead({
+        ...pendingLead,
+        website: "",
+        startedAt,
+        confirm: true,
+      });
+      if (!result.ok) {
+        if ("alreadyMember" in result) {
+          setMemberNote(result.note);
+          setPendingLead(null);
+          return;
+        }
+        setError(result.error);
+        return;
+      }
+      const url = leadWhatsAppUrl(contactWhatsapp, pendingLead);
+      setWhatsappUrl(url);
+      setPendingLead(null);
+      setMessage("Details saved. Send them on WhatsApp so we know this number is yours.");
+      (document.getElementById("lead-form") as HTMLFormElement | null)?.reset();
+      window.open(url, "_blank", "noopener,noreferrer");
     });
   }
 
@@ -266,9 +311,14 @@ export function LeadForm({
           {pending ? "Sending..." : "Submit"}
         </Button>
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+        {pendingLead ? (
+          <Button type="button" disabled={pending} className="w-full" onClick={confirmOnWhatsApp}>
+            {pending ? "Saving..." : "Confirm on WhatsApp"}
+          </Button>
+        ) : null}
         {whatsappUrl ? (
           <Button href={whatsappUrl} className="w-full">
-            Confirm on WhatsApp
+            Open WhatsApp again
           </Button>
         ) : null}
         {error ? <p className="text-sm text-red-300">{error}</p> : null}

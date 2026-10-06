@@ -4,6 +4,8 @@ import { z } from "zod";
 import { GYM_ID } from "@/lib/config";
 import { findMembersByMobile } from "@/lib/member-portal/members";
 import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
+import { LEAD_DUPLICATE_ERROR, leadFillError, leadSpamError } from "@/lib/site/lead-guard";
+import { hasRecentEnquiry } from "@/lib/site/recent-enquiry";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
 const leadSchema = z.object({
@@ -20,6 +22,8 @@ const leadSchema = z.object({
     "website_newsletter",
   ]),
   website: z.string().optional(), // honeypot
+  startedAt: z.number().optional(),
+  confirm: z.boolean().optional(),
 });
 
 /** Join Now / Free Trial / Contact — skip saving when mobile already belongs to a member. */
@@ -65,10 +69,19 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
   if (needsRealMobile) {
     const mobileError = leadMobileError(parsed.data.mobile);
     if (mobileError) return { ok: false, error: mobileError };
+    const spamError = leadSpamError([
+      parsed.data.fullName,
+      parsed.data.message,
+      parsed.data.interestPlan,
+      parsed.data.goal,
+    ]);
+    if (spamError) return { ok: false, error: spamError };
+    const fillError = leadFillError(parsed.data.startedAt);
+    if (fillError) return { ok: false, error: fillError };
   }
 
   const key = `${mobile}:${parsed.data.source}`;
-  if (!rateLimit(key)) {
+  if (parsed.data.confirm && !rateLimit(key)) {
     return { ok: false, error: "Please wait a moment before submitting again." };
   }
 
@@ -83,6 +96,14 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
     } catch (err) {
       console.error("lead member-mobile check", err);
     }
+  }
+
+  if (needsRealMobile && !parsed.data.confirm) {
+    return { ok: true, confirmWhatsApp: true, mobile };
+  }
+
+  if (needsRealMobile && (await hasRecentEnquiry(mobile, parsed.data.message || ""))) {
+    return { ok: false, error: LEAD_DUPLICATE_ERROR };
   }
 
   const supabase = createAnonServerClient();
