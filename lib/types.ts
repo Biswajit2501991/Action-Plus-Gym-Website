@@ -15,6 +15,10 @@ export type WebsiteSettings = {
   seo_og_image: string;
   hero_headline: string;
   hero_subheadline: string;
+  festival_theme?: string;
+  festival_enabled?: boolean;
+  festival_starts_at?: string | null;
+  festival_ends_at?: string | null;
 };
 
 export type WebsiteSection = {

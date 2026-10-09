@@ -1,10 +1,11 @@
 import { Navbar } from "@/components/site/Navbar";
+import { FestivalShell } from "@/components/site/FestivalShell";
 import { getSiteContent } from "@/lib/cms/get-site-content";
 
 export default async function TermsPage() {
   const { settings } = await getSiteContent();
   return (
-    <>
+    <FestivalShell settings={settings}>
       <Navbar brand={settings.site_name} />
       <main className="container-site prose prose-invert max-w-3xl px-5 py-28 md:px-8">
         <h1>Terms of Use</h1>
@@ -15,6 +16,6 @@ export default async function TermsPage() {
           in the website admin.
         </p>
       </main>
-    </>
+    </FestivalShell>
   );
 }

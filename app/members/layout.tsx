@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { MemberPortalServiceWorkerBootstrap } from "@/components/members/MemberPortalServiceWorkerBootstrap";
+import { ClearFestivalTheme } from "@/components/site/FestivalTheme";
 
 /** Bump when home-screen icons change — iOS caches apple-touch-icon by URL path. */
 const ICON_V = "v3";
@@ -39,6 +40,7 @@ export const viewport: Viewport = {
 export default function MembersLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <ClearFestivalTheme />
       <MemberPortalServiceWorkerBootstrap />
       {children}
     </>

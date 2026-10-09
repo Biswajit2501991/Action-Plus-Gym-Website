@@ -76,6 +76,28 @@ async function requireOwner() {
   return session;
 }
 
+export async function saveFestivalAction(payload: {
+  enabled: boolean;
+  starts_at: string;
+  ends_at: string;
+}) {
+  const session = await requireOwner();
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase.rpc("website_admin_save_festival", {
+    p_token: session.token,
+    p_payload: payload,
+  });
+  if (error) {
+    console.error(error);
+    return { ok: false as const, error: "Could not save the festival theme." };
+  }
+  revalidatePublicSite();
+  return (data || { ok: false, error: "Could not save the festival theme." }) as {
+    ok: boolean;
+    error?: string;
+  };
+}
+
 export async function saveSettingsAction(payload: Record<string, unknown>) {
   const session = await requireOwner();
   const supabase = createAnonServerClient();

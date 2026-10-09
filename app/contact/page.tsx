@@ -5,6 +5,7 @@ import { Footer } from "@/components/site/Footer";
 import { LeadForm } from "@/components/site/LeadForm";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
+import { FestivalShell } from "@/components/site/FestivalShell";
 import { isGoogleMapsEmbedUrl, normalizeGoogleMapsEmbedUrl } from "@/lib/maps";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function ContactPage() {
   const { settings } = content;
 
   return (
-    <>
+    <FestivalShell settings={settings}>
       <Navbar brand={settings.site_name} />
       <main className="pt-28">
         <section className="container-site px-5 pb-14 md:px-8">
@@ -120,6 +121,6 @@ export default async function ContactPage() {
       <ClientErrorBoundary>
         <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
       </ClientErrorBoundary>
-    </>
+    </FestivalShell>
   );
 }

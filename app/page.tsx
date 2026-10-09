@@ -16,6 +16,7 @@ import { Footer } from "@/components/site/Footer";
 import { PopupOffer } from "@/components/site/PopupOffer";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
+import { FestivalShell } from "@/components/site/FestivalShell";
 import { SITE_URL } from "@/lib/config";
 
 /** CMS-driven homepage — always fetch latest content from Supabase. */
@@ -57,7 +58,7 @@ export default async function HomePage() {
   };
 
   return (
-    <>
+    <FestivalShell settings={settings}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -106,6 +107,6 @@ export default async function HomePage() {
       <ClientErrorBoundary>
         <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
       </ClientErrorBoundary>
-    </>
+    </FestivalShell>
   );
 }

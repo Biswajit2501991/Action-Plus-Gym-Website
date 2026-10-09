@@ -5,6 +5,11 @@ export const websiteSections = [
     description: "Turn homepage blocks on or off",
   },
   {
+    href: "/admin/website/festival",
+    label: "Durga Puja",
+    description: "Festive public-site theme with an IST start and end",
+  },
+  {
     href: "/admin/website/popup",
     label: "Popup Offer",
     description: "Welcome offer, colours, expiry and CTA",

@@ -3,6 +3,7 @@ import { logoutAction } from "@/lib/actions/admin";
 import { countBotUnreadAction } from "@/lib/actions/bot-admin";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { ClearFestivalTheme } from "@/components/site/FestivalTheme";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function AdminLayout({
 
   return (
     <div className="admin-shell">
+      <ClearFestivalTheme />
       {session ? (
         <div className="flex min-h-screen">
           <aside className="hidden w-64 flex-col border-r border-[color:var(--panel-border)] bg-[color:var(--bg-elevated)]/80 p-5 md:flex">
