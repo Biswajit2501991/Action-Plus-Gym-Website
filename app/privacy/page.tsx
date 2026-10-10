@@ -6,7 +6,7 @@ export default async function PrivacyPage() {
   const { settings } = await getSiteContent();
   return (
     <FestivalShell settings={settings}>
-      <Navbar brand={settings.site_name} />
+      <Navbar brand={settings.site_name} returningMessage={settings.returning_bar_text} />
       <main className="container-site prose prose-invert max-w-3xl px-5 py-28 md:px-8">
         <h1>Privacy Policy</h1>
         <p>

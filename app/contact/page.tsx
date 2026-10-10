@@ -22,7 +22,7 @@ export default async function ContactPage() {
 
   return (
     <FestivalShell settings={settings}>
-      <Navbar brand={settings.site_name} />
+      <Navbar brand={settings.site_name} returningMessage={settings.returning_bar_text} />
       <main className="pt-28">
         <section className="container-site px-5 pb-14 md:px-8">
           {/*

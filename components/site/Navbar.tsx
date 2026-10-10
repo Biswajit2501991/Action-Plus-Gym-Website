@@ -14,13 +14,18 @@ const links = [
   { href: "#reviews", label: "Reviews" },
 ];
 
+const DEFAULT_RETURNING_BAR = "Welcome back — book a visit";
+
 export function Navbar({
   brand,
   darkHero = false,
+  returningMessage,
 }: {
   brand: string;
   /** Keep light nav text over a dark full-bleed hero (homepage). */
   darkHero?: boolean;
+  /** Blank keeps the default returning-visitor line. */
+  returningMessage?: string | null;
 }) {
   const headerRef = useRef<HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -119,7 +124,7 @@ export function Navbar({
           href="/#join"
           className="block border-t border-gold/20 bg-black/50 px-5 py-1.5 text-center text-xs tracking-wide text-gold"
         >
-          Welcome back — book a visit
+          {returningMessage?.trim() || DEFAULT_RETURNING_BAR}
         </Link>
       ) : null}
 

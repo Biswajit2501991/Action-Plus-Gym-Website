@@ -67,6 +67,6 @@ export const websiteSections = [
   {
     href: "/admin/website/contact-details",
     label: "Contact & Brand",
-    description: "Phone, address, WhatsApp, SEO and hero text",
+    description: "Phone, address, WhatsApp, SEO, hero text, and the welcome back bar",
   },
 ] as const;

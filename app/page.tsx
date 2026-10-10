@@ -63,7 +63,11 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Navbar brand={settings.site_name} darkHero />
+      <Navbar
+        brand={settings.site_name}
+        darkHero
+        returningMessage={settings.returning_bar_text}
+      />
       {sections.hero !== false ? (
         <Hero
           settings={settings}

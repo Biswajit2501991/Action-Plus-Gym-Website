@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { websiteSections } from "@/lib/admin/website-nav";
+import { WebsiteSectionSearch } from "@/components/admin/WebsiteSectionSearch";
 import { cn } from "@/lib/utils";
 
 export function WebsiteSubnav() {
@@ -10,6 +11,7 @@ export function WebsiteSubnav() {
 
   return (
     <div className="mb-8 space-y-3">
+      {pathname === "/admin/website" ? null : <WebsiteSectionSearch />}
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/admin/website"

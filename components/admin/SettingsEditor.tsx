@@ -35,6 +35,7 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
     seo_og_image: settings.seo_og_image,
     hero_headline: settings.hero_headline,
     hero_subheadline: settings.hero_subheadline,
+    returning_bar_text: settings.returning_bar_text || "",
     instagram: settings.socials?.instagram || "",
     facebook: settings.socials?.facebook || "",
     youtube: settings.socials?.youtube || "",
@@ -67,7 +68,7 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
     >
       <AdminPageHeader
         title="Contact & Brand"
-        description="Phone, address, WhatsApp, social links, SEO text, and hero headlines."
+        description="Phone, address, WhatsApp, social links, SEO text, hero headlines, and the returning visitor bar."
       />
 
       <section className="space-y-3 rounded-2xl border border-white/10 bg-charcoal/40 p-4 md:p-5">
@@ -98,6 +99,17 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
               rows={3}
               value={form.hero_subheadline}
               onChange={(e) => set("hero_subheadline", e.target.value)}
+            />
+          </Field>
+          <Field
+            label="Returning visitor bar"
+            className="md:col-span-2"
+            hint="Shown under the menu after someone closes the welcome popup. Leave blank to keep “Welcome back — book a visit”."
+          >
+            <TextInput
+              value={form.returning_bar_text}
+              onChange={(e) => set("returning_bar_text", e.target.value)}
+              placeholder="Welcome back — book a visit"
             />
           </Field>
         </div>
