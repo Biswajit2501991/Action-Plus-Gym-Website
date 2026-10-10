@@ -27,20 +27,14 @@ export function Navbar({
   /** Blank keeps the default returning-visitor line. */
   returningMessage?: string | null;
 }) {
-  const headerRef = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [menuTop, setMenuTop] = useState(72);
   const [returning, setReturning] = useState(false);
 
   function toggleMenu() {
-    setOpen((current) => {
-      const next = !current;
-      if (next && headerRef.current) {
-        setMenuTop(headerRef.current.getBoundingClientRect().bottom);
-      }
-      return next;
-    });
+    setOpen((current) => !current);
   }
 
   useEffect(() => {
@@ -62,22 +56,32 @@ export function Navbar({
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const measure = () => {
+      if (!barRef.current) return;
+      setMenuTop(barRef.current.getBoundingClientRect().bottom);
+    };
+    measure();
+    window.addEventListener("resize", measure);
     return () => {
       document.body.style.overflow = previous;
+      window.removeEventListener("resize", measure);
     };
-  }, [open]);
+  }, [open, scrolled, returning, returningMessage]);
 
   const overHero = darkHero && !scrolled;
 
   return (
     <header
-      ref={headerRef}
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled ? "glass py-3 shadow-lg shadow-black/30" : "bg-transparent py-5",
-      )}
+      className="fixed inset-x-0 top-0 z-50"
       {...(overHero ? { "data-on-dark": "" } : {})}
     >
+      <div
+        ref={barRef}
+        className={cn(
+          "transition-all duration-300",
+          scrolled ? "glass py-3 shadow-lg shadow-black/30" : "bg-transparent py-5",
+        )}
+      >
       <div className="container-site flex items-center justify-between gap-4 px-5 md:px-8">
         <Link href="/" className="font-display text-xl tracking-tight text-white md:text-2xl">
           <span className="text-gold-gradient">{brand}</span>
@@ -127,6 +131,7 @@ export function Navbar({
           {returningMessage?.trim() || DEFAULT_RETURNING_BAR}
         </Link>
       ) : null}
+      </div>
 
       {open ? (
         <div
