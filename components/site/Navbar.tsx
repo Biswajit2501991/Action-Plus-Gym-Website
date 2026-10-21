@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +35,9 @@ export function Navbar({
   const [returning, setReturning] = useState(false);
 
   function toggleMenu() {
+    if (!open && barRef.current) {
+      setMenuTop(barRef.current.getBoundingClientRect().bottom);
+    }
     setOpen((current) => !current);
   }
 
@@ -54,17 +58,24 @@ export function Navbar({
 
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtml = html.style.overflow;
+    const previousBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
     const measure = () => {
       if (!barRef.current) return;
       setMenuTop(barRef.current.getBoundingClientRect().bottom);
     };
     measure();
     window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
     return () => {
-      document.body.style.overflow = previous;
+      html.style.overflow = previousHtml;
+      body.style.overflow = previousBody;
       window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
     };
   }, [open, scrolled, returning, returningMessage]);
 
@@ -133,36 +144,39 @@ export function Navbar({
       ) : null}
       </div>
 
-      {open ? (
-        <div
-          className="site-mobile-nav fixed inset-x-0 bottom-0 z-40 flex flex-col overflow-y-auto px-5 pb-8 pt-4 lg:hidden"
-          style={{ top: menuTop }}
-        >
-          <div className="flex flex-col">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="site-mobile-link"
-                onClick={() => setOpen(false)}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-          <div className="mt-5 flex flex-col gap-3">
-            <Button href="/members" className="w-full" onClick={() => setOpen(false)}>
-              Member Portal
-            </Button>
-            <Button href="/contact" className="w-full" onClick={() => setOpen(false)}>
-              Contact
-            </Button>
-            <Button href="#join" className="w-full" onClick={() => setOpen(false)}>
-              Join Now
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="site-mobile-nav fixed inset-x-0 z-[45] flex flex-col overflow-y-auto overscroll-contain px-5 pb-8 pt-4 lg:hidden"
+              style={{ top: menuTop, height: `calc(100dvh - ${menuTop}px)` }}
+            >
+              <div className="flex flex-col">
+                {links.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className="site-mobile-link"
+                    onClick={() => setOpen(false)}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+              </div>
+              <div className="mt-5 flex flex-col gap-3">
+                <Button href="/members" className="w-full" onClick={() => setOpen(false)}>
+                  Member Portal
+                </Button>
+                <Button href="/contact" className="w-full" onClick={() => setOpen(false)}>
+                  Contact
+                </Button>
+                <Button href="#join" className="w-full" onClick={() => setOpen(false)}>
+                  Join Now
+                </Button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </header>
   );
 }
