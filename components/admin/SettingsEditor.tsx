@@ -192,13 +192,13 @@ export function SettingsEditor({ settings }: { settings: WebsiteSettings }) {
           Social links
         </h2>
         <div className="grid gap-3 md:grid-cols-3">
-          <Field label="Instagram">
+          <Field label="Instagram" hint="Full profile link. This is the Instagram QR on the website.">
             <TextInput
               value={form.instagram}
               onChange={(e) => set("instagram", e.target.value)}
             />
           </Field>
-          <Field label="Facebook">
+          <Field label="Facebook" hint="Full page link. This is the Facebook QR on the website.">
             <TextInput
               value={form.facebook}
               onChange={(e) => set("facebook", e.target.value)}

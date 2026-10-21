@@ -7,6 +7,7 @@ import type { OpeningHour, WebsiteSettings } from "@/lib/types";
 import { getTodayDayOfWeek } from "@/lib/hours";
 import { DEFAULT_GOOGLE_REVIEWS_URL } from "@/lib/reviews/google-places";
 import { DAY_NAMES, formatTime } from "@/lib/utils";
+import { SocialQrLinks } from "@/components/site/SocialQrLinks";
 
 export function Footer({
   settings,
@@ -34,12 +35,17 @@ export function Footer({
             {settings.site_name}
           </p>
           <p className="mt-3 text-sm text-muted">{settings.tagline}</p>
-          <div className="mt-4 flex gap-4 text-sm text-white/70">
-            {Object.entries(settings.socials || {}).map(([k, v]) => (
-              <a key={k} href={v} target="_blank" rel="noreferrer" className="hover:text-gold capitalize">
-                {k}
-              </a>
-            ))}
+          <div className="mt-4 space-y-3">
+            <SocialQrLinks socials={settings.socials} />
+            <div className="flex gap-4 text-sm text-white/70">
+              {Object.entries(settings.socials || {})
+                .filter(([k, v]) => k !== "instagram" && k !== "facebook" && v)
+                .map(([k, v]) => (
+                  <a key={k} href={v} target="_blank" rel="noreferrer" className="hover:text-gold capitalize">
+                    {k}
+                  </a>
+                ))}
+            </div>
           </div>
         </div>
 

@@ -14,8 +14,8 @@ export const fallbackContent: SiteContent = {
     google_reviews_url: "https://www.google.com/maps",
     timezone: "Asia/Kolkata",
     socials: {
-      instagram: "https://instagram.com",
-      facebook: "https://facebook.com",
+      instagram: "https://www.instagram.com/actionplusgymandfitness/",
+      facebook: "https://www.facebook.com/profile.php?id=100075999476294",
       youtube: "https://youtube.com",
     },
     seo_title: "Action Plus Gym | Premium Fitness Club",

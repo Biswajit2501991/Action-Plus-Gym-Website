@@ -7,6 +7,7 @@ import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
 import { FestivalShell } from "@/components/site/FestivalShell";
 import { isGoogleMapsEmbedUrl, normalizeGoogleMapsEmbedUrl } from "@/lib/maps";
+import { SocialQrLinks } from "@/components/site/SocialQrLinks";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -70,6 +71,7 @@ export default async function ContactPage() {
                     WhatsApp Us
                   </a>
                 ) : null}
+                <SocialQrLinks socials={settings.socials} />
                 <div className="mt-auto h-56 w-full overflow-hidden rounded-2xl border border-white/10 md:h-72">
                   {isGoogleMapsEmbedUrl(settings.map_embed_url) ? (
                     <iframe
