@@ -7,7 +7,7 @@ export const websiteSections = [
   {
     href: "/admin/website/festival",
     label: "Themes",
-    description: "Default, Durga Puja, Diwali, Chhath Puja, and New Year 2027 themes with IST schedules",
+    description: "Default, Durga Puja, Diwali, Chhath Puja, New Year 2027, and Holi 2027 themes with IST schedules",
   },
   {
     href: "/admin/website/popup",

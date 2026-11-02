@@ -6,6 +6,7 @@ import {
   CHHATH_PUJA_THEME,
   DIWALI_THEME,
   DURGA_PUJA_THEME,
+  HOLI_2027_THEME,
   NEW_YEAR_2027_THEME,
   FESTIVAL_THEME_META,
   PREVIEW_QUERY,
@@ -33,6 +34,7 @@ export function FestivalEditor({ settings }: { settings: WebsiteSettings }) {
   const initial = useMemo(() => hydrateFestivalCatalog(settings), [settings]);
   const [catalog, setCatalog] = useState(initial);
   const [selected, setSelected] = useState<SelectKey>(() => {
+    if (initial.holi_2027.enabled) return HOLI_2027_THEME;
     if (initial.new_year_2027.enabled) return NEW_YEAR_2027_THEME;
     if (initial.chhath_puja.enabled) return CHHATH_PUJA_THEME;
     if (initial.diwali.enabled) return DIWALI_THEME;
@@ -95,6 +97,7 @@ export function FestivalEditor({ settings }: { settings: WebsiteSettings }) {
               diwali: { ...prev.diwali, enabled: false },
               chhath_puja: { ...prev.chhath_puja, enabled: false },
               new_year_2027: { ...prev.new_year_2027, enabled: false },
+              holi_2027: { ...prev.holi_2027, enabled: false },
             }));
             setMsg("Default theme saved. Festival dates are kept for later.");
           });
@@ -159,6 +162,7 @@ export function FestivalEditor({ settings }: { settings: WebsiteSettings }) {
             <option value={DIWALI_THEME}>Diwali Theme</option>
             <option value={CHHATH_PUJA_THEME}>Chhath Puja Theme</option>
             <option value={NEW_YEAR_2027_THEME}>New Year 2027 🎆</option>
+            <option value={HOLI_2027_THEME}>Holi Colour Blast 2027</option>
           </select>
         </Field>
 

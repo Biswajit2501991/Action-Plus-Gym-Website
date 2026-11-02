@@ -19,8 +19,15 @@ import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
 import { FestivalShell } from "@/components/site/FestivalShell";
 import { NewYearHero } from "@/components/site/NewYearHero";
 import { NewYearStory } from "@/components/site/NewYearStory";
+import { HoliHero } from "@/components/site/HoliHero";
+import { HoliStory } from "@/components/site/HoliStory";
 import { SITE_URL } from "@/lib/config";
-import { NEW_YEAR_2027_THEME, liveFestivalTheme, parsePreviewTheme } from "@/lib/festival";
+import {
+  HOLI_2027_THEME,
+  NEW_YEAR_2027_THEME,
+  liveFestivalTheme,
+  parsePreviewTheme,
+} from "@/lib/festival";
 
 /** CMS-driven homepage — always fetch latest content from Supabase. */
 export const dynamic = "force-dynamic";
@@ -54,7 +61,9 @@ export default async function HomePage({
   const sp = searchParams ? await searchParams : {};
   const previewRaw = typeof sp.preview_festival === "string" ? sp.preview_festival : "";
   const previewTheme = parsePreviewTheme(previewRaw);
-  const newYearLive = (previewTheme || liveFestivalTheme(settings)) === NEW_YEAR_2027_THEME;
+  const liveTheme = previewTheme || liveFestivalTheme(settings);
+  const newYearLive = liveTheme === NEW_YEAR_2027_THEME;
+  const holiLive = liveTheme === HOLI_2027_THEME;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -82,6 +91,8 @@ export default async function HomePage({
       {sections.hero !== false ? (
         newYearLive ? (
           <NewYearHero />
+        ) : holiLive ? (
+          <HoliHero />
         ) : (
           <Hero
             settings={settings}
@@ -92,6 +103,7 @@ export default async function HomePage({
         )
       ) : null}
       {newYearLive ? <NewYearStory /> : null}
+      {holiLive ? <HoliStory /> : null}
       {sections.stats !== false ? <Stats stats={content.stats} /> : null}
       {sections.services !== false ? (
         <Services services={content.services} />

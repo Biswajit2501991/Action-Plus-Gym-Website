@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { DiwaliEffects } from "@/components/site/DiwaliEffects";
 import { ChhathEffects } from "@/components/site/ChhathEffects";
 import { NewYearFireworks } from "@/components/site/NewYearFireworks";
+import { HoliFireworks } from "@/components/site/HoliFireworks";
 import {
   CHHATH_PUJA_THEME,
   DIWALI_THEME,
+  HOLI_2027_THEME,
   NEW_YEAR_2027_THEME,
   PREVIEW_QUERY,
   PREVIEW_STORAGE_KEY,
@@ -101,6 +103,14 @@ export function FestivalTheme({
     return (
       <div className="festival-decor" aria-hidden>
         <NewYearFireworks />
+      </div>
+    );
+  }
+
+  if (theme === HOLI_2027_THEME) {
+    return (
+      <div className="festival-decor" aria-hidden>
+        <HoliFireworks />
       </div>
     );
   }

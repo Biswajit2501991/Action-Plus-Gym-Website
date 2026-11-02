@@ -4,11 +4,13 @@ export const DURGA_PUJA_THEME = "durga_puja";
 export const DIWALI_THEME = "diwali";
 export const CHHATH_PUJA_THEME = "chhath_puja";
 export const NEW_YEAR_2027_THEME = "new_year_2027";
+export const HOLI_2027_THEME = "holi_2027";
 export const FESTIVAL_THEMES = [
   DURGA_PUJA_THEME,
   DIWALI_THEME,
   CHHATH_PUJA_THEME,
   NEW_YEAR_2027_THEME,
+  HOLI_2027_THEME,
 ] as const;
 export type FestivalThemeId = (typeof FESTIVAL_THEMES)[number];
 export type FestivalSurface = "website" | "gym_manager";
@@ -24,6 +26,7 @@ export const FESTIVAL_THEME_META: Record<
   diwali: { label: "Diwali Theme", attr: "diwali" },
   chhath_puja: { label: "Chhath Puja Theme", attr: "chhath-puja" },
   new_year_2027: { label: "New Year 2027", attr: "new-year-2027" },
+  holi_2027: { label: "Holi Colour Blast 2027", attr: "holi-2027" },
 };
 
 export type FestivalThemeConfig = {
@@ -84,6 +87,7 @@ export function emptyFestivalCatalog(): FestivalCatalog {
     diwali: emptyTheme(),
     chhath_puja: emptyTheme(),
     new_year_2027: emptyTheme(),
+    holi_2027: emptyTheme(),
   };
 }
 
@@ -96,6 +100,7 @@ export function hydrateFestivalCatalog(settings: FestivalSettings): FestivalCata
     catalog.diwali = parseTheme((raw as Record<string, unknown>).diwali);
     catalog.chhath_puja = parseTheme((raw as Record<string, unknown>).chhath_puja);
     catalog.new_year_2027 = parseTheme((raw as Record<string, unknown>).new_year_2027);
+    catalog.holi_2027 = parseTheme((raw as Record<string, unknown>).holi_2027);
   }
   const catalogMissing =
     !raw ||
@@ -133,6 +138,16 @@ export function hydrateFestivalCatalog(settings: FestivalSettings): FestivalCata
     if (theme === NEW_YEAR_2027_THEME) {
       catalog.durga_puja.enabled = false;
       catalog.new_year_2027 = {
+        enabled: Boolean(settings.festival_enabled),
+        starts_at: asIso(settings.festival_starts_at),
+        ends_at: asIso(settings.festival_ends_at),
+        apply_website: true,
+        apply_gym_manager: false,
+      };
+    }
+    if (theme === HOLI_2027_THEME) {
+      catalog.durga_puja.enabled = false;
+      catalog.holi_2027 = {
         enabled: Boolean(settings.festival_enabled),
         starts_at: asIso(settings.festival_starts_at),
         ends_at: asIso(settings.festival_ends_at),
@@ -327,5 +342,6 @@ export function parsePreviewTheme(value: string | null | undefined): FestivalThe
   if (v === DIWALI_THEME || v === "diwali") return DIWALI_THEME;
   if (v === CHHATH_PUJA_THEME || v === "chhath-puja" || v === "chhath") return CHHATH_PUJA_THEME;
   if (v === NEW_YEAR_2027_THEME || v === "new-year-2027" || v === "new_year") return NEW_YEAR_2027_THEME;
+  if (v === HOLI_2027_THEME || v === "holi-2027" || v === "holi") return HOLI_2027_THEME;
   return null;
 }
