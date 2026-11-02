@@ -17,7 +17,10 @@ import { PopupOffer } from "@/components/site/PopupOffer";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
 import { FestivalShell } from "@/components/site/FestivalShell";
+import { NewYearHero } from "@/components/site/NewYearHero";
+import { NewYearStory } from "@/components/site/NewYearStory";
 import { SITE_URL } from "@/lib/config";
+import { NEW_YEAR_2027_THEME, liveFestivalTheme, parsePreviewTheme } from "@/lib/festival";
 
 /** CMS-driven homepage — always fetch latest content from Supabase. */
 export const dynamic = "force-dynamic";
@@ -41,9 +44,17 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const content = await getSiteContent();
   const { settings, sections } = content;
+  const sp = searchParams ? await searchParams : {};
+  const previewRaw = typeof sp.preview_festival === "string" ? sp.preview_festival : "";
+  const previewTheme = parsePreviewTheme(previewRaw);
+  const newYearLive = (previewTheme || liveFestivalTheme(settings)) === NEW_YEAR_2027_THEME;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -58,7 +69,7 @@ export default async function HomePage() {
   };
 
   return (
-    <FestivalShell settings={settings}>
+    <FestivalShell settings={settings} previewTheme={previewTheme}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -69,13 +80,18 @@ export default async function HomePage() {
         returningMessage={settings.returning_bar_text}
       />
       {sections.hero !== false ? (
-        <Hero
-          settings={settings}
-          slides={content.heroSlides}
-          rating={content.reviews?.overall_rating}
-          reviewCount={content.reviews?.total_reviews}
-        />
+        newYearLive ? (
+          <NewYearHero />
+        ) : (
+          <Hero
+            settings={settings}
+            slides={content.heroSlides}
+            rating={content.reviews?.overall_rating}
+            reviewCount={content.reviews?.total_reviews}
+          />
+        )
       ) : null}
+      {newYearLive ? <NewYearStory /> : null}
       {sections.stats !== false ? <Stats stats={content.stats} /> : null}
       {sections.services !== false ? (
         <Services services={content.services} />

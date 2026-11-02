@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { DiwaliEffects } from "@/components/site/DiwaliEffects";
 import { ChhathEffects } from "@/components/site/ChhathEffects";
+import { NewYearFireworks } from "@/components/site/NewYearFireworks";
 import {
   CHHATH_PUJA_THEME,
   DIWALI_THEME,
+  NEW_YEAR_2027_THEME,
   PREVIEW_QUERY,
   PREVIEW_STORAGE_KEY,
   festivalAttrValue,
@@ -39,11 +41,13 @@ function readPreview(): FestivalThemeId | null {
 
 export function FestivalTheme({
   settings,
+  initialPreview = null,
 }: {
   settings: FestivalSettings;
+  initialPreview?: FestivalThemeId | null;
 }) {
   const catalog = useMemo(() => hydrateFestivalCatalog(settings), [settings]);
-  const [preview, setPreview] = useState<FestivalThemeId | null>(null);
+  const [preview, setPreview] = useState<FestivalThemeId | null>(initialPreview);
   const [clock, setClock] = useState(0);
   void clock;
   const live = liveFestivalTheme(settings, "website", Date.now());
@@ -89,6 +93,14 @@ export function FestivalTheme({
     return (
       <div className="festival-decor" aria-hidden>
         <ChhathEffects greeting />
+      </div>
+    );
+  }
+
+  if (theme === NEW_YEAR_2027_THEME) {
+    return (
+      <div className="festival-decor" aria-hidden>
+        <NewYearFireworks />
       </div>
     );
   }
