@@ -5,6 +5,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { configureWebPush, sendPushToMemberSubscriptions } from "@/lib/member-portal/billing-push";
+import { isProductionRuntime } from "@/lib/member-portal/config";
+import { safeEqualHex } from "@/lib/member-portal/crypto";
 import {
   INBOX_DEFAULT_URL,
   insertBroadcastInboxRows,
@@ -31,11 +33,20 @@ export function clampBroadcastBody(raw: unknown): string {
     .slice(0, OWNER_BROADCAST_BODY_MAX);
 }
 
-export function authorizeInternalPushSecret(req: Request): boolean {
+const MIN_CRON_SECRET_LEN = 16;
+
+export function portalCronSecret(): string {
   const secret = String(process.env.MEMBER_PORTAL_CRON_SECRET || "").trim();
+  if (isProductionRuntime() && secret.length < MIN_CRON_SECRET_LEN) return "";
+  return secret;
+}
+
+export function authorizeInternalPushSecret(req: Request): boolean {
+  const secret = portalCronSecret();
   const auth = req.headers.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  return Boolean(secret && token && token === secret);
+  if (!secret || !token) return false;
+  return safeEqualHex(secret, token);
 }
 
 /**

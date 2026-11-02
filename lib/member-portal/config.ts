@@ -69,7 +69,7 @@ export function portalGymId() {
 
 const MEMBER_JWT_DEV_FALLBACK = "member-portal-dev-secret-change-me";
 
-function isProductionRuntime() {
+export function isProductionRuntime() {
   if (process.env.NODE_ENV !== "production") return false;
   // next build sets NODE_ENV=production; do not fail the compile for missing secrets.
   if (process.env.NEXT_PHASE === "phase-production-build") return false;

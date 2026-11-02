@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { portalGymId } from "@/lib/member-portal/config";
+import { authorizeInternalPushSecret } from "@/lib/member-portal/owner-broadcast";
 import {
   DEFAULT_BILLING_PUSH_BODY,
   DEFAULT_BILLING_PUSH_TITLE,
@@ -28,10 +29,7 @@ export const dynamic = "force-dynamic";
  * Pass ?force_time=1 to skip the hour gate (manual test).
  */
 async function runBillingPushCron(req: Request) {
-  const secret = String(process.env.MEMBER_PORTAL_CRON_SECRET || "").trim();
-  const auth = req.headers.get("authorization") || "";
-  const token = auth.replace(/^Bearer\s+/i, "").trim();
-  if (!secret || token !== secret) {
+  if (!authorizeInternalPushSecret(req)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

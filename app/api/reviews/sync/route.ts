@@ -1,18 +1,33 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { GYM_ID } from "@/lib/config";
-import { getAdminSession } from "@/lib/auth/session";
+import { getAdminSession, isOwnerRole } from "@/lib/auth/session";
+import { isProductionRuntime } from "@/lib/member-portal/config";
+import { safeEqualHex } from "@/lib/member-portal/crypto";
 import { syncGoogleReviewsCache } from "@/lib/reviews/sync";
 import type { ReviewCache } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const MIN_REVIEWS_SECRET_LEN = 16;
+
 export async function POST(request: Request) {
-  const secret = process.env.REVIEWS_SYNC_SECRET?.trim();
-  const header = request.headers.get("x-reviews-sync-secret");
+  const secret = String(process.env.REVIEWS_SYNC_SECRET || "").trim();
+  if (isProductionRuntime() && secret.length < MIN_REVIEWS_SECRET_LEN) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "REVIEWS_SYNC_SECRET must be set (16+ characters) in production.",
+      },
+      { status: 503 },
+    );
+  }
+
+  const header = String(request.headers.get("x-reviews-sync-secret") || "").trim();
+  const headerOk = Boolean(secret && header && safeEqualHex(secret, header));
   const admin = await getAdminSession();
-  const authorized = Boolean(admin) || (secret && header === secret);
-  if (!authorized) {
+  const ownerOk = Boolean(admin && isOwnerRole(admin.staff_role));
+  if (!headerOk && !ownerOk) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
