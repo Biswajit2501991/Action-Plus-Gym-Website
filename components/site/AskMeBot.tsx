@@ -78,7 +78,6 @@ export function AskMeBot() {
     message: "",
     website: "",
   });
-  const [lookupMobile, setLookupMobile] = useState("");
   const formStartedAt = useRef(0);
 
   const openRef = useRef(false);
@@ -167,7 +166,7 @@ export function AskMeBot() {
   );
 
   const loadThread = useCallback(
-    async (opts: { publicToken?: string; mobile?: string }) => {
+    async (opts: { publicToken?: string }) => {
       const result = await getBotThreadAction(opts);
       if (!result.ok) return result;
       persistToken(result.thread.public_token);
@@ -341,20 +340,31 @@ export function AskMeBot() {
     });
   }
 
-  function lookupByMobile() {
+  function lookupSavedChat() {
     setError(null);
     startTransition(async () => {
-      const result = await loadThread({ mobile: lookupMobile });
+      let saved = token;
+      try {
+        saved = token || localStorage.getItem(TOKEN_KEY) || "";
+      } catch {
+        /* ignore */
+      }
+      if (!saved) {
+        setError(
+          "Use the same phone or browser where you sent the query, or submit a new message.",
+        );
+        return;
+      }
+      const result = await loadThread({ publicToken: saved });
       if (!result || !("ok" in result) || !result.ok) {
         setError(
           result && "error" in result
             ? result.error
-            : "No conversation found for that mobile.",
+            : "No saved conversation on this device.",
         );
         return;
       }
       setShowLookup(false);
-      setLookupMobile("");
     });
   }
 
@@ -551,19 +561,17 @@ export function AskMeBot() {
 
                 {showLookup ? (
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-3">
-                    <input
-                      value={lookupMobile}
-                      onChange={(e) => setLookupMobile(e.target.value)}
-                      placeholder="Mobile used when you enquired"
-                      className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gold/40"
-                    />
+                    <p className="text-xs text-white/70">
+                      Replies load on the same phone or browser that sent the query. We do not look
+                      up chats by mobile number.
+                    </p>
                     <button
                       type="button"
-                      disabled={pending || lookupMobile.trim().length < 6}
-                      onClick={lookupByMobile}
+                      disabled={pending}
+                      onClick={lookupSavedChat}
                       className="w-full rounded-full gold-gradient py-2.5 text-xs font-semibold text-black disabled:opacity-50"
                     >
-                      {pending ? "Looking…" : "Load my conversation"}
+                      {pending ? "Looking…" : "Load this device’s chat"}
                     </button>
                   </div>
                 ) : null}

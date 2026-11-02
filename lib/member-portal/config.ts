@@ -20,6 +20,9 @@ export const MEMBER_OTP_TTL_SEC = Number(
 export const MEMBER_MAX_DEVICES = 3;
 export const MEMBER_OTP_COOLDOWN_SEC = 45;
 export const MEMBER_OTP_HOURLY_LIMIT = 8;
+/** PIN guesses allowed in MEMBER_PIN_LOCKOUT_SEC before WhatsApp verify is required. */
+export const MEMBER_PIN_MAX_FAILURES = 5;
+export const MEMBER_PIN_LOCKOUT_SEC = 15 * 60;
 
 export const ALLOWED_MEMBER_STATUSES = new Set(["active", "hold"]);
 
@@ -64,10 +67,21 @@ export function portalGymId() {
   return GYM_ID;
 }
 
+const MEMBER_JWT_DEV_FALLBACK = "member-portal-dev-secret-change-me";
+
+function isProductionRuntime() {
+  if (process.env.NODE_ENV !== "production") return false;
+  // next build sets NODE_ENV=production; do not fail the compile for missing secrets.
+  if (process.env.NEXT_PHASE === "phase-production-build") return false;
+  return true;
+}
+
 export function memberJwtSecret() {
-  return (
-    process.env.MEMBER_PORTAL_JWT_SECRET ||
-    process.env.ADMIN_SESSION_SECRET ||
-    "member-portal-dev-secret-change-me"
-  );
+  const secret =
+    process.env.MEMBER_PORTAL_JWT_SECRET || process.env.ADMIN_SESSION_SECRET || "";
+  if (secret) return secret;
+  if (isProductionRuntime()) {
+    throw new Error("MEMBER_PORTAL_JWT_SECRET is required in production.");
+  }
+  return MEMBER_JWT_DEV_FALLBACK;
 }

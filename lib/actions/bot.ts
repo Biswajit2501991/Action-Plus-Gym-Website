@@ -151,14 +151,12 @@ export async function submitBotEnquiryAction(
 
 export async function getBotThreadAction(opts: {
   publicToken?: string;
-  mobile?: string;
 }): Promise<
   | { ok: true; thread: BotThread; messages: BotMessage[] }
   | { ok: false; error: string }
 > {
   const token = opts.publicToken?.trim() || null;
-  const mobile = opts.mobile?.trim() || null;
-  if (!token && !mobile) {
+  if (!token) {
     return { ok: false, error: "Missing conversation." };
   }
 
@@ -166,7 +164,7 @@ export async function getBotThreadAction(opts: {
   const { data, error } = await supabase.rpc("website_bot_get_thread", {
     p_gym_id: GYM_ID,
     p_public_token: token,
-    p_mobile: mobile,
+    p_mobile: null,
   });
 
   if (error) {

@@ -9,8 +9,14 @@ import {
   requestMeta,
 } from "@/lib/member-portal/session";
 import { cookies } from "next/headers";
-import { MEMBER_DEVICE_COOKIE } from "@/lib/member-portal/config";
+import {
+  MEMBER_DEVICE_COOKIE,
+  MEMBER_PIN_LOCKOUT_SEC,
+  MEMBER_PIN_MAX_FAILURES,
+  portalGymId,
+} from "@/lib/member-portal/config";
 import { randomToken } from "@/lib/member-portal/crypto";
+import { createServiceRoleClient } from "@/lib/supabase/service";
 
 const bodySchema = z.object({
   mobile: z.string().min(8).max(20),
@@ -62,8 +68,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const okPin = await verifyPin(parsed.data.pin, found.member.pin_hash);
     const { ip, userAgent } = requestMeta(req);
+    const svc = createServiceRoleClient();
+    if (svc.ok) {
+      const since = new Date(Date.now() - MEMBER_PIN_LOCKOUT_SEC * 1000).toISOString();
+      const { count, error: countErr } = await svc.client
+        .from("member_portal_audit_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("gym_id", portalGymId())
+        .eq("member_uuid", found.member.member_uuid)
+        .eq("event_type", "pin_failed")
+        .gte("created_at", since);
+      if (!countErr && (count || 0) >= MEMBER_PIN_MAX_FAILURES) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Too many PIN attempts. Verify with WhatsApp to continue.",
+            code: "pin-locked",
+          },
+          { status: 429 },
+        );
+      }
+    }
+
+    const okPin = await verifyPin(parsed.data.pin, found.member.pin_hash);
     if (!okPin) {
       await auditLog({
         memberUuid: found.member.member_uuid,
