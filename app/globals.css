@@ -1540,6 +1540,13 @@ html[data-festival="diwali"] .gold-gradient {
   border-radius: 1.1rem;
   background: linear-gradient(180deg, rgba(20, 8, 6, 0.42), rgba(20, 8, 6, 0.18));
   border: 1px solid rgba(240, 193, 75, 0.28);
+  opacity: 1;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.festival-diwali-greeting.is-hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
 }
 
 .festival-diwali-title {
@@ -1578,5 +1585,8 @@ html[data-festival="diwali"] .gold-gradient {
   }
   .festival-diwali-canvas {
     display: none;
+  }
+  .festival-diwali-greeting {
+    transition: none;
   }
 }

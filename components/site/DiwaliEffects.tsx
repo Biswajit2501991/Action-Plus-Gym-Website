@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Intensity = "full" | "subtle";
 
@@ -57,6 +57,18 @@ export function DiwaliEffects({
   greeting?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [greetingHidden, setGreetingHidden] = useState(false);
+
+  useEffect(() => {
+    if (!greeting) return;
+    const onScroll = () => {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      setGreetingHidden((hidden) => (hidden ? y > 24 : y > 64));
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [greeting]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -190,7 +202,10 @@ export function DiwaliEffects({
         <span className="festival-sparkle festival-sparkle-b" />
       </div>
       {greeting ? (
-        <div className="festival-diwali-greeting" aria-hidden>
+        <div
+          className={`festival-diwali-greeting${greetingHidden ? " is-hidden" : ""}`}
+          aria-hidden
+        >
           <p className="festival-diwali-title">🪔 Happy Diwali 🪔</p>
           <p className="festival-diwali-wish">
             Wishing You Strength, Happiness, Prosperity &amp; Good Health!
