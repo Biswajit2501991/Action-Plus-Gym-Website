@@ -1,66 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PopupOffer as PopupType } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 
-const KEY = "apg_popup_dismissed";
-
-function offerAlreadyClosed() {
-  try {
-    if (localStorage.getItem(KEY) === "1") return true;
-    if (sessionStorage.getItem(KEY) === "1") {
-      localStorage.setItem(KEY, "1");
-      return true;
-    }
-  } catch {
-    return true;
-  }
-  return false;
-}
-
-export function PopupOffer({ popup }: { popup: PopupType | null }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!popup?.enabled) return;
-    if (popup.expires_at && new Date(popup.expires_at) < new Date()) return;
-    if (typeof window === "undefined") return;
-    if (offerAlreadyClosed()) return;
-
-    let opened = false;
-    let timer = 0;
-    const show = () => {
-      if (opened) return;
-      opened = true;
-      setOpen(true);
-      window.clearTimeout(timer);
-      window.removeEventListener("scroll", onScroll);
-    };
-    const onScroll = () => {
-      if (window.scrollY > window.innerHeight * 0.35) show();
-    };
-    timer = window.setTimeout(show, 10_000);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [popup]);
-
-  function dismiss() {
-    try {
-      localStorage.setItem(KEY, "1");
-      sessionStorage.setItem(KEY, "1");
-    } catch {
-      /* private mode */
-    }
-    setOpen(false);
-  }
-
+export function PopupOffer({
+  popup,
+  open,
+  onClose,
+  onCelebrateAgain,
+}: {
+  popup: PopupType | null;
+  open: boolean;
+  onClose: () => void;
+  onCelebrateAgain?: () => void;
+}) {
   if (!popup) return null;
 
   return (
@@ -71,6 +27,9 @@ export function PopupOffer({ popup }: { popup: PopupType | null }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="apg-offer-title"
         >
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
@@ -81,7 +40,7 @@ export function PopupOffer({ popup }: { popup: PopupType | null }) {
           >
             <button
               type="button"
-              onClick={dismiss}
+              onClick={onClose}
               className="absolute right-3 top-3 z-10 rounded-full bg-black/40 p-2"
               aria-label="Close offer"
             >
@@ -104,12 +63,32 @@ export function PopupOffer({ popup }: { popup: PopupType | null }) {
               >
                 Limited Offer
               </p>
-              <h3 className="mt-2 font-display text-3xl">{popup.title}</h3>
-              <p className="mt-3 text-sm opacity-85">{popup.body}</p>
-              <div className="mt-6" onClick={dismiss}>
-                <Button href={popup.button_href || "#join"}>
-                  {popup.button_text || "Claim Offer"}
-                </Button>
+              <h3 id="apg-offer-title" className="mt-2 font-display text-3xl">
+                {popup.title}
+              </h3>
+              <p className="mt-3 whitespace-pre-line text-sm opacity-85">{popup.body}</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {onCelebrateAgain ? (
+                  <button
+                    type="button"
+                    className="apg-celebrate-btn apg-celebrate-btn-sm"
+                    onClick={onCelebrateAgain}
+                  >
+                    Celebrate again
+                  </button>
+                ) : null}
+                <div onClick={onClose}>
+                  <Button href={popup.button_href || "#join"}>
+                    {popup.button_text || "Claim Offer"}
+                  </Button>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-5 py-3 text-sm text-white/80"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </motion.div>

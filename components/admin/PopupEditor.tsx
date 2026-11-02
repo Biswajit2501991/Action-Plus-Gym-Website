@@ -54,7 +54,7 @@ export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
     >
       <AdminPageHeader
         title="Popup Offer"
-        description="Welcome popup shown to visitors. Turn it off anytime."
+        description="Offer shown when a visitor taps LET'S CELEBRATE on the homepage. It no longer opens by itself."
       />
 
       <div className="grid max-w-3xl gap-3 rounded-2xl border border-white/10 bg-charcoal/40 p-4 md:grid-cols-2">

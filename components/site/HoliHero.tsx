@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { CelebrateOfferButton } from "@/components/site/CelebrateOfferButton";
 import { launchHoliBlast, setHoliEffectsPaused } from "@/lib/holi-effects";
+import type { PopupOffer as PopupType } from "@/lib/types";
 
-export function HoliHero() {
+export function HoliHero({ popup = null }: { popup?: PopupType | null }) {
   const [paused, setPaused] = useState(false);
   const [hiddenBar, setHiddenBar] = useState(false);
   const [glow, setGlow] = useState(false);
@@ -48,6 +50,13 @@ export function HoliHero() {
         </p>
         <p className="holi-slogan">New colours · New energy · Same unstoppable you</p>
         <div className="holi-actions">
+          <CelebrateOfferButton
+            popup={popup}
+            fallback={{
+              title: "Happy Holi 2027",
+              body: "Celebrate colour, strength and new energy at Action Plus Gym.",
+            }}
+          />
           <button type="button" className="holi-btn holi-btn-neon" onClick={blast}>
             ✳ Let the colours fly
           </button>

@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
-import type { HeroSlide, WebsiteSettings } from "@/lib/types";
+import { CelebrateOfferButton } from "@/components/site/CelebrateOfferButton";
+import type { HeroSlide, PopupOffer as PopupType, WebsiteSettings } from "@/lib/types";
 
 export function Hero({
   settings,
   slides,
   rating,
   reviewCount,
+  popup = null,
 }: {
   settings: WebsiteSettings;
   slides: HeroSlide[];
   rating?: number | null;
   reviewCount?: number | null;
+  popup?: PopupType | null;
 }) {
   const safeSlides = slides.filter((s) => Boolean(s?.image_url));
   const [index, setIndex] = useState(0);
@@ -103,8 +106,15 @@ export function Hero({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.7 }}
-            className="mt-8 flex flex-wrap gap-3"
+            className="mt-8 flex flex-wrap items-center gap-3"
           >
+            <CelebrateOfferButton
+              popup={popup}
+              fallback={{
+                title: "Let's celebrate",
+                body: "Action Plus Gym & Fitness Club. Join us for the latest offer — book a trial or membership below.",
+              }}
+            />
             <Button href="#join">Book a Free Trial</Button>
             <Button href="#join" variant="secondary">
               Join

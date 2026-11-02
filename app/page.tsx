@@ -13,7 +13,6 @@ import { Hours } from "@/components/site/Hours";
 import { Reviews } from "@/components/site/Reviews";
 import { LeadForm } from "@/components/site/LeadForm";
 import { Footer } from "@/components/site/Footer";
-import { PopupOffer } from "@/components/site/PopupOffer";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
 import { FestivalShell } from "@/components/site/FestivalShell";
@@ -89,15 +88,16 @@ export default async function HomePage({
       />
       {sections.hero !== false ? (
         newYearLive ? (
-          <NewYearHero />
+          <NewYearHero popup={sections.popup === false ? null : content.popup} />
         ) : holiLive ? (
-          <HoliHero />
+          <HoliHero popup={sections.popup === false ? null : content.popup} />
         ) : (
           <Hero
             settings={settings}
             slides={content.heroSlides}
             rating={content.reviews?.overall_rating}
             reviewCount={content.reviews?.total_reviews}
+            popup={sections.popup === false ? null : content.popup}
           />
         )
       ) : null}
@@ -134,7 +134,6 @@ export default async function HomePage({
       {sections.footer !== false ? (
         <Footer settings={settings} hours={content.hours} />
       ) : null}
-      {sections.popup !== false ? <PopupOffer popup={content.popup} /> : null}
       <ClientErrorBoundary>
         <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
       </ClientErrorBoundary>
