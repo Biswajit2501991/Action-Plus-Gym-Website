@@ -20,6 +20,7 @@ export type WebsiteSettings = {
   festival_enabled?: boolean;
   festival_starts_at?: string | null;
   festival_ends_at?: string | null;
+  festival_catalog?: Record<string, unknown> | null;
 };
 
 export type WebsiteSection = {

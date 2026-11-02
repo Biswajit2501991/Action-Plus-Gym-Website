@@ -1,15 +1,38 @@
 "use client";
 
-import { useEffect } from "react";
-import { festivalIsLive, type FestivalSettings } from "@/lib/festival";
+import { useEffect, useMemo, useState } from "react";
+import { DiwaliEffects } from "@/components/site/DiwaliEffects";
+import {
+  DIWALI_THEME,
+  PREVIEW_QUERY,
+  PREVIEW_STORAGE_KEY,
+  festivalAttrValue,
+  hydrateFestivalCatalog,
+  liveFestivalTheme,
+  parsePreviewTheme,
+  type FestivalSettings,
+  type FestivalThemeId,
+} from "@/lib/festival";
 
 const ATTR = "data-festival";
-const VALUE = "durga-puja";
+const MAX_TIMEOUT = 2_147_000_000;
 
-function applyFestival(live: boolean) {
+function applyFestival(theme: FestivalThemeId | null) {
   const root = document.documentElement;
-  if (live) root.setAttribute(ATTR, VALUE);
+  const value = festivalAttrValue(theme);
+  if (value) root.setAttribute(ATTR, value);
   else root.removeAttribute(ATTR);
+}
+
+function readPreview(): FestivalThemeId | null {
+  try {
+    const q = new URLSearchParams(window.location.search).get(PREVIEW_QUERY);
+    const fromQuery = parsePreviewTheme(q);
+    if (fromQuery) return fromQuery;
+    return parsePreviewTheme(sessionStorage.getItem(PREVIEW_STORAGE_KEY));
+  } catch {
+    return null;
+  }
 }
 
 export function FestivalTheme({
@@ -17,28 +40,48 @@ export function FestivalTheme({
 }: {
   settings: FestivalSettings;
 }) {
-  const endsAt = settings.festival_ends_at || "";
-  const live = festivalIsLive(settings);
+  const catalog = useMemo(() => hydrateFestivalCatalog(settings), [settings]);
+  const [preview, setPreview] = useState<FestivalThemeId | null>(null);
+  const [clock, setClock] = useState(0);
+  void clock;
+  const live = liveFestivalTheme(settings, "website", Date.now());
+  const theme = preview || live;
 
   useEffect(() => {
-    applyFestival(live);
-    if (!live || !endsAt) {
-      return () => applyFestival(false);
-    }
-    const end = new Date(endsAt).getTime();
-    const ms = end - Date.now();
-    if (!Number.isFinite(end) || ms <= 0) {
-      applyFestival(false);
-      return () => applyFestival(false);
-    }
-    const timer = window.setTimeout(() => applyFestival(false), ms);
-    return () => {
-      window.clearTimeout(timer);
-      applyFestival(false);
-    };
-  }, [live, endsAt]);
+    setPreview(readPreview());
+  }, []);
 
-  if (!live) return null;
+  useEffect(() => {
+    applyFestival(theme);
+    return () => applyFestival(null);
+  }, [theme]);
+
+  useEffect(() => {
+    const timers: number[] = [];
+    const schedule = (at: number) => {
+      const ms = at - Date.now();
+      if (!Number.isFinite(at) || ms <= 0) return;
+      timers.push(
+        window.setTimeout(() => setClock((n) => n + 1), Math.min(ms, MAX_TIMEOUT)),
+      );
+    };
+    for (const cfg of Object.values(catalog)) {
+      if (!cfg.enabled || !cfg.apply_website) continue;
+      if (cfg.starts_at) schedule(new Date(cfg.starts_at).getTime());
+      if (cfg.ends_at) schedule(new Date(cfg.ends_at).getTime());
+    }
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [catalog]);
+
+  if (!theme) return null;
+
+  if (theme === DIWALI_THEME) {
+    return (
+      <div className="festival-decor" aria-hidden>
+        <DiwaliEffects intensity="full" greeting />
+      </div>
+    );
+  }
 
   return (
     <div className="festival-decor" aria-hidden>

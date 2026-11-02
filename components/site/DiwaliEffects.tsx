@@ -1,0 +1,203 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+type Intensity = "full" | "subtle";
+
+const COLORS = ["#ffd76a", "#ff4d4d", "#4da3ff", "#c084fc", "#34d399", "#fb923c"];
+
+type Particle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  max: number;
+  color: string;
+  size: number;
+  spark: boolean;
+};
+
+type Rocket = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  targetY: number;
+  color: string;
+  trail: { x: number; y: number }[];
+};
+
+function burst(particles: Particle[], x: number, y: number, full: boolean) {
+  const count = full ? 48 + Math.floor(Math.random() * 28) : 18 + Math.floor(Math.random() * 10);
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const star = Math.random() > 0.45;
+  for (let i = 0; i < count; i++) {
+    const a = star ? (i / count) * Math.PI * 2 : Math.random() * Math.PI * 2;
+    const sp = (full ? 1.6 : 0.7) + Math.random() * (full ? 3.4 : 1.6);
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+      life: 1,
+      max: 0.55 + Math.random() * 0.7,
+      color,
+      size: full ? 1.4 + Math.random() * 2.2 : 1 + Math.random(),
+      spark: Math.random() > 0.7,
+    });
+  }
+}
+
+export function DiwaliEffects({
+  intensity,
+  greeting = false,
+}: {
+  intensity: Intensity;
+  greeting?: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) return;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    const full = intensity === "full";
+    let raf = 0;
+    let running = true;
+    const particles: Particle[] = [];
+    const rockets: Rocket[] = [];
+    let lastRocket = 0;
+    const rocketGap = full ? 2800 : 14000;
+    const maxParticles = full ? 420 : 90;
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const launch = () => {
+      if (document.hidden) return;
+      rockets.push({
+        x: 40 + Math.random() * (window.innerWidth - 80),
+        y: window.innerHeight + 8,
+        vx: (Math.random() - 0.5) * 1.1,
+        vy: full ? -(6.2 + Math.random() * 2.4) : -(4.4 + Math.random() * 1.4),
+        targetY: window.innerHeight * (full ? 0.12 + Math.random() * 0.38 : 0.18 + Math.random() * 0.28),
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        trail: [],
+      });
+    };
+
+    const tick = (now: number) => {
+      if (!running) return;
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      if (!document.hidden) {
+        if (now - lastRocket > rocketGap + Math.random() * rocketGap * 0.4) {
+          lastRocket = now;
+          launch();
+        }
+
+        for (let i = rockets.length - 1; i >= 0; i--) {
+          const r = rockets[i];
+          r.x += r.vx;
+          r.y += r.vy;
+          r.vy += 0.018;
+          r.trail.push({ x: r.x, y: r.y });
+          if (r.trail.length > 14) r.trail.shift();
+          ctx.beginPath();
+          for (let t = 0; t < r.trail.length; t++) {
+            const p = r.trail[t];
+            ctx.strokeStyle = r.color;
+            ctx.globalAlpha = (t / r.trail.length) * 0.55;
+            ctx.lineWidth = 1.6;
+            if (t === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = "#fff6c8";
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, full ? 2.4 : 1.6, 0, Math.PI * 2);
+          ctx.fill();
+          if (r.y <= r.targetY || r.vy >= -0.4) {
+            burst(particles, r.x, r.y, full);
+            if (full && Math.random() > 0.55) {
+              burst(particles, r.x + (Math.random() - 0.5) * 40, r.y + 10, true);
+            }
+            rockets.splice(i, 1);
+          }
+        }
+
+        while (particles.length > maxParticles) particles.shift();
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.018;
+          p.vx *= 0.992;
+          p.life -= 0.012;
+          if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = Math.max(0, p.life / p.max);
+          ctx.fillStyle = p.color;
+          if (p.spark) {
+            ctx.fillRect(p.x, p.y, p.size * 1.6, p.size * 0.5);
+            ctx.fillRect(p.x, p.y, p.size * 0.5, p.size * 1.6);
+          } else {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+
+    return () => {
+      running = false;
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      particles.length = 0;
+      rockets.length = 0;
+    };
+  }, [intensity]);
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="festival-diwali-canvas" aria-hidden />
+      <div className="festival-diwali-decor" aria-hidden>
+        <span className="festival-string-lights" />
+        <span className="festival-diya festival-diya-left" />
+        <span className="festival-diya festival-diya-right" />
+        <span className="festival-rangoli" />
+        <span className="festival-sparkle festival-sparkle-a" />
+        <span className="festival-sparkle festival-sparkle-b" />
+      </div>
+      {greeting ? (
+        <div className="festival-diwali-greeting" aria-hidden>
+          <p className="festival-diwali-title">🪔 Happy Diwali 🪔</p>
+          <p className="festival-diwali-wish">
+            Wishing You Strength, Happiness, Prosperity &amp; Good Health!
+          </p>
+          <p className="festival-diwali-brand">— Action Plus Gym &amp; Fitness Club</p>
+        </div>
+      ) : null}
+    </>
+  );
+}

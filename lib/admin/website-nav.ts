@@ -6,8 +6,8 @@ export const websiteSections = [
   },
   {
     href: "/admin/website/festival",
-    label: "Durga Puja",
-    description: "Festive public-site theme with an IST start and end",
+    label: "Themes",
+    description: "Default, Durga Puja, and Diwali public-site themes with IST schedules",
   },
   {
     href: "/admin/website/popup",

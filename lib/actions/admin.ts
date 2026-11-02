@@ -77,13 +77,16 @@ async function requireOwner() {
 }
 
 export async function saveFestivalAction(payload: {
+  theme: string;
   enabled: boolean;
   starts_at: string;
   ends_at: string;
+  apply_website?: boolean;
+  apply_gym_manager?: boolean;
 }) {
   const session = await requireOwner();
   const supabase = createAnonServerClient();
-  const { data, error } = await supabase.rpc("website_admin_save_festival", {
+  const { data, error } = await supabase.rpc("website_admin_save_festival_theme", {
     p_token: session.token,
     p_payload: payload,
   });

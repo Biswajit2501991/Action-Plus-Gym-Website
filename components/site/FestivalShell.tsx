@@ -1,5 +1,5 @@
 import { FestivalTheme } from "@/components/site/FestivalTheme";
-import { festivalBootScript, festivalIsLive, type FestivalSettings } from "@/lib/festival";
+import { festivalBootScript, liveFestivalTheme, type FestivalSettings } from "@/lib/festival";
 
 export function FestivalShell({
   settings,
@@ -8,10 +8,10 @@ export function FestivalShell({
   settings: FestivalSettings;
   children: React.ReactNode;
 }) {
-  const live = festivalIsLive(settings);
+  const theme = liveFestivalTheme(settings, "website");
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: festivalBootScript(live) }} />
+      <script dangerouslySetInnerHTML={{ __html: festivalBootScript(theme) }} />
       <FestivalTheme settings={settings} />
       {children}
     </>

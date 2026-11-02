@@ -1,0 +1,14 @@
+{
+  "taken_at": "2026-11-02T00:00:00Z",
+  "note": "Verified pre-migration snapshot of public.website_settings festival columns. Additive catalog only; no deletes.",
+  "rows": [
+    {
+      "gym_id": "48815df4-6144-40dd-bbd6-91fd8522d1ff",
+      "festival_theme": "",
+      "festival_enabled": false,
+      "festival_starts_at": "2026-10-09 22:44:00+00",
+      "festival_ends_at": "2026-10-20 22:30:00+00",
+      "updated_at": "2026-10-21 10:20:48.895355+00"
+    }
+  ]
+}

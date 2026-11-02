@@ -1432,3 +1432,151 @@ html[data-theme="day"][data-festival="durga-puja"] .text-gold-gradient {
 @media (prefers-reduced-motion: reduce) {
   .festival-diya { box-shadow: none; }
 }
+
+/* Diwali — public site. Canvas and decorations never capture clicks. */
+html[data-festival="diwali"] {
+  --gold: #f0c14b;
+  --gold-soft: #ffe7a3;
+  --gold-dim: #8a4b12;
+  --border: rgba(240, 193, 75, 0.38);
+  --page-gradient:
+    radial-gradient(980px 540px at 6% -12%, rgba(180, 70, 12, 0.38), transparent 56%),
+    radial-gradient(720px 420px at 100% 0%, rgba(240, 193, 75, 0.22), transparent 52%),
+    radial-gradient(640px 380px at 70% 100%, rgba(90, 20, 50, 0.32), transparent 55%),
+    linear-gradient(180deg, #1a0c08 0%, #12080c 48%, #16090a 100%);
+}
+
+html[data-theme="day"][data-festival="diwali"] {
+  --bg: #fff7ea;
+  --bg-elevated: #fffaf1;
+  --charcoal: #fffaf1;
+  --charcoal-soft: #f8ead4;
+  --text: #3a2410;
+  --text-muted: #7a5530;
+  --gold: #c27810;
+  --gold-soft: #e09a20;
+  --gold-dim: #8a4b12;
+  --border: rgba(194, 120, 16, 0.28);
+  --glass: rgba(255, 248, 236, 0.92);
+  --page-gradient:
+    radial-gradient(900px 480px at 0% -8%, rgba(240, 140, 40, 0.16), transparent 58%),
+    radial-gradient(680px 360px at 100% 0%, rgba(240, 193, 75, 0.28), transparent 52%),
+    linear-gradient(180deg, #fff8ee 0%, #f8ecd8 46%, #fff7ea 100%);
+}
+
+html[data-festival="diwali"] header {
+  box-shadow: inset 0 -2px 0 rgba(240, 193, 75, 0.88);
+}
+
+html[data-festival="diwali"] .gold-gradient {
+  background: linear-gradient(135deg, #ffe7a3 0%, #f0c14b 32%, #e05a1a 72%, #8a1a2a 100%);
+  color: #fff8ef;
+}
+
+.festival-diwali-canvas {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.festival-diwali-decor {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.festival-string-lights {
+  position: absolute;
+  top: 4.4rem;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background-image: radial-gradient(circle, #f0c14b 0 2px, transparent 3px);
+  background-size: 28px 10px;
+  background-repeat: repeat-x;
+  opacity: 0.55;
+  animation: festival-lights 1.8s ease-in-out infinite alternate;
+}
+
+.festival-rangoli {
+  left: 50%;
+  bottom: 0.6rem;
+  width: 8.5rem;
+  height: 8.5rem;
+  position: absolute;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 28%, rgba(240, 193, 75, 0.18) 29% 34%, transparent 35%),
+    conic-gradient(from 0deg, #c4314a, #f0c14b, #34d399, #4da3ff, #c084fc, #c4314a);
+  opacity: 0.22;
+  mask: radial-gradient(circle, transparent 0 22%, #000 23% 48%, transparent 49%);
+}
+
+.festival-sparkle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #ffe7a3;
+  border-radius: 50%;
+  opacity: 0.5;
+  box-shadow: 0 0 12px #f0c14b;
+}
+
+.festival-sparkle-a { top: 28%; left: 12%; animation: festival-spark 2.4s ease-in-out infinite; }
+.festival-sparkle-b { top: 42%; right: 14%; animation: festival-spark 3s ease-in-out infinite 0.6s; }
+
+.festival-diwali-greeting {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 5.4rem;
+  transform: translateX(-50%);
+  width: min(36rem, calc(100vw - 2rem));
+  text-align: center;
+  padding: 0.65rem 1rem 0.8rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, rgba(20, 8, 6, 0.42), rgba(20, 8, 6, 0.18));
+  border: 1px solid rgba(240, 193, 75, 0.28);
+}
+
+.festival-diwali-title {
+  font-family: var(--font-syne), sans-serif;
+  font-size: clamp(1.05rem, 2.4vw, 1.45rem);
+  color: #ffe7a3;
+  letter-spacing: 0.04em;
+}
+
+.festival-diwali-wish {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: rgba(255, 246, 220, 0.88);
+}
+
+.festival-diwali-brand {
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  color: rgba(240, 193, 75, 0.9);
+}
+
+@keyframes festival-lights {
+  from { opacity: 0.35; filter: brightness(0.9); }
+  to { opacity: 0.75; filter: brightness(1.25); }
+}
+
+@keyframes festival-spark {
+  0%, 100% { opacity: 0.2; transform: scale(0.7); }
+  50% { opacity: 0.8; transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .festival-string-lights,
+  .festival-sparkle {
+    animation: none;
+  }
+  .festival-diwali-canvas {
+    display: none;
+  }
+}
