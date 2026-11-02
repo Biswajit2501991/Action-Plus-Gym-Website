@@ -1,6 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { SITE_CONTENT_CACHE_TAG } from "@/lib/cms/get-site-content";
 import { redirect } from "next/navigation";
 import { GYM_ID } from "@/lib/config";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/lib/media/constants";
 
 function revalidatePublicSite() {
+  revalidateTag(SITE_CONTENT_CACHE_TAG);
   revalidatePath("/", "layout");
   revalidatePath("/");
   revalidatePath("/contact");

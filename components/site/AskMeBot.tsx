@@ -205,34 +205,47 @@ export function AskMeBot() {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const list = await listBotFaqsAction();
-      if (!cancelled) setFaqs(list);
-      try {
-        const saved = localStorage.getItem(TOKEN_KEY) || "";
-        if (saved && !cancelled) {
-          setToken(saved);
-          await loadThread({ publicToken: saved });
-        } else if (!cancelled) {
-          setLines([greeting]);
+    const run = () => {
+      void (async () => {
+        try {
+          const saved = localStorage.getItem(TOKEN_KEY) || "";
+          if (saved && !cancelled) {
+            setToken(saved);
+            await loadThread({ publicToken: saved });
+          } else if (!cancelled) {
+            setLines([greeting]);
+          }
+        } catch {
+          if (!cancelled) setLines([greeting]);
         }
-      } catch {
-        if (!cancelled) setLines([greeting]);
-      }
-    })();
+      })();
+    };
+    const idle = window.setTimeout(run, 400);
     return () => {
       cancelled = true;
+      window.clearTimeout(idle);
     };
   }, [greeting, loadThread]);
 
-  // Poll for staff replies whether chat is open or closed (needs a saved token).
+  useEffect(() => {
+    if (!open || faqs.length) return;
+    let cancelled = false;
+    void listBotFaqsAction().then((list) => {
+      if (!cancelled) setFaqs(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, faqs.length]);
+
+  // Poll for staff replies. Slower while the chat is closed so the homepage stays light.
   useEffect(() => {
     if (!token) return;
     const id = window.setInterval(() => {
       void loadThread({ publicToken: token });
-    }, 12_000);
+    }, open ? 12_000 : 30_000);
     return () => window.clearInterval(id);
-  }, [token, loadThread]);
+  }, [token, loadThread, open]);
 
   useEffect(() => {
     if (!showForm && !showLookup) return;

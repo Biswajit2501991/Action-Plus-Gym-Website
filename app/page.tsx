@@ -29,9 +29,8 @@ import {
   parsePreviewTheme,
 } from "@/lib/festival";
 
-/** CMS-driven homepage — always fetch latest content from Supabase. */
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+/** Public homepage uses the 60s CMS cache; owner saves revalidate it. */
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getSiteContent();

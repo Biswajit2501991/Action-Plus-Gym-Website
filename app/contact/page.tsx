@@ -9,8 +9,7 @@ import { FestivalShell } from "@/components/site/FestivalShell";
 import { isGoogleMapsEmbedUrl, normalizeGoogleMapsEmbedUrl } from "@/lib/maps";
 import { SocialQrLinks } from "@/components/site/SocialQrLinks";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Contact",

@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { GYM_ID } from "@/lib/config";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { fallbackContent } from "@/lib/cms/fallback";
@@ -19,7 +21,9 @@ import type {
   GalleryAlbum,
 } from "@/lib/types";
 
-export async function getSiteContent(): Promise<SiteContent> {
+export const SITE_CONTENT_CACHE_TAG = "site-content";
+
+async function loadSiteContentFromDb(): Promise<SiteContent> {
   try {
     const supabase = createAnonServerClient();
     const gymId = GYM_ID;
@@ -186,3 +190,11 @@ export async function getSiteContent(): Promise<SiteContent> {
     return fallbackContent;
   }
 }
+
+const loadSiteContentCached = unstable_cache(loadSiteContentFromDb, ["site-content", GYM_ID], {
+  revalidate: 60,
+  tags: [SITE_CONTENT_CACHE_TAG],
+});
+
+/** One CMS fetch per request; 60s shared cache. Owner saves revalidate the tag. */
+export const getSiteContent = cache(() => loadSiteContentCached());
