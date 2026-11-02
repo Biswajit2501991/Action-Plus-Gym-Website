@@ -2524,12 +2524,6 @@ html[data-festival="holi-2027"] header > div > .container-site {
   transform: translateX(120%);
 }
 
-.apg-celebrate-btn-sm {
-  min-height: 2.6rem;
-  padding: 0.5rem 1.1rem;
-  font-size: 0.75rem;
-}
-
 @media (max-width: 720px) {
   .apg-celebrate-btn {
     min-height: 2.75rem;

@@ -8,12 +8,10 @@ export function PopupOffer({
   popup,
   open,
   onClose,
-  onCelebrateAgain,
 }: {
   popup: PopupType | null;
   open: boolean;
   onClose: () => void;
-  onCelebrateAgain?: () => void;
 }) {
   if (!popup || !open) return null;
 
@@ -58,15 +56,6 @@ export function PopupOffer({
               </h3>
               <p className="mt-3 whitespace-pre-line text-sm opacity-85">{popup.body}</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                {onCelebrateAgain ? (
-                  <button
-                    type="button"
-                    className="apg-celebrate-btn apg-celebrate-btn-sm"
-                    onClick={onCelebrateAgain}
-                  >
-                    Celebrate again
-                  </button>
-                ) : null}
                 <div onClick={onClose}>
                   <Button href={popup.button_href || "#join"}>
                     {popup.button_text || "Claim Offer"}

@@ -57,7 +57,6 @@ export function CelebrateOfferButton({
         popup={live ? popup : fallbackPopup}
         open={modal}
         onClose={() => setModal(false)}
-        onCelebrateAgain={celebrate}
       />
     </>
   );
