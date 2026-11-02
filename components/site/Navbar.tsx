@@ -4,8 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+
+const actions = [
+  { href: "/members", label: "Member Portal", join: false },
+  { href: "/contact", label: "Contact", join: false },
+  { href: "#join", label: "Join Now", join: true },
+] as const;
 
 const links = [
   { href: "#services", label: "Services" },
@@ -108,17 +113,16 @@ export function Navbar({
               {l.label}
             </Link>
           ))}
-          <div className="flex items-center gap-2">
-            <Button href="/members" className="!py-2.5 !text-xs">
-              Member Portal
-            </Button>
-            <Button href="/contact" className="!py-2.5 !text-xs">
-              Contact
-            </Button>
-            <Button href="#join" className="!py-2.5 !text-xs">
-              Join Now
-            </Button>
-          </div>
+          {actions.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn("nav-action", item.join && "nav-action-join")}
+            >
+              {item.label}
+              {item.join ? <span className="nav-action-arrow">↗</span> : null}
+            </Link>
+          ))}
         </nav>
 
         <div className="flex items-center gap-2 lg:hidden">
@@ -162,16 +166,18 @@ export function Navbar({
                   </Link>
                 ))}
               </div>
-              <div className="mt-5 flex flex-col gap-3">
-                <Button href="/members" className="w-full" onClick={() => setOpen(false)}>
-                  Member Portal
-                </Button>
-                <Button href="/contact" className="w-full" onClick={() => setOpen(false)}>
-                  Contact
-                </Button>
-                <Button href="#join" className="w-full" onClick={() => setOpen(false)}>
-                  Join Now
-                </Button>
+              <div className="mt-5 flex flex-col">
+                {actions.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn("nav-action nav-action-mobile", item.join && "nav-action-join")}
+                    onClick={() => setOpen(false)}
+                  >
+                    {item.label}
+                    {item.join ? <span className="nav-action-arrow">↗</span> : null}
+                  </Link>
+                ))}
               </div>
             </div>,
             document.body,
