@@ -1,8 +1,6 @@
 "use client";
 
-import Image from "next/image";
 import { X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import type { PopupOffer as PopupType } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 
@@ -17,24 +15,16 @@ export function PopupOffer({
   onClose: () => void;
   onCelebrateAgain?: () => void;
 }) {
-  if (!popup) return null;
+  if (!popup || !open) return null;
 
   return (
-    <AnimatePresence>
-      {open ? (
-        <motion.div
+        <div
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="apg-offer-title"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12 }}
+          <div
             className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-gold/30 shadow-2xl"
             style={{ background: popup.bg_color, color: popup.text_color }}
           >
@@ -47,12 +37,12 @@ export function PopupOffer({
               <X className="h-4 w-4" />
             </button>
             {popup.image_url ? (
-              <div className="relative h-44 w-full">
-                <Image
+              <div className="relative h-44 w-full overflow-hidden">
+                {/* Native img so the offer is not blocked on Next image optimisation. */}
+                <img
                   src={popup.image_url}
                   alt={popup.title}
-                  fill
-                  className="object-cover"
+                  className="h-full w-full object-cover"
                 />
               </div>
             ) : null}
@@ -91,9 +81,7 @@ export function PopupOffer({
                 </button>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+          </div>
+        </div>
   );
 }

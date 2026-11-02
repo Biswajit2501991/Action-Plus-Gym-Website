@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { PopupOffer } from "@/components/site/PopupOffer";
 import { CelebrateFireworks } from "@/components/site/CelebrateFireworks";
 import { isOfferLive } from "@/lib/celebrate-offer";
@@ -20,23 +20,13 @@ export function CelebrateOfferButton({
 }) {
   const [playId, setPlayId] = useState(0);
   const [modal, setModal] = useState(false);
-  const openTimer = useRef(0);
-
-  useEffect(() => {
-    return () => window.clearTimeout(openTimer.current);
-  }, []);
 
   function celebrate() {
-    window.clearTimeout(openTimer.current);
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setModal(true);
-      return;
-    }
-    setPlayId((n) => n + 1);
-    openTimer.current = window.setTimeout(() => setModal(true), 1100);
+    setModal(true);
+    if (!reduce) setPlayId((n) => n + 1);
   }
 
   const live = isOfferLive(popup);
