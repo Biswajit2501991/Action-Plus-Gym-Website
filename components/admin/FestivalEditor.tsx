@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { saveFestivalAction } from "@/lib/actions/admin";
 import {
+  CHHATH_PUJA_THEME,
   DIWALI_THEME,
   DURGA_PUJA_THEME,
   FESTIVAL_THEME_META,
@@ -31,6 +32,7 @@ export function FestivalEditor({ settings }: { settings: WebsiteSettings }) {
   const initial = useMemo(() => hydrateFestivalCatalog(settings), [settings]);
   const [catalog, setCatalog] = useState(initial);
   const [selected, setSelected] = useState<SelectKey>(() => {
+    if (initial.chhath_puja.enabled) return CHHATH_PUJA_THEME;
     if (initial.diwali.enabled) return DIWALI_THEME;
     if (initial.durga_puja.enabled) return DURGA_PUJA_THEME;
     return "default";
@@ -89,6 +91,7 @@ export function FestivalEditor({ settings }: { settings: WebsiteSettings }) {
               ...prev,
               durga_puja: { ...prev.durga_puja, enabled: false },
               diwali: { ...prev.diwali, enabled: false },
+              chhath_puja: { ...prev.chhath_puja, enabled: false },
             }));
             setMsg("Default theme saved. Festival dates are kept for later.");
           });
@@ -151,6 +154,7 @@ export function FestivalEditor({ settings }: { settings: WebsiteSettings }) {
             <option value="default">Default Theme</option>
             <option value={DURGA_PUJA_THEME}>Durga Puja Theme</option>
             <option value={DIWALI_THEME}>Diwali Theme</option>
+            <option value={CHHATH_PUJA_THEME}>Chhath Puja Theme</option>
           </select>
         </Field>
 

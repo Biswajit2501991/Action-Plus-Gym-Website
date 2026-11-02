@@ -197,7 +197,6 @@ export function DiwaliEffects({
         <span className="festival-string-lights" />
         <span className="festival-diya festival-diya-left" />
         <span className="festival-diya festival-diya-right" />
-        <span className="festival-rangoli" />
         <span className="festival-sparkle festival-sparkle-a" />
         <span className="festival-sparkle festival-sparkle-b" />
       </div>

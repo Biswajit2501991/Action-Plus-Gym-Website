@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { DiwaliEffects } from "@/components/site/DiwaliEffects";
+import { ChhathEffects } from "@/components/site/ChhathEffects";
 import {
+  CHHATH_PUJA_THEME,
   DIWALI_THEME,
   PREVIEW_QUERY,
   PREVIEW_STORAGE_KEY,
@@ -79,6 +81,14 @@ export function FestivalTheme({
     return (
       <div className="festival-decor" aria-hidden>
         <DiwaliEffects intensity="full" greeting />
+      </div>
+    );
+  }
+
+  if (theme === CHHATH_PUJA_THEME) {
+    return (
+      <div className="festival-decor" aria-hidden>
+        <ChhathEffects greeting />
       </div>
     );
   }
