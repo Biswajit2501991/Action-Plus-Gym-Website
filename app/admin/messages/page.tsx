@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { isOwnerRole } from "@/lib/auth/session";
 import {
   listBotFaqsAdminAction,
   listBotThreadsAction,
@@ -6,7 +7,7 @@ import {
 import { MessagesBoard } from "@/components/admin/MessagesBoard";
 
 export default async function MessagesPage() {
-  await requireAdmin();
+  const session = await requireAdmin();
   const [threadsData, faqsData] = await Promise.all([
     listBotThreadsAction(),
     listBotFaqsAdminAction(),
@@ -36,5 +37,11 @@ export default async function MessagesPage() {
     is_active: f.is_active !== false,
   }));
 
-  return <MessagesBoard initialThreads={threads} initialFaqs={faqs} />;
+  return (
+    <MessagesBoard
+      initialThreads={threads}
+      initialFaqs={faqs}
+      canEditFaqs={isOwnerRole(session.staff_role)}
+    />
+  );
 }

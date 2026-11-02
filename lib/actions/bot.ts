@@ -6,19 +6,11 @@ import { GYM_ID } from "@/lib/config";
 import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
 import { LEAD_DUPLICATE_ERROR, leadFillError, leadSpamError } from "@/lib/site/lead-guard";
 import { hasRecentEnquiry } from "@/lib/site/recent-enquiry";
+import {
+  isRateLimited,
+  markRateLimited,
+} from "@/lib/site/rate-limit";
 import { createAnonServerClient } from "@/lib/supabase/server";
-
-const rateMap = new Map<string, number>();
-
-function isRateLimited(key: string, windowMs: number) {
-  const now = Date.now();
-  const last = rateMap.get(key) ?? 0;
-  return now - last < windowMs;
-}
-
-function markRateLimited(key: string) {
-  rateMap.set(key, Date.now());
-}
 
 export type BotFaq = {
   id: number;
@@ -124,7 +116,7 @@ export async function submitBotEnquiryAction(
     ? `bot-followup:${parsed.data.publicToken}`
     : `bot:${parsed.data.mobile}`;
   const rateWindowMs = parsed.data.publicToken ? 8_000 : 20_000;
-  if (isRateLimited(rateKey, rateWindowMs)) {
+  if (await isRateLimited(rateKey, rateWindowMs)) {
     return { ok: false, error: "Please wait a moment before submitting again." };
   }
 
@@ -145,7 +137,7 @@ export async function submitBotEnquiryAction(
   if (!data?.ok) {
     return { ok: false, error: data?.error || "Unable to submit." };
   }
-  markRateLimited(rateKey);
+  await markRateLimited(rateKey);
   return { ok: true, publicToken: String(data.public_token) };
 }
 

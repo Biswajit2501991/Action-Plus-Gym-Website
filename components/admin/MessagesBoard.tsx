@@ -45,9 +45,11 @@ type ChatMsg = {
 export function MessagesBoard({
   initialThreads,
   initialFaqs,
+  canEditFaqs = false,
 }: {
   initialThreads: ThreadSummary[];
   initialFaqs: FaqRow[];
+  canEditFaqs?: boolean;
 }) {
   const [tab, setTab] = useState<"inbox" | "faqs">("inbox");
   const [threads, setThreads] = useState(initialThreads);
@@ -321,12 +323,15 @@ export function MessagesBoard({
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            saveFaqs();
+            if (canEditFaqs) saveFaqs();
           }}
         >
           <p className="text-sm text-muted">
             These questions appear as chips in the Ask Me chat. Answers show instantly
             when a visitor taps one.
+            {canEditFaqs
+              ? ""
+              : " Only the gym owner can change them."}
           </p>
           {faqs.map((faq, index) => (
             <div
@@ -337,18 +342,21 @@ export function MessagesBoard({
                 <p className="text-xs uppercase tracking-[0.2em] text-gold">
                   Question {index + 1}
                 </p>
-                <button
-                  type="button"
-                  className="text-xs text-muted hover:text-white"
-                  onClick={() =>
-                    setFaqs((prev) => prev.filter((_, i) => i !== index))
-                  }
-                >
-                  Remove
-                </button>
+                {canEditFaqs ? (
+                  <button
+                    type="button"
+                    className="text-xs text-muted hover:text-white"
+                    onClick={() =>
+                      setFaqs((prev) => prev.filter((_, i) => i !== index))
+                    }
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </div>
               <Field label="Question">
                 <TextInput
+                  readOnly={!canEditFaqs}
                   value={faq.question}
                   onChange={(e) =>
                     setFaqs((prev) =>
@@ -361,6 +369,7 @@ export function MessagesBoard({
               </Field>
               <Field label="Auto-reply">
                 <TextTextarea
+                  readOnly={!canEditFaqs}
                   rows={3}
                   value={faq.answer}
                   onChange={(e) =>
@@ -376,34 +385,39 @@ export function MessagesBoard({
                 label="Active on website"
                 hint="Hidden when off"
                 checked={faq.is_active !== false}
-                onChange={(next) =>
+                onChange={(next) => {
+                  if (!canEditFaqs) return;
                   setFaqs((prev) =>
                     prev.map((row, i) =>
                       i === index ? { ...row, is_active: next } : row,
                     ),
-                  )
-                }
+                  );
+                }}
               />
             </div>
           ))}
-          <button
-            type="button"
-            onClick={() =>
-              setFaqs((prev) => [
-                ...prev,
-                {
-                  question: "",
-                  answer: "",
-                  sort_order: prev.length,
-                  is_active: true,
-                },
-              ])
-            }
-            className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 hover:border-gold/40 hover:text-gold"
-          >
-            + Add question
-          </button>
-          <SaveBar pending={pending} message={msg} label="Save bot questions" />
+          {canEditFaqs ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  setFaqs((prev) => [
+                    ...prev,
+                    {
+                      question: "",
+                      answer: "",
+                      sort_order: prev.length,
+                      is_active: true,
+                    },
+                  ])
+                }
+                className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 hover:border-gold/40 hover:text-gold"
+              >
+                + Add question
+              </button>
+              <SaveBar pending={pending} message={msg} label="Save bot questions" />
+            </>
+          ) : null}
         </form>
       )}
     </div>

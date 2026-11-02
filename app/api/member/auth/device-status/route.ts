@@ -111,9 +111,10 @@ export async function GET(req: NextRequest) {
       registered: true,
       hasPin,
       hasWebauthn,
-      mobile:
-        (hasPin || hasWebauthn) && mobile.length >= 10 ? mobile : null,
-      maskedMobile: mobile.length >= 4 ? `******${mobile.slice(-4)}` : null,
+      maskedMobile:
+        (hasPin || hasWebauthn) && mobile.length >= 4
+          ? `******${mobile.slice(-4)}`
+          : null,
     });
   } catch (error) {
     console.error("device-status", error);

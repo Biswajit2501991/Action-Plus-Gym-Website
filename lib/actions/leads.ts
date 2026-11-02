@@ -6,6 +6,7 @@ import { findMembersByMobile } from "@/lib/member-portal/members";
 import { leadMobileError, normalizeMobile } from "@/lib/member-portal/phone";
 import { LEAD_DUPLICATE_ERROR, leadFillError, leadSpamError } from "@/lib/site/lead-guard";
 import { hasRecentEnquiry } from "@/lib/site/recent-enquiry";
+import { consumeRateLimit } from "@/lib/site/rate-limit";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
 const leadSchema = z.object({
@@ -35,16 +36,6 @@ const MEMBER_CHECK_SOURCES = new Set([
 
 const ALREADY_MEMBER_NOTE =
   "You are already a member. Please contact the gym for your membership update or any queries.";
-
-const rateMap = new Map<string, number>();
-
-function rateLimit(key: string, windowMs = 60_000) {
-  const now = Date.now();
-  const last = rateMap.get(key) ?? 0;
-  if (now - last < windowMs) return false;
-  rateMap.set(key, now);
-  return true;
-}
 
 export type LeadResult =
   | { ok: true; confirmWhatsApp?: boolean; mobile?: string }
@@ -81,7 +72,7 @@ export async function submitLead(input: z.infer<typeof leadSchema>): Promise<Lea
   }
 
   const key = `${mobile}:${parsed.data.source}`;
-  if (parsed.data.confirm && !rateLimit(key)) {
+  if (parsed.data.confirm && !(await consumeRateLimit(key))) {
     return { ok: false, error: "Please wait a moment before submitting again." };
   }
 
@@ -134,7 +125,7 @@ export async function submitNewsletter(email: string): Promise<NewsletterResult>
   if (!email || !email.includes("@")) {
     return { ok: false, error: "Enter a valid email." };
   }
-  if (!rateLimit(`newsletter:${email}`, 120_000)) {
+  if (!(await consumeRateLimit(`newsletter:${email}`, 120_000))) {
     return { ok: false, error: "Already submitted. Please wait." };
   }
 

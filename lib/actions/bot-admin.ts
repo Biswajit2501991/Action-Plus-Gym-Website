@@ -1,11 +1,17 @@
 "use server";
 
-import { getAdminSession } from "@/lib/auth/session";
+import { getAdminSession, isOwnerRole } from "@/lib/auth/session";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
 async function requireSession() {
   const session = await getAdminSession();
   if (!session) throw new Error("Unauthorized");
+  return session;
+}
+
+async function requireOwner() {
+  const session = await requireSession();
+  if (!isOwnerRole(session.staff_role)) throw new Error("Owner only");
   return session;
 }
 
@@ -101,11 +107,18 @@ export async function saveBotFaqsAdminAction(
     is_active?: boolean;
   }>,
 ) {
-  const session = await requireSession();
-  const supabase = createAnonServerClient();
-  const { data } = await supabase.rpc("website_bot_admin_save_faqs", {
-    p_token: session.token,
-    p_faqs: faqs,
-  });
-  return data;
+  try {
+    const session = await requireOwner();
+    const supabase = createAnonServerClient();
+    const { data } = await supabase.rpc("website_bot_admin_save_faqs", {
+      p_token: session.token,
+      p_faqs: faqs,
+    });
+    return data;
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Owner only",
+    };
+  }
 }

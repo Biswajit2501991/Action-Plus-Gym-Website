@@ -862,7 +862,7 @@ export function MemberPortalApp() {
           const hasPin = Boolean(status?.hasPin || local?.hasPin);
           const hasWebauthn = Boolean(status?.hasWebauthn || local?.hasWebauthn);
           const unlockMobile =
-            String(status?.mobile || local?.mobile || "")
+            String(local?.mobile || "")
               .replace(/\D/g, "")
               .slice(-10) || "";
 
