@@ -26,11 +26,11 @@ export default async function AdminLayout({
       <ClearFestivalTheme />
       {session ? (
         <div className="flex min-h-screen">
-          <aside className="hidden w-64 flex-col border-r border-[color:var(--panel-border)] bg-[color:var(--bg-elevated)]/80 p-5 md:flex">
+          <aside className="sticky top-0 hidden h-screen w-[16.5rem] shrink-0 flex-col overflow-hidden border-r border-[color:var(--panel-border)] bg-[color:var(--bg-elevated)]/80 p-4 md:flex">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-display text-lg text-gold-gradient">APG Admin</p>
-                <p className="mt-1 text-xs text-muted">
+                <p className="font-display text-xl text-gold-gradient">APG Admin</p>
+                <p className="mt-1 text-sm text-muted">
                   {session.full_name || session.staff_login_id} · {session.staff_role}
                 </p>
               </div>
@@ -49,8 +49,10 @@ export default async function AdminLayout({
               </p>
               <ThemeToggle className="w-full justify-between" />
             </div>
-            <AdminNav owner={owner} unreadMessages={unreadMessages} />
-            <p className="mt-auto pt-6 text-[11px] leading-relaxed text-muted">
+            <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+              <AdminNav owner={owner} unreadMessages={unreadMessages} />
+            </div>
+            <p className="mt-auto shrink-0 pt-4 text-xs leading-relaxed text-muted">
               Staff accounts are managed in{" "}
               <a
                 href="https://app.gymactionplus.com/"
