@@ -1,5 +1,6 @@
 import type { SiteContent } from "@/lib/types";
 import { GYM_ID } from "@/lib/config";
+import { DEFAULT_SECTION_ORDER } from "@/lib/cms/section-order";
 
 export const fallbackContent: SiteContent = {
   settings: {
@@ -43,6 +44,7 @@ export const fallbackContent: SiteContent = {
     popup: true,
     footer: true,
   },
+  sectionOrder: [...DEFAULT_SECTION_ORDER],
   popup: {
     id: 1,
     enabled: true,

@@ -5,6 +5,11 @@ export const websiteSections = [
     description: "Turn homepage blocks on or off",
   },
   {
+    href: "/admin/website/section-order",
+    label: "Section Order",
+    description: "Choose the order homepage blocks appear in",
+  },
+  {
     href: "/admin/website/festival",
     label: "Themes",
     description: "Default, Durga Puja, Diwali, Chhath Puja, New Year 2027, and Holi 2027 themes with IST schedules",

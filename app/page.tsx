@@ -2,17 +2,7 @@ import type { Metadata } from "next";
 import { getSiteContent } from "@/lib/cms/get-site-content";
 import { Navbar } from "@/components/site/Navbar";
 import { Hero } from "@/components/site/Hero";
-import { Stats } from "@/components/site/Stats";
-import { Services } from "@/components/site/Services";
-import { Pricing } from "@/components/site/Pricing";
-import { Trainers } from "@/components/site/Trainers";
-import { Transformations } from "@/components/site/Transformations";
-import { Gallery } from "@/components/site/Gallery";
-import { Videos } from "@/components/site/Videos";
-import { Testimonials } from "@/components/site/Testimonials";
-import { Hours } from "@/components/site/Hours";
-import { Reviews } from "@/components/site/Reviews";
-import { LeadForm } from "@/components/site/LeadForm";
+import { HomeSection } from "@/components/site/HomeSection";
 import { Footer } from "@/components/site/Footer";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
@@ -22,6 +12,7 @@ import { NewYearStory } from "@/components/site/NewYearStory";
 import { HoliHero } from "@/components/site/HoliHero";
 import { HoliStory } from "@/components/site/HoliStory";
 import { SITE_URL } from "@/lib/config";
+import { SECTION_NAV } from "@/lib/cms/section-order";
 import {
   HOLI_2027_THEME,
   NEW_YEAR_2027_THEME,
@@ -86,11 +77,16 @@ export default async function HomePage({
         brand={settings.site_name}
         darkHero
         returningMessage={settings.returning_bar_text}
-        extraLinks={
-          sections.transformations === true && content.transformations.length > 0
-            ? [{ href: "#transformations", label: "Transformations" }]
-            : []
-        }
+        menuLinks={content.sectionOrder.flatMap((key) => {
+          const link = SECTION_NAV[key];
+          if (!link) return [];
+          if (key === "transformations") {
+            return sections.transformations === true && content.transformations.length > 0
+              ? [link]
+              : [];
+          }
+          return sections[key] !== false ? [link] : [];
+        })}
       />
       {sections.hero !== false ? (
         newYearLive ? (
@@ -109,41 +105,9 @@ export default async function HomePage({
       ) : null}
       {newYearLive ? <NewYearStory /> : null}
       {holiLive ? <HoliStory /> : null}
-      {sections.stats !== false ? <Stats stats={content.stats} /> : null}
-      {sections.transformations === true && content.transformations.length > 0 ? (
-        <Transformations items={content.transformations} />
-      ) : sections.services !== false ? (
-        <Services services={content.services} />
-      ) : null}
-      {sections.pricing !== false ? <Pricing plans={content.pricing} /> : null}
-      {sections.trainers !== false ? (
-        <Trainers trainers={content.trainers} />
-      ) : null}
-      {sections.transformations === true &&
-      content.transformations.length > 0 &&
-      sections.services !== false ? (
-        <Services services={content.services} />
-      ) : null}
-      {sections.gallery !== false ? (
-        <Gallery images={content.gallery} />
-      ) : null}
-      {sections.videos !== false ? <Videos videos={content.videos} /> : null}
-      {sections.testimonials !== false ? (
-        <Testimonials items={content.testimonials} />
-      ) : null}
-      {sections.hours !== false ? (
-        <Hours hours={content.hours} timezone={settings.timezone} />
-      ) : null}
-      {sections.reviews !== false && content.reviews ? (
-        <Reviews reviews={content.reviews} />
-      ) : null}
-      {sections.contact !== false ? (
-        <LeadForm
-          contactPhone={settings.phone}
-          contactEmail={settings.email}
-          contactWhatsapp={settings.whatsapp}
-        />
-      ) : null}
+      {content.sectionOrder.map((key) => (
+        <HomeSection key={key} sectionKey={key} content={content} />
+      ))}
       {sections.footer !== false ? (
         <Footer settings={settings} hours={content.hours} />
       ) : null}

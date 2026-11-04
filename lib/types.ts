@@ -186,6 +186,8 @@ export type WebsiteMedia = {
 export type SiteContent = {
   settings: WebsiteSettings;
   sections: Record<string, boolean>;
+  /** Movable homepage blocks, top to bottom. Hero and footer stay fixed. */
+  sectionOrder: string[];
   popup: PopupOffer | null;
   heroSlides: HeroSlide[];
   stats: StatItem[];

@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { GYM_ID } from "@/lib/config";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { fallbackContent } from "@/lib/cms/fallback";
+import { buildSectionOrder } from "@/lib/cms/section-order";
 import { ensureFreshReviews } from "@/lib/reviews/sync";
 import type {
   GalleryImage,
@@ -78,7 +79,7 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
       supabase.from("website_settings").select("*").eq("gym_id", gymId).maybeSingle(),
       supabase
         .from("website_sections")
-        .select("section_key, enabled")
+        .select("section_key, enabled, sort_order")
         .eq("gym_id", gymId),
       supabase
         .from("website_popup_offers")
@@ -168,6 +169,9 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
     for (const row of sectionsRes.data ?? []) {
       sections[row.section_key] = row.enabled;
     }
+    const sectionOrder = sectionsRes.error
+      ? fallbackContent.sectionOrder
+      : buildSectionOrder(sectionsRes.data);
 
     const pricing = (pricingRes.data ?? []).map((p) => {
       let features: string[] = [];
@@ -211,6 +215,7 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
     return {
       settings: settingsRes.data as WebsiteSettings,
       sections,
+      sectionOrder,
       popup: (popupRes.data as PopupOffer) ?? null,
       heroSlides: ((slidesRes.data as HeroSlide[]) ?? []).filter(
         (s) => Boolean(s?.image_url),

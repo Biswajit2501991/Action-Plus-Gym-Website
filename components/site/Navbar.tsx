@@ -26,15 +26,15 @@ export function Navbar({
   brand,
   darkHero = false,
   returningMessage,
-  extraLinks = [],
+  menuLinks,
 }: {
   brand: string;
   /** Keep light nav text over a dark full-bleed hero (homepage). */
   darkHero?: boolean;
   /** Blank keeps the default returning-visitor line. */
   returningMessage?: string | null;
-  /** Extra homepage anchors, inserted after Trainers. */
-  extraLinks?: { href: string; label: string }[];
+  /** Homepage menu, already sorted to match the section order. */
+  menuLinks?: { href: string; label: string }[];
 }) {
   const barRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -88,7 +88,7 @@ export function Navbar({
   }, [open, scrolled, returning, returningMessage]);
 
   const overHero = darkHero && !scrolled;
-  const navLinks = [...extraLinks, ...links];
+  const navLinks = menuLinks ?? links;
 
   return (
     <header

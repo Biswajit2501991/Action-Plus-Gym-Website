@@ -114,6 +114,26 @@ export async function saveSettingsAction(payload: Record<string, unknown>) {
   return data;
 }
 
+export async function saveSectionOrderAction(keys: string[]) {
+  const session = await requireOwner();
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase.rpc("website_admin_set_section_order", {
+    p_token: session.token,
+    p_keys: keys,
+  });
+  if (error || !data?.ok) {
+    console.error(error || data);
+    return {
+      ok: false as const,
+      error:
+        (typeof data?.error === "string" && data.error) ||
+        "Could not save section order.",
+    };
+  }
+  revalidatePublicSite();
+  return data;
+}
+
 export async function setSectionAction(sectionKey: string, enabled: boolean) {
   const session = await requireOwner();
   const supabase = createAnonServerClient();
