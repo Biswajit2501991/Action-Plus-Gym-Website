@@ -6,6 +6,7 @@ import { Stats } from "@/components/site/Stats";
 import { Services } from "@/components/site/Services";
 import { Pricing } from "@/components/site/Pricing";
 import { Trainers } from "@/components/site/Trainers";
+import { Transformations } from "@/components/site/Transformations";
 import { Gallery } from "@/components/site/Gallery";
 import { Videos } from "@/components/site/Videos";
 import { Testimonials } from "@/components/site/Testimonials";
@@ -85,6 +86,11 @@ export default async function HomePage({
         brand={settings.site_name}
         darkHero
         returningMessage={settings.returning_bar_text}
+        extraLinks={
+          sections.transformations === true && content.transformations.length > 0
+            ? [{ href: "#transformations", label: "Transformations" }]
+            : []
+        }
       />
       {sections.hero !== false ? (
         newYearLive ? (
@@ -110,6 +116,9 @@ export default async function HomePage({
       {sections.pricing !== false ? <Pricing plans={content.pricing} /> : null}
       {sections.trainers !== false ? (
         <Trainers trainers={content.trainers} />
+      ) : null}
+      {sections.transformations === true && content.transformations.length > 0 ? (
+        <Transformations items={content.transformations} />
       ) : null}
       {sections.gallery !== false ? (
         <Gallery images={content.gallery} />

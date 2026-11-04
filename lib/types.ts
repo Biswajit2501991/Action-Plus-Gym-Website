@@ -135,6 +135,18 @@ export type Testimonial = {
   is_active: boolean;
 };
 
+export type Transformation = {
+  id: number;
+  member_name: string;
+  before_photo_url: string;
+  after_photo_url: string;
+  photo_message: string;
+  message: string;
+  trained_under: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
 export type OpeningHour = {
   id: number;
   day_of_week: number;
@@ -184,6 +196,7 @@ export type SiteContent = {
   gallery: GalleryImage[];
   videos: VideoItem[];
   testimonials: Testimonial[];
+  transformations: Transformation[];
   hours: OpeningHour[];
   reviews: ReviewCache | null;
 };

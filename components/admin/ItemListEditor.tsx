@@ -77,6 +77,7 @@ export function ItemListEditor({
   );
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [tone, setTone] = useState<"ok" | "error">("ok");
 
   useEffect(() => {
     setRows(initialRows.length ? initialRows.map((r) => ({ ...r })) : []);
@@ -119,7 +120,22 @@ export function ItemListEditor({
             }
             return out;
           });
-          await replaceCollectionAction(table, payload);
+          const result = await replaceCollectionAction(table, payload);
+          if (
+            result &&
+            typeof result === "object" &&
+            "ok" in result &&
+            result.ok === false
+          ) {
+            setTone("error");
+            setMsg(
+              "error" in result && typeof result.error === "string"
+                ? result.error
+                : "Could not save.",
+            );
+            return;
+          }
+          setTone("ok");
           setMsg(`${title} saved.`);
         });
       }}
@@ -281,7 +297,7 @@ export function ItemListEditor({
         </div>
       )}
 
-      <SaveBar pending={pending} message={msg} />
+      <SaveBar pending={pending} message={msg} tone={tone} />
     </form>
   );
 }

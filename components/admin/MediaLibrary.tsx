@@ -22,6 +22,7 @@ const SECTION_TAGS = [
   { value: "trainers", label: "Trainers" },
   { value: "services", label: "Services" },
   { value: "testimonials", label: "Testimonials" },
+  { value: "transformations", label: "Transformation Journey" },
   { value: "popup", label: "Popup" },
   { value: "brand", label: "Brand / SEO" },
 ];

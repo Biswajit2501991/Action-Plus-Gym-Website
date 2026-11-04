@@ -55,6 +55,11 @@ export const websiteSections = [
     description: "Member reviews and quotes",
   },
   {
+    href: "/admin/website/transformations",
+    label: "Transformation Journey",
+    description: "Member photos, a photo message, their story, and who trained them",
+  },
+  {
     href: "/admin/website/hours",
     label: "Opening Hours",
     description: "Weekly schedule and open/closed status",

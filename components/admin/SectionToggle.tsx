@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   gallery: "Gallery",
   videos: "Videos",
   testimonials: "Testimonials",
+  transformations: "Transformation Journey",
   hours: "Opening hours",
   reviews: "Google reviews",
   contact: "Join / Contact form",

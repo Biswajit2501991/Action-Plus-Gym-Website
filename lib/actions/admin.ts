@@ -143,6 +143,26 @@ export async function replaceCollectionAction(
 ) {
   const session = await requireOwner();
   const supabase = createAnonServerClient();
+  if (table === "website_transformations") {
+    const { data, error } = await supabase.rpc(
+      "website_admin_replace_transformations",
+      {
+        p_token: session.token,
+        p_rows: rows,
+      },
+    );
+    if (error || !data?.ok) {
+      console.error(error || data);
+      return {
+        ok: false as const,
+        error:
+          (typeof data?.error === "string" && data.error) ||
+          "Could not save transformation journeys.",
+      };
+    }
+    revalidatePublicSite();
+    return data;
+  }
   const { data } = await supabase.rpc("website_admin_replace_collection", {
     p_token: session.token,
     p_table: table,

@@ -99,10 +99,12 @@ export function SaveBar({
   pending,
   message,
   label = "Save changes",
+  tone = "ok",
 }: {
   pending: boolean;
   message: string | null;
   label?: string;
+  tone?: "ok" | "error";
 }) {
   return (
     <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/80 px-4 py-3 backdrop-blur">
@@ -113,7 +115,11 @@ export function SaveBar({
       >
         {pending ? "Saving…" : label}
       </button>
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+      {message ? (
+        <p className={`text-sm ${tone === "error" ? "text-rose-300" : "text-emerald-300"}`}>
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

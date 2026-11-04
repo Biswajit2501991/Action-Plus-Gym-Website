@@ -16,12 +16,42 @@ import type {
   StatItem,
   Testimonial,
   Trainer,
+  Transformation,
   VideoItem,
   WebsiteSettings,
   GalleryAlbum,
 } from "@/lib/types";
 
 export const SITE_CONTENT_CACHE_TAG = "site-content";
+
+function safeHttpsUrl(value: unknown) {
+  const url = String(value ?? "").trim();
+  if (url.length > 2000 || !/^https:\/\/\S+$/i.test(url)) return "";
+  return url;
+}
+
+function mapTransformations(rows: unknown): Transformation[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const item = row as Transformation;
+    const before = safeHttpsUrl(item.before_photo_url);
+    const after = safeHttpsUrl(item.after_photo_url);
+    const name = String(item.member_name ?? "").trim().slice(0, 80);
+    if (!name || (!before && !after)) return [];
+    return [
+      {
+        ...item,
+        member_name: name,
+        before_photo_url: before,
+        after_photo_url: after,
+        photo_message: String(item.photo_message ?? "").trim().slice(0, 200),
+        message: String(item.message ?? "").trim().slice(0, 1000),
+        trained_under: String(item.trained_under ?? "").trim().slice(0, 80),
+      },
+    ];
+  });
+}
 
 async function loadSiteContentFromDb(): Promise<SiteContent> {
   try {
@@ -41,6 +71,7 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
       galleryRes,
       videosRes,
       testimonialsRes,
+      transformationsRes,
       hoursRes,
       reviewsRes,
     ] = await Promise.all([
@@ -108,6 +139,14 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
         .eq("is_active", true)
         .order("sort_order"),
       supabase
+        .from("website_transformations")
+        .select(
+          "id, member_name, before_photo_url, after_photo_url, photo_message, message, trained_under, sort_order, is_active",
+        )
+        .eq("gym_id", gymId)
+        .eq("is_active", true)
+        .order("sort_order"),
+      supabase
         .from("website_opening_hours")
         .select("*")
         .eq("gym_id", gymId)
@@ -165,6 +204,10 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
       };
     }
 
+    if (transformationsRes.error) {
+      console.error("website_transformations", transformationsRes.error.message);
+    }
+
     return {
       settings: settingsRes.data as WebsiteSettings,
       sections,
@@ -182,6 +225,9 @@ async function loadSiteContentFromDb(): Promise<SiteContent> {
       ),
       videos: (videosRes.data as VideoItem[]) ?? [],
       testimonials: (testimonialsRes.data as Testimonial[]) ?? [],
+      transformations: transformationsRes.error
+        ? []
+        : mapTransformations(transformationsRes.data),
       hours: (hoursRes.data as OpeningHour[]) ?? [],
       reviews,
     };

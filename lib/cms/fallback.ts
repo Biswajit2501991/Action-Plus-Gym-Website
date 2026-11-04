@@ -33,6 +33,7 @@ export const fallbackContent: SiteContent = {
     services: true,
     pricing: true,
     trainers: true,
+    transformations: false,
     gallery: true,
     videos: true,
     testimonials: true,
@@ -352,6 +353,7 @@ export const fallbackContent: SiteContent = {
       is_active: true,
     },
   ],
+  transformations: [],
   hours: [
     {
       id: 1,

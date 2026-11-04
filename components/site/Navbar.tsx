@@ -26,12 +26,15 @@ export function Navbar({
   brand,
   darkHero = false,
   returningMessage,
+  extraLinks = [],
 }: {
   brand: string;
   /** Keep light nav text over a dark full-bleed hero (homepage). */
   darkHero?: boolean;
   /** Blank keeps the default returning-visitor line. */
   returningMessage?: string | null;
+  /** Extra homepage anchors, inserted after Trainers. */
+  extraLinks?: { href: string; label: string }[];
 }) {
   const barRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -85,6 +88,7 @@ export function Navbar({
   }, [open, scrolled, returning, returningMessage]);
 
   const overHero = darkHero && !scrolled;
+  const navLinks = [...links.slice(0, 3), ...extraLinks, ...links.slice(3)];
 
   return (
     <header
@@ -104,7 +108,7 @@ export function Navbar({
         </Link>
 
         <nav className="hidden items-center gap-7 lg:flex">
-          {links.map((l) => (
+          {navLinks.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -155,7 +159,7 @@ export function Navbar({
               style={{ top: menuTop, height: `calc(100dvh - ${menuTop}px)` }}
             >
               <div className="flex flex-col">
-                {links.map((l) => (
+                {navLinks.map((l) => (
                   <Link
                     key={l.href}
                     href={l.href}
