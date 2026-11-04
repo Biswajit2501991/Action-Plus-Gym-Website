@@ -100,7 +100,7 @@ export function NewYearFireworks({ idle = true }: { idle?: boolean }) {
     const particles: Particle[] = [];
     const rockets: Rocket[] = [];
     let lastIdle = 0;
-    const idleGap = 4200;
+    const idleGap = 6800;
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -136,8 +136,12 @@ export function NewYearFireworks({ idle = true }: { idle?: boolean }) {
 
     const tick = (now: number) => {
       if (!running) return;
+      if (document.hidden) {
+        raf = 0;
+        return;
+      }
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      if (!document.hidden && !paused) {
+      if (!paused) {
         if (idle && now - lastIdle > idleGap + Math.random() * 2200) {
           lastIdle = now;
           launchRocket(rockets, false);
@@ -170,7 +174,7 @@ export function NewYearFireworks({ idle = true }: { idle?: boolean }) {
             rockets.splice(i, 1);
           }
         }
-        while (particles.length > 520) particles.shift();
+        while (particles.length > 260) particles.shift();
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.x += p.vx;
@@ -198,11 +202,16 @@ export function NewYearFireworks({ idle = true }: { idle?: boolean }) {
       }
       raf = window.requestAnimationFrame(tick);
     };
+    const onVisible = () => {
+      if (!document.hidden && running && !raf) raf = window.requestAnimationFrame(tick);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     raf = window.requestAnimationFrame(tick);
 
     return () => {
       running = false;
       window.cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("resize", resize);
       window.removeEventListener(NY_FIREWORKS_EVENT, onBurst);
       window.removeEventListener(NY_PAUSE_EVENT, onPause);

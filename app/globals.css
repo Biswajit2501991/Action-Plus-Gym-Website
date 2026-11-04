@@ -1866,12 +1866,12 @@ html[data-festival="new-year-2027"] {
   --gold: #f4d38a;
   --gold-soft: #ffe9b4;
   --gold-dim: #8a6418;
-  --border: rgba(244, 211, 138, 0.4);
+  --border: rgba(216, 180, 255, 0.35);
   --page-gradient:
-    radial-gradient(980px 540px at 50% -10%, rgba(180, 90, 20, 0.28), transparent 56%),
-    radial-gradient(720px 420px at 0% 100%, rgba(40, 80, 160, 0.22), transparent 52%),
-    radial-gradient(640px 380px at 100% 80%, rgba(160, 40, 80, 0.18), transparent 55%),
-    linear-gradient(180deg, #12080c 0%, #0a0c16 48%, #08060a 100%);
+    radial-gradient(980px 540px at 50% -8%, rgba(168, 85, 247, 0.32), transparent 56%),
+    radial-gradient(720px 420px at 8% 100%, rgba(88, 28, 135, 0.38), transparent 52%),
+    radial-gradient(640px 380px at 100% 78%, rgba(244, 114, 182, 0.18), transparent 55%),
+    linear-gradient(180deg, #14081c 0%, #1a0b28 42%, #0c0614 100%);
 }
 
 html[data-theme="day"][data-festival="new-year-2027"] {
@@ -1898,9 +1898,10 @@ html[data-festival="new-year-2027"] header > div > .container-site {
 
 .ny-hero {
   position: relative;
+  isolation: isolate;
   min-height: 100svh;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   overflow: hidden;
   color: #fff8ea;
 }
@@ -1916,64 +1917,78 @@ html[data-festival="new-year-2027"] header > div > .container-site {
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(180deg, rgba(8, 4, 8, 0.28) 0%, rgba(8, 4, 8, 0.18) 38%, rgba(8, 4, 8, 0.72) 100%),
-    radial-gradient(ellipse at 70% 35%, transparent 0 32%, rgba(8, 4, 8, 0.35) 78%);
+    linear-gradient(180deg, rgba(20, 8, 36, 0.55) 0%, rgba(28, 10, 48, 0.35) 38%, rgba(12, 6, 22, 0.82) 100%),
+    radial-gradient(ellipse at 50% 20%, rgba(192, 132, 252, 0.28), transparent 58%);
+}
+
+.ny-hero-glow {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 1;
+  width: min(38rem, 88vw);
+  height: 14rem;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse at center, rgba(251, 191, 216, 0.28), rgba(167, 139, 250, 0.12) 42%, transparent 70%);
+  filter: blur(8px);
+  pointer-events: none;
 }
 
 .ny-hero-copy {
   position: relative;
-  z-index: 2;
-  width: min(44rem, calc(100% - 2rem));
-  margin: 0 auto 4.5rem;
+  z-index: 40;
+  width: min(46rem, calc(100% - 2rem));
+  margin: 0 auto;
   text-align: center;
-  padding: 1.25rem 0 2rem;
-}
-
-.ny-hero-copy.is-glow {
-  text-shadow: 0 0 28px rgba(244, 211, 138, 0.55);
+  padding: 5.5rem 0 3rem;
+  animation: ny-hero-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ny-kicker {
+  font-family: var(--font-manrope), var(--font-dm-sans), sans-serif;
   font-size: 0.72rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: rgba(255, 232, 180, 0.78);
-}
-
-.ny-eyebrow {
-  margin-top: 0.55rem;
-  font-size: clamp(0.95rem, 2vw, 1.15rem);
-  color: rgba(255, 244, 220, 0.92);
-}
-
-.ny-sub {
-  margin-top: 0.2rem;
-  font-size: 0.95rem;
-  color: rgba(255, 220, 160, 0.85);
+  color: rgba(255, 236, 250, 0.82);
 }
 
 .ny-title {
   margin-top: 0.85rem;
-  font-family: var(--font-syne), sans-serif;
-  font-size: clamp(2.4rem, 7vw, 4.6rem);
-  line-height: 0.95;
-  letter-spacing: -0.03em;
+  line-height: 0.88;
 }
 
-.ny-year {
+.ny-celebrate {
   display: block;
-  background: linear-gradient(180deg, #fff6d2, #f0c14b 55%, #c9a227);
+  font-family: var(--font-manrope), var(--font-dm-sans), sans-serif;
+  font-size: clamp(3.1rem, 12vw, 7.2rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  color: #ffffff;
+  text-shadow: 0 0 48px rgba(255, 255, 255, 0.28), 0 12px 40px rgba(88, 28, 135, 0.45);
+}
+
+.ny-again {
+  display: block;
+  margin-top: 0.12em;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: clamp(2.4rem, 8vw, 4.8rem);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  background: linear-gradient(100deg, #ffd7c2 0%, #f9a8d4 42%, #c4b5fd 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  filter: drop-shadow(0 0 22px rgba(249, 168, 212, 0.35));
 }
 
 .ny-message {
-  margin: 1rem auto 0;
+  margin: 1.15rem auto 0;
   max-width: 34rem;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: rgba(255, 244, 220, 0.9);
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: rgba(255, 244, 250, 0.86);
 }
 
 .ny-actions {
@@ -2030,6 +2045,213 @@ html[data-festival="new-year-2027"] header > div > .container-site {
   background: transparent;
   color: rgba(255, 232, 180, 0.72);
   font-size: 0.72rem;
+}
+
+@keyframes ny-hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ny-float-a {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-6deg); }
+  50% { transform: translate3d(12px, -28px, 0) rotate(8deg); }
+}
+
+@keyframes ny-float-b {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(4deg); }
+  50% { transform: translate3d(-16px, -36px, 0) rotate(-10deg); }
+}
+
+@keyframes ny-twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.7); }
+  50% { opacity: 0.9; transform: scale(1); }
+}
+
+@keyframes ny-confetti-fall {
+  0% { transform: translate3d(0, -8vh, 0) rotate(0deg); opacity: 0; }
+  12% { opacity: 0.85; }
+  100% { transform: translate3d(18px, 108vh, 0) rotate(220deg); opacity: 0; }
+}
+
+@keyframes ny-ribbon-sway {
+  0%, 100% { transform: rotate(-18deg); }
+  50% { transform: rotate(14deg); }
+}
+
+@keyframes ny-orb-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(24px, -20px, 0) scale(1.08); }
+}
+
+.ny-celebrate-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ny-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(18px);
+  opacity: 0.45;
+  animation: ny-orb-drift 16s ease-in-out infinite;
+}
+
+.ny-orb-1 {
+  left: 8%;
+  top: 18%;
+  width: 9rem;
+  height: 9rem;
+  background: #a855f7;
+}
+
+.ny-orb-2 {
+  right: 10%;
+  top: 28%;
+  width: 7rem;
+  height: 7rem;
+  background: #f472b6;
+  animation-duration: 20s;
+}
+
+.ny-orb-3 {
+  left: 40%;
+  bottom: 8%;
+  width: 11rem;
+  height: 11rem;
+  background: #6366f1;
+  animation-duration: 22s;
+}
+
+.ny-star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #fde68a;
+  border-radius: 999px;
+  box-shadow: 0 0 10px #fde68a;
+  animation: ny-twinkle 3.4s ease-in-out infinite;
+}
+
+.ny-star-a { left: 12%; top: 22%; }
+.ny-star-b { left: 28%; top: 14%; animation-delay: 0.6s; }
+.ny-star-c { right: 18%; top: 20%; animation-delay: 1.1s; }
+.ny-star-d { right: 32%; top: 12%; animation-delay: 1.8s; }
+.ny-star-e { left: 62%; top: 18%; animation-delay: 0.3s; }
+.ny-star-f { left: 78%; bottom: 22%; animation-delay: 2s; }
+
+.ny-balloon {
+  position: absolute;
+  width: 1.35rem;
+  height: 1.7rem;
+  border-radius: 50% 50% 50% 50% / 58% 58% 42% 42%;
+  animation: ny-float-a 11s ease-in-out infinite;
+}
+
+.ny-balloon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: 2.2rem;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.ny-balloon-a {
+  left: 7%;
+  bottom: 18%;
+  background: linear-gradient(#fb7185, #f43f5e);
+}
+
+.ny-balloon-b {
+  right: 9%;
+  bottom: 26%;
+  background: linear-gradient(#c4b5fd, #8b5cf6);
+  animation: ny-float-b 13s ease-in-out infinite;
+}
+
+.ny-balloon-c {
+  left: 18%;
+  bottom: 8%;
+  background: linear-gradient(#fda4af, #fb7185);
+  animation-duration: 15s;
+}
+
+.ny-ribbon {
+  position: absolute;
+  top: -2%;
+  width: 4.5rem;
+  height: 9rem;
+  background: linear-gradient(180deg, rgba(251, 113, 133, 0.55), transparent);
+  clip-path: polygon(40% 0, 100% 0, 70% 100%, 0 100%);
+  opacity: 0.45;
+  animation: ny-ribbon-sway 9s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.ny-ribbon-l { left: 4%; }
+.ny-ribbon-r {
+  right: 6%;
+  background: linear-gradient(180deg, rgba(167, 139, 250, 0.5), transparent);
+  animation-delay: 1.4s;
+}
+
+.ny-popper {
+  position: absolute;
+  bottom: 12%;
+  width: 0.7rem;
+  height: 1.8rem;
+  border-radius: 0.2rem;
+  background: linear-gradient(#fbbf24, #f59e0b);
+  box-shadow: 0 -10px 18px rgba(251, 191, 36, 0.35);
+}
+
+.ny-popper-l { left: 22%; transform: rotate(-28deg); }
+.ny-popper-r { right: 20%; transform: rotate(24deg); background: linear-gradient(#f472b6, #db2777); }
+
+.ny-confetti {
+  position: absolute;
+  top: -4%;
+  width: 6px;
+  height: 10px;
+  border-radius: 1px;
+  opacity: 0.7;
+  animation: ny-confetti-fall 11s linear infinite;
+}
+
+.ny-confetti-1 { left: 8%; background: #fbbf24; animation-duration: 9s; }
+.ny-confetti-2 { left: 16%; background: #f472b6; animation-delay: 1s; }
+.ny-confetti-3 { left: 24%; background: #a78bfa; animation-duration: 13s; }
+.ny-confetti-4 { left: 38%; background: #34d399; animation-delay: 2.2s; }
+.ny-confetti-5 { left: 48%; background: #fb7185; animation-duration: 10s; }
+.ny-confetti-6 { left: 58%; background: #60a5fa; animation-delay: 0.8s; }
+.ny-confetti-7 { left: 68%; background: #fde68a; animation-duration: 12s; }
+.ny-confetti-8 { left: 76%; background: #c084fc; animation-delay: 1.6s; }
+.ny-confetti-9 { left: 84%; background: #fb923c; animation-duration: 8.5s; }
+.ny-confetti-10 { left: 92%; background: #f9a8d4; animation-delay: 3s; }
+.ny-confetti-11 { left: 32%; background: #facc15; animation-delay: 4s; animation-duration: 14s; }
+.ny-confetti-12 { left: 72%; background: #818cf8; animation-delay: 2.8s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ny-hero-copy,
+  .ny-orb,
+  .ny-star,
+  .ny-balloon,
+  .ny-ribbon,
+  .ny-confetti {
+    animation: none;
+  }
+  .ny-celebrate-layer {
+    display: none;
+  }
 }
 
 .ny-dialog {

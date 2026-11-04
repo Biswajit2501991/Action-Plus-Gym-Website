@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { DM_Sans, Syne } from "next/font/google";
+import { DM_Sans, Manrope, Playfair_Display, Syne } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -14,6 +14,19 @@ const syne = Syne({
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
+  display: "swap",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
   display: "swap",
 });
 
@@ -55,7 +68,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-IN"
-      className={`${syne.variable} ${dmSans.variable}`}
+      className={`${syne.variable} ${dmSans.variable} ${manrope.variable} ${playfair.variable}`}
       suppressHydrationWarning
     >
       <body className="antialiased">

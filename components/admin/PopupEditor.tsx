@@ -54,14 +54,14 @@ export function PopupEditor({ popup }: { popup: PopupOffer | null }) {
     >
       <AdminPageHeader
         title="Popup Offer"
-        description="Offer shown when a visitor taps LET'S CELEBRATE on the homepage. It no longer opens by itself."
+        description="Title and Message below are what visitors see after they tap LET'S CELEBRATE. Turn the offer on, clear expiry if it has passed, then Save. It does not open by itself."
       />
 
       <div className="grid max-w-3xl gap-3 rounded-2xl border border-white/10 bg-charcoal/40 p-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <Toggle
-            label="Show popup on website"
-            hint="When off, visitors will not see this offer"
+            label="Show this offer on LET'S CELEBRATE"
+            hint="When off, the homepage shows a generic celebrate note instead of this offer"
             checked={form.enabled}
             onChange={(next) => set("enabled", next)}
           />

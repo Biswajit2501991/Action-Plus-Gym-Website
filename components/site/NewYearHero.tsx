@@ -23,18 +23,16 @@ export function NewYearHero({ popup = null }: { popup?: PopupType | null }) {
         sizes="100vw"
       />
       <div className="ny-hero-shade" />
+      <div className="ny-hero-glow" />
       <div className="ny-hero-copy">
-        <p className="ny-kicker">Action Plus Gym &amp; Fitness Club</p>
-        <p className="ny-eyebrow">A new chapter is calling — Action Plus Gym</p>
-        <p className="ny-sub">Here&apos;s to a stronger you</p>
+        <p className="ny-kicker">New Year ✳ New Goals ✳ New Energy</p>
         <h1 className="ny-title">
-          Happy New Year
-          <span className="ny-year">2027</span>
+          <span className="ny-celebrate">CELEBRATE</span>
+          <span className="ny-again">Again.</span>
         </h1>
         <p className="ny-message">
-          More strength. More smiles. More reasons to celebrate.
-          <br />
-          Let&apos;s make every rep, every day, and every victory count.
+          Fresh year. Fearless energy. A thousand new reasons to show up for yourself. Let&apos;s
+          make 2027 unforgettable.
         </p>
         <div className="ny-actions">
           <CelebrateOfferButton
@@ -56,7 +54,7 @@ export function NewYearHero({ popup = null }: { popup?: PopupType | null }) {
             setDialog("goals");
           }}
         >
-          ✳ New Year · New Goals · New Energy
+          ✳ Your 2027 goals
         </button>
         <div className="ny-controls">
           <button type="button" className="ny-mini" onClick={() => launchNyFireworks("short")}>
@@ -82,17 +80,15 @@ export function NewYearHero({ popup = null }: { popup?: PopupType | null }) {
             <button type="button" className="ny-dialog-close" onClick={() => setDialog(null)} aria-label="Close">
               ×
             </button>
-            <h2 id="ny-goals-title">💪 Your strongest year starts now!</h2>
+            <h2 id="ny-goals-title">Your strongest year starts now</h2>
             <p>
               2027 is your year to dream bigger, push harder, stay consistent, and become stronger
               every day.
             </p>
             <p>New Year. New Goals. New Energy.</p>
-            <p>Every rep matters. Every effort counts. Every victory deserves celebration.</p>
-            <p>Let&apos;s make 2027 legendary together!</p>
-            <p>— Action Plus Gym &amp; Fitness Club ✨</p>
+            <p>— Action Plus Gym &amp; Fitness Club</p>
             <button type="button" className="ny-btn ny-btn-gold" onClick={() => setDialog(null)}>
-              Let&apos;s go! 💪
+              Let&apos;s go
             </button>
           </div>
         </div>
