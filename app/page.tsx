@@ -110,15 +110,19 @@ export default async function HomePage({
       {newYearLive ? <NewYearStory /> : null}
       {holiLive ? <HoliStory /> : null}
       {sections.stats !== false ? <Stats stats={content.stats} /> : null}
-      {sections.services !== false ? (
+      {sections.transformations === true && content.transformations.length > 0 ? (
+        <Transformations items={content.transformations} />
+      ) : sections.services !== false ? (
         <Services services={content.services} />
       ) : null}
       {sections.pricing !== false ? <Pricing plans={content.pricing} /> : null}
       {sections.trainers !== false ? (
         <Trainers trainers={content.trainers} />
       ) : null}
-      {sections.transformations === true && content.transformations.length > 0 ? (
-        <Transformations items={content.transformations} />
+      {sections.transformations === true &&
+      content.transformations.length > 0 &&
+      sections.services !== false ? (
+        <Services services={content.services} />
       ) : null}
       {sections.gallery !== false ? (
         <Gallery images={content.gallery} />

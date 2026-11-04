@@ -88,7 +88,7 @@ export function Navbar({
   }, [open, scrolled, returning, returningMessage]);
 
   const overHero = darkHero && !scrolled;
-  const navLinks = [...links.slice(0, 3), ...extraLinks, ...links.slice(3)];
+  const navLinks = [...extraLinks, ...links];
 
   return (
     <header
