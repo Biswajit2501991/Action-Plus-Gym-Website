@@ -448,13 +448,16 @@ export function PaymentsPanel({
   onBack,
   memberUuid = "",
   liveTick: _liveTick = 0,
+  initialReceiptId = null,
 }: {
   onBack: () => void;
   memberUuid?: string;
   /** Kept for call-site compat; Payments uses cache + soft TTL instead of liveTick polling. */
   liveTick?: number;
+  /** Opens this saved payment's receipt. Does not create or change a payment. */
+  initialReceiptId?: string | null;
 }) {
-  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(initialReceiptId);
   const [items, setItems] = useState<Payment[]>(() => {
     const cached = readPaymentsCache<Payment[]>(memberUuid);
     return Array.isArray(cached) ? cached : [];
@@ -493,6 +496,10 @@ export function PaymentsPanel({
     },
     [applyPayments, memberUuid],
   );
+
+  useEffect(() => {
+    if (initialReceiptId) setReceiptId(initialReceiptId);
+  }, [initialReceiptId]);
 
   useEffect(() => {
     let cancelled = false;

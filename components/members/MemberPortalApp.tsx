@@ -41,6 +41,7 @@ import {
   MemberPortalInboxBell,
   MemberPortalInboxScreen,
 } from "@/components/members/MemberPortalInboxBell";
+import { paymentIdFromPortalUrl } from "@/lib/member-portal/payment-received-link";
 import { detectExistingBillingPushSubscription } from "@/lib/member-portal/web-push-support";
 import {
   deriveBillingAlert,
@@ -223,9 +224,25 @@ function clearWelcomeShownThisSession() {
 export function MemberPortalApp() {
   const [step, setStep] = useState<Step>("mobile");
   const [inboxNonce, setInboxNonce] = useState(0);
+  const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
   const openInbox = useCallback(() => {
     setInboxNonce((n) => n + 1);
     setStep("inbox");
+  }, []);
+  const openPaymentReceipt = useCallback((paymentId: string) => {
+    const id = paymentId.trim();
+    if (!id) return;
+    setReceiptPaymentId(id);
+    setStep("payments");
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("payment")) return;
+      url.searchParams.delete("payment");
+      const next = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState({}, "", next);
+    } catch {
+      /* ignore */
+    }
   }, []);
   const [mobile, setMobile] = useState("");
   const [pin, setPin] = useState("");
@@ -239,6 +256,12 @@ export function MemberPortalApp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [member, setMember] = useState<MemberMe | null>(null);
+  useEffect(() => {
+    if (!member?.memberUuid) return;
+    const id = paymentIdFromPortalUrl(window.location.href);
+    if (!id) return;
+    openPaymentReceipt(id);
+  }, [member?.memberUuid, openPaymentReceipt]);
   const [card, setCard] = useState<QrCard | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [booting, setBooting] = useState(true);
@@ -1736,7 +1759,11 @@ export function MemberPortalApp() {
               <p className="mt-1 text-sm text-muted">{member.memberCode}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <MemberPortalInboxBell memberUuid={member.memberUuid} onOpen={openInbox} />
+              <MemberPortalInboxBell
+                memberUuid={member.memberUuid}
+                onOpen={openInbox}
+                onOpenPayment={openPaymentReceipt}
+              />
               <button
                 type="button"
                 onClick={logout}
@@ -2173,9 +2200,13 @@ export function MemberPortalApp() {
 
           {step === "payments" ? (
             <PaymentsPanel
-              onBack={() => setStep("home")}
+              onBack={() => {
+                setReceiptPaymentId(null);
+                setStep("home");
+              }}
               memberUuid={member.memberUuid}
               liveTick={liveTick}
+              initialReceiptId={receiptPaymentId}
             />
           ) : null}
           {step === "attendance" ? (
