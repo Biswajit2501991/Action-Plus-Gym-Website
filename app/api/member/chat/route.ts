@@ -15,6 +15,33 @@ async function getRetentionDays(client: any, gymId: string) {
   return 7;
 }
 
+/** Tell Gym Manager after the member message is saved. A failed alert does not undo the message. */
+function notifyStaffOfMemberChat(input: {
+  messageId: string;
+  memberName: string | null | undefined;
+  branchId: string | null | undefined;
+}) {
+  const messageId = String(input.messageId || "").trim();
+  if (!messageId) return;
+  const secret = String(process.env.MEMBER_PORTAL_CRON_SECRET || "").trim();
+  const base = String(process.env.GYM_MANAGER_API_URL || "https://app.gymactionplus.com")
+    .trim()
+    .replace(/\/+$/, "");
+  if (!secret || secret.length < 16 || !base) return;
+  void fetch(`${base}/api/internal/staff-push/portal-chat`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messageId,
+      memberName: String(input.memberName || "").trim(),
+      branchId: String(input.branchId || "").trim(),
+    }),
+  }).catch(() => undefined);
+}
+
 /**
  * One continuous chat per member: reuse the latest thread (any status).
  * Only reopen answered → open when the member sends (POST), not on read (GET),
@@ -205,6 +232,12 @@ export async function POST(req: Request) {
   await auditLog({
     memberUuid: session.member.member_uuid,
     eventType: "chat_message_sent",
+  });
+
+  void notifyStaffOfMemberChat({
+    messageId: String(data?.id || ""),
+    memberName: session.member.full_name,
+    branchId: session.member.assigned_gym_code_id,
   });
 
   return NextResponse.json({ ok: true, message: data });
