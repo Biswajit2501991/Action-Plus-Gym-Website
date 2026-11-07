@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { PortalBackButton } from "@/components/members/PortalBackButton";
 import { peekInboxCache, readInboxCache, writeInboxCache } from "@/lib/member-portal/panel-cache";
+import {
+  paymentIdFromPortalUrl,
+  paymentReceivedPortalPath,
+} from "@/lib/member-portal/payment-received-link";
 
 export type PortalInboxItem = {
   id: string;
@@ -130,9 +134,11 @@ function clearInboxQueryParam() {
 export function MemberPortalInboxBell({
   memberUuid,
   onOpen,
+  onOpenPayment,
 }: {
   memberUuid: string;
   onOpen: () => void;
+  onOpenPayment?: (paymentId: string) => void;
 }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -178,8 +184,13 @@ export function MemberPortalInboxBell({
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string } | null;
+      const data = event.data as { type?: string; url?: string } | null;
       if (!data || data.type !== "apg-open-inbox") return;
+      const paymentId = paymentIdFromPortalUrl(data.url);
+      if (paymentId && onOpenPayment) {
+        onOpenPayment(paymentId);
+        return;
+      }
       clearInboxQueryParam();
       onOpen();
     };
@@ -187,7 +198,7 @@ export function MemberPortalInboxBell({
     return () => {
       navigator.serviceWorker?.removeEventListener?.("message", onMessage);
     };
-  }, [onOpen]);
+  }, [onOpen, onOpenPayment]);
 
   const badgeLabel =
     unreadCount > 9 ? "9+" : unreadCount > 0 ? String(unreadCount) : "";
@@ -309,6 +320,19 @@ export function MemberPortalInboxScreen({
         <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/85">
           {selected.body}
         </p>
+        {paymentIdFromPortalUrl(selected.url) ? (
+          <button
+            type="button"
+            onClick={() => {
+              const id = paymentIdFromPortalUrl(selected.url);
+              if (!id) return;
+              window.location.assign(paymentReceivedPortalPath(id));
+            }}
+            className="mt-5 w-full rounded-full border border-white/15 px-5 py-3 text-sm text-white"
+          >
+            View receipt
+          </button>
+        ) : null}
         <p className="mt-6 text-xs text-muted">Messages auto-remove after 7 days.</p>
       </section>
     );
