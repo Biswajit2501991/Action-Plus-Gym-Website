@@ -22,6 +22,7 @@ import {
   Smartphone,
   User,
 } from "lucide-react";
+import { SpinOfferHost } from "@/components/spin/SpinOfferHost";
 import {
   AttendancePanel,
   BiometricPanel,
@@ -2344,6 +2345,7 @@ export function MemberPortalApp() {
         </div>
       ) : null}
 
+      {member && !welcomeKind ? <SpinOfferHost surface="member_portal" /> : null}
       <PushEnableReminderModal
         open={Boolean(pushReminderOpen && member && !welcomeKind)}
         onClose={() => {
