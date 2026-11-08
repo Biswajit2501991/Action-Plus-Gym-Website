@@ -6,6 +6,7 @@ import { HomeSection } from "@/components/site/HomeSection";
 import { Footer } from "@/components/site/Footer";
 import { FloatingActions } from "@/components/site/FloatingActions";
 import { ClientErrorBoundary } from "@/components/site/ClientErrorBoundary";
+import { SpinOfferHost } from "@/components/spin/SpinOfferHost";
 import { FestivalShell } from "@/components/site/FestivalShell";
 import { NewYearHero } from "@/components/site/NewYearHero";
 import { NewYearStory } from "@/components/site/NewYearStory";
@@ -113,6 +114,7 @@ export default async function HomePage({
       ) : null}
       <ClientErrorBoundary>
         <FloatingActions phone={settings.phone} whatsapp={settings.whatsapp} />
+        <SpinOfferHost surface="website" />
       </ClientErrorBoundary>
     </FestivalShell>
   );
